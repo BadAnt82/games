@@ -217,7 +217,8 @@ export function initBreakout() {
   }
 
   function postHighest() {
-    void fetch("/api/breakout-high-scores", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: "Anonymous pilot", score: state.progress.highestLevel }) }).catch(() => undefined);
+    const name = localStorage.getItem("badant-games-player-name")?.trim() || "Player 1";
+    void fetch("/api/breakout-high-scores", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, score: state.progress.highestLevel }) }).catch(() => undefined);
   }
 
   function showCheckpoint() {

@@ -5579,6 +5579,17 @@ function askForRecordName(finalScore: number, recordLabels: string[], unitLabel 
   });
 }
 
+function promptForPlayerName() {
+  const savedName = localStorage.getItem(playerNameKey)?.trim() || "";
+  recordMessage.textContent = savedName
+    ? `Use “${savedName}” as your player name, or change it below.`
+    : "Enter your player name. We’ll use it for scores and multiplayer on this device.";
+  recordNameInput.value = savedName;
+  recordNameInput.placeholder = "Player 1";
+  recordDialog.hidden = false;
+  recordNameInput.focus();
+}
+
 async function syncFinalScore(finalScore: number) {
   if (planeScoreSyncActive) {
     return;
@@ -7311,6 +7322,7 @@ recordForm.addEventListener("submit", (event) => {
   const name = recordNameInput.value.trim() || "Player 1";
   localStorage.setItem(playerNameKey, name);
   setText(bridgePlayerNameEls, name);
+  window.dispatchEvent(new CustomEvent("badant-player-name-changed", { detail: { name } }));
   recordDialog.hidden = true;
   pendingRecordName?.(name);
   pendingRecordName = null;
@@ -7336,4 +7348,5 @@ void loadBridgeJackpot();
 resize();
 updateFullscreenButton();
 reset("platform");
+promptForPlayerName();
 requestAnimationFrame(loop);
