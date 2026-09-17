@@ -767,6 +767,11 @@ const pixelShieldDamage = 10;
 const pixelShieldRadius = 19;
 const pixelCannonLength = pixelShieldRadius;
 const pixelCornerSpawnInset = pixelShieldRadius * 0.42;
+// Turrets on the perimeter sweep a 180° semicircle centred on the board-facing
+// normal. A turret in the board centre has no edge to constrain it, so it can
+// rotate through the full 360°.
+const pixelEdgeTurretArc = Math.PI / 2;
+const pixelCenterTurretArc = Math.PI;
 const pixelRespawnShieldClearanceCells = 2;
 const pixelRespawnWindow = 10;
 const pixelRunnerLanes: PixelLane[] = ["left", "center", "right"];
@@ -1230,12 +1235,11 @@ function applyPixelSnapshot(snapshot: PixelWarsSnapshot) {
     const id = ownerMap.get(remoteTurret.id) ?? "neutral";
     const x = layout.x + remoteTurret.xRatio * layout.boardW;
     const y = layout.y + remoteTurret.yRatio * layout.boardH;
-    const homeAngle = Math.atan2(layout.y + layout.boardH / 2 - y, layout.x + layout.boardW / 2 - x);
-    return {
+    const turret: PixelTurret = {
       aiTargetTimer: 0,
       angle: remoteTurret.angle,
       autoRotate: remoteTurret.autoRotate ?? false,
-      arc: remoteTurret.isBot ? Math.PI * 0.44 : Math.PI * 0.85,
+      arc: pixelEdgeTurretArc,
       bombShots: remoteTurret.bombShots,
       bouncePower: remoteTurret.bouncePower ?? 0,
       color: remoteTurret.color,
@@ -1243,7 +1247,7 @@ function applyPixelSnapshot(snapshot: PixelWarsSnapshot) {
       fireCooldown: 0,
       fireInterval: pixelBaseFireInterval,
       fireSpeedBoosts: remoteTurret.fireSpeedBoosts,
-      homeAngle,
+      homeAngle: 0,
       id,
       isPlayer: remoteTurret.id === pixelClientId,
       respawnDelay: 0,
@@ -1257,6 +1261,10 @@ function applyPixelSnapshot(snapshot: PixelWarsSnapshot) {
       x,
       y,
     };
+    // Recompute the local orientation from the authoritative spawn ratio so
+    // edge and centre turrets use the same rotation rules in multiplayer.
+    setPixelTurretPosition(turret, snapshot.turrets.indexOf(remoteTurret));
+    return turret;
   });
   pixelShots = snapshot.shots.map((shot) => ({
     bouncesRemaining: 0,
@@ -1703,7 +1711,7 @@ function setPixelTurretPosition(turret: PixelTurret, index: number) {
   turret.y = anchor.y;
   const centered = Math.abs(turret.x - centerX) < 1 && Math.abs(turret.y - centerY) < 1;
   turret.homeAngle = centered ? -Math.PI / 2 : Math.atan2(centerY - turret.y, centerX - turret.x);
-  turret.arc = centered ? Math.PI : turret.isPlayer ? Math.PI / 2 : Math.PI * 0.42;
+  turret.arc = centered ? pixelCenterTurretArc : pixelEdgeTurretArc;
   turret.angle = clampPixelTurretAngle(turret, Number.isFinite(turret.angle) ? turret.angle : turret.homeAngle);
 }
 
@@ -1792,7 +1800,7 @@ function createPixelTurret(id: PixelOwner, isPlayer: boolean): PixelTurret {
     autoRotate: true,
     bombShots: 0,
     bouncePower: 0,
-    arc: isPlayer ? Math.PI * 0.85 : Math.PI * 0.44,
+    arc: pixelEdgeTurretArc,
     color,
     eliminated: false,
     fireCooldown: Math.random() * pixelBaseFireInterval,
@@ -1874,6 +1882,10 @@ function pixelPlayerTurretCount() {
   return pixelTurrets.filter((turret) => turret.isPlayer && !turret.eliminated).length;
 }
 
+function playerPixelTurretSpeedBoosts() {
+  return Math.max(0, ...pixelTurrets.filter((turret) => turret.isPlayer).map((turret) => turret.fireSpeedBoosts));
+}
+
 function addPixelPlayerTurret() {
   if (pixelPlayerTurretCount() >= pixelMaxTurretsPerOwner) {
     pixelRunnerMessage = "Turrets maxed";
@@ -1881,7 +1893,9 @@ function addPixelPlayerTurret() {
     return false;
   }
   const turret = createPixelTurret("player", true);
-  turret.bouncePower = Math.max(0, ...pixelTurrets.filter((ownedTurret) => ownedTurret.isPlayer).map((ownedTurret) => ownedTurret.bouncePower));
+  const ownedTurrets = pixelTurrets.filter((ownedTurret) => ownedTurret.isPlayer);
+  turret.fireSpeedBoosts = playerPixelTurretSpeedBoosts();
+  turret.bouncePower = Math.max(0, ...ownedTurrets.map((ownedTurret) => ownedTurret.bouncePower));
   turret.respawnPending = true;
   turret.shieldHealth = 0;
   turret.fireCooldown = pixelBaseFireInterval;
@@ -2162,6 +2176,7 @@ function pixelSpinAllReels(freeSpin = false) {
 
 function pixelApplySlotPrize(prize: PixelPrize) {
   const playerTurrets = pixelTurrets.filter((turret) => turret.isPlayer && !turret.eliminated);
+  const allPlayerTurrets = pixelTurrets.filter((turret) => turret.isPlayer);
   if (playerTurrets.length === 0) {
     return;
   }
@@ -2181,10 +2196,13 @@ function pixelApplySlotPrize(prize: PixelPrize) {
     return;
   }
   if (prize === "clock") {
-    playerTurrets.forEach((turret) => {
-      turret.fireSpeedBoosts += 1;
+    // Fire speed is a player-wide stat. Keep every owned turret in sync so a
+    // newly added or respawned turret always fires at the same rate.
+    const nextBoost = playerPixelTurretSpeedBoosts() + 1;
+    allPlayerTurrets.forEach((turret) => {
+      turret.fireSpeedBoosts = nextBoost;
     });
-    pixelRunnerMessage = `Speed +${Math.max(...playerTurrets.map((turret) => turret.fireSpeedBoosts))}`;
+    pixelRunnerMessage = `Speed +${nextBoost}`;
   } else if (prize === "bomb") {
     playerTurrets.forEach((turret) => {
       turret.bombShots += pixelBombShotAward;

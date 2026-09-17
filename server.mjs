@@ -79,6 +79,10 @@ const pixelShotLife = 2.2;
 const pixelShieldMaxHealth = 100;
 const pixelShieldDamage = 10;
 const pixelShieldRadiusCells = 2.15;
+// Perimeter turrets sweep a 180° semicircle around the board-facing normal;
+// a turret placed in the centre has a full 360° rotation range.
+const pixelEdgeTurretArc = Math.PI / 2;
+const pixelCenterTurretArc = Math.PI;
 const pixelRespawnShieldClearanceCells = 2;
 const pixelRespawnSeconds = 10;
 const pixelBombShotAward = 4;
@@ -738,6 +742,11 @@ function pixelHomeAngleForPoint(x, y) {
   return Math.atan2(pixelBoard.rows / 2 - y, pixelBoard.columns / 2 - x);
 }
 
+function pixelTurretArcForPoint(x, y) {
+  const centered = Math.abs(x - pixelBoard.columns / 2) < 0.001 && Math.abs(y - pixelBoard.rows / 2) < 0.001;
+  return centered ? pixelCenterTurretArc : pixelEdgeTurretArc;
+}
+
 function createPixelTurret(id, index, isBot = false, options = {}) {
   const anchor = pixelSpawnAnchors()[index % pixelMaxPlayers];
   const x = anchor.xRatio * pixelBoard.columns;
@@ -746,7 +755,7 @@ function createPixelTurret(id, index, isBot = false, options = {}) {
   return {
     angle: homeAngle,
     autoRotate: true,
-    arc: isBot ? Math.PI * 0.44 : Math.PI * 0.85,
+    arc: pixelTurretArcForPoint(x, y),
     bombShots: 0,
     bouncePower: 0,
     color: pixelOwnerColors[id] || "#ffffff",
@@ -854,13 +863,16 @@ function addPixelOwnerTurret(match, owner) {
   if (ownerTurrets.length >= pixelMaxTurretsPerOwner) {
     return null;
   }
-  const referenceTurret = ownerTurrets[0] || match.turrets.find((turret) => turret.id === owner);
+  const allOwnerTurrets = match.turrets.filter((turret) => turret.id === owner);
+  const referenceTurret = ownerTurrets[0] || allOwnerTurrets[0];
   if (!referenceTurret) {
     return null;
   }
   const turret = createPixelTurret(owner, match.turrets.length, referenceTurret.isBot, { primary: false });
   turret.color = referenceTurret.color;
-  turret.fireSpeedBoosts = Math.max(0, ...ownerTurrets.map((ownedTurret) => ownedTurret.fireSpeedBoosts));
+  // Fire speed is a player-wide stat. Include eliminated turrets so upgrades
+  // are retained and every replacement turret inherits the same rate.
+  turret.fireSpeedBoosts = Math.max(0, ...allOwnerTurrets.map((ownedTurret) => ownedTurret.fireSpeedBoosts));
   turret.bouncePower = Math.max(0, ...ownerTurrets.map((ownedTurret) => ownedTurret.bouncePower));
   turret.respawnPending = true;
   turret.shieldHealth = 0;
@@ -1021,6 +1033,7 @@ function queuePixelRespawn(match, turret, xRatio, yRatio) {
   turret.x = nextX;
   turret.y = nextY;
   turret.homeAngle = pixelHomeAngleForPoint(turret.x, turret.y);
+  turret.arc = pixelTurretArcForPoint(turret.x, turret.y);
   turret.angle = clampPixelAngle(turret, turret.angle);
   turret.respawnPending = false;
   turret.respawnTimer = pixelRespawnSeconds;
@@ -1972,8 +1985,10 @@ pixelServer.on("connection", (socket) => {
 
     if (message.type === "pixel-prize") {
       if (message.prize === "clock") {
-        pixelOwnerTurrets(match, turret.id).forEach((ownedTurret) => {
-          ownedTurret.fireSpeedBoosts += 1;
+        const ownerTurrets = match.turrets.filter((ownedTurret) => ownedTurret.id === turret.id);
+        const nextBoost = Math.max(0, ...ownerTurrets.map((ownedTurret) => ownedTurret.fireSpeedBoosts)) + 1;
+        ownerTurrets.forEach((ownedTurret) => {
+          ownedTurret.fireSpeedBoosts = nextBoost;
         });
       } else if (message.prize === "bomb") {
         pixelOwnerTurrets(match, turret.id).forEach((ownedTurret) => {
