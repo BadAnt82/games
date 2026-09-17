@@ -497,6 +497,7 @@ const bridgeMessage = requireElement<HTMLElement>("#bridge-message");
 const crashMessage = requireElement<HTMLElement>("#crash-message");
 const recordDialog = requireElement<HTMLElement>("#record-dialog");
 const recordForm = requireElement<HTMLFormElement>(".record-card");
+const recordTitle = requireElement<HTMLElement>("#record-title");
 const recordMessage = requireElement<HTMLElement>("#record-message");
 const recordNameInput = requireElement<HTMLInputElement>("#record-name");
 const bridgePlayerNameEls = Array.from(document.querySelectorAll<HTMLElement>("[data-bridge-player-name]"));
@@ -5571,6 +5572,7 @@ function askForRecordName(finalScore: number, recordLabels: string[], unitLabel 
     return Promise.resolve(savedName);
   }
   recordMessage.textContent = `You set ${recordLabels.join(" and ")} with ${formatScore(finalScore)} ${unitLabel}.`;
+  recordTitle.textContent = "Congratulations!";
   recordNameInput.value = "Player 1";
   recordDialog.hidden = false;
   recordNameInput.focus();
@@ -5587,6 +5589,7 @@ function promptForPlayerName() {
     : "Enter your player name. We’ll use it for scores and multiplayer on this device.";
   recordNameInput.value = savedName;
   recordNameInput.placeholder = "Player 1";
+  recordTitle.textContent = "Choose your player name";
   recordDialog.hidden = false;
   recordNameInput.focus();
 }
