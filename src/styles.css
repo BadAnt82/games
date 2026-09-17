@@ -1525,6 +1525,18 @@ body.fullscreen-fallback-active {
     border-radius: 0;
   }
 
+  /* Keep the picker full-height on phones so every game tile is tappable. */
+  .game-frame:has(.overlay.is-platform:not([hidden])) {
+    width: 100vw;
+    height: 100dvh;
+    max-height: none;
+    aspect-ratio: auto;
+  }
+
+  .game-frame:has(.overlay.is-platform:not([hidden])) .overlay {
+    overflow-y: auto;
+  }
+
   .game-frame:fullscreen,
   .game-frame:-webkit-full-screen,
   .game-frame.fullscreen-fallback {
