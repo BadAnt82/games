@@ -1286,7 +1286,10 @@ function applyPixelSnapshot(snapshot: PixelWarsSnapshot) {
   const selfPixels = snapshot.cells.reduce((total, owner) => total + (owner === pixelClientId ? 1 : 0), 0);
   if (selfTurrets.length > 0 && !selfHasTurret && selfPixels <= 0) {
     pixelMatchOver = true;
-    pixelMatchMessage = "You were eliminated";
+    pixelMatchMessage = "Sorry, You Lost!";
+  } else if (selfPixels >= snapshot.cells.length && snapshot.cells.length > 0) {
+    pixelMatchOver = true;
+    pixelMatchMessage = "Congratulations You Won!";
   }
 }
 
@@ -2073,13 +2076,13 @@ function checkPixelWinCondition() {
   const playerHasTurret = pixelTurrets.some((turret) => turret.isPlayer && !turret.eliminated);
   if (!playerHasTurret && pixelOwnedCellCount("player") <= 0) {
     pixelMatchOver = true;
-    pixelMatchMessage = "You were eliminated";
+    pixelMatchMessage = "Sorry, You Lost!";
     return;
   }
 
   if (pixelTerritory >= 100) {
     pixelMatchOver = true;
-    pixelMatchMessage = "You claimed the board";
+    pixelMatchMessage = "Congratulations You Won!";
     return;
   }
 }
@@ -2122,12 +2125,15 @@ function pixelRunnerLayout(layout: PixelBoardLayout): PixelRunnerLayout {
   const laneWidth = trackW / 3;
   const spinButtonW = Math.min(150, w * 0.46);
   const buttonY = trackY + trackH + 8;
+  // Keep the runner one perspective square ahead of the old position so an
+  // obstacle remains visible after it passes the player.
+  const forwardSquare = Math.max(18, Math.min(42, trackH / 9));
   return {
     duckButton: { h: buttonSize, w: buttonSize, x: x + w - buttonSize, y: buttonY },
     h: layout.canvasH - panelPadding * 2,
     jumpButton: { h: buttonSize, w: buttonSize, x, y: buttonY },
     laneCenters: [trackX + laneWidth * 0.5, trackX + laneWidth * 1.5, trackX + laneWidth * 2.5],
-    playerY: trackY + trackH - 36,
+    playerY: trackY + trackH - 36 - forwardSquare,
     slotH,
     slotW: w,
     slotX: x,
@@ -4646,7 +4652,7 @@ function drawPixelWars(time: number) {
     ctx.fillText(pixelMatchMessage, layout.x + layout.boardW / 2, layout.y + layout.boardH / 2 - 14);
     ctx.fillStyle = "rgba(217, 248, 255, 0.86)";
     ctx.font = "800 14px Inter, sans-serif";
-    ctx.fillText("Tap the board to restart", layout.x + layout.boardW / 2, layout.y + layout.boardH / 2 + 24);
+    ctx.fillText("Click or tap to return to title screen", layout.x + layout.boardW / 2, layout.y + layout.boardH / 2 + 24);
     ctx.restore();
   }
 
@@ -6975,7 +6981,7 @@ window.addEventListener("keydown", (event) => {
     const playerTurret = activePlayerPixelTurret();
     if (pixelMatchOver && (event.code === "Enter" || event.code === "Space")) {
       event.preventDefault();
-      startPixelWars();
+      showPixelMenu();
       return;
     }
     if (
@@ -7110,7 +7116,7 @@ canvas.addEventListener("pointerdown", (event) => {
     if (pixelMatchOver) {
       event.preventDefault();
       unlockAudio();
-      startPixelWars();
+      showPixelMenu();
       return;
     }
     if (handlePixelRespawnPointer(point.x, point.y)) {
