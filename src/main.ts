@@ -1,0 +1,7339 @@
+import "./styles.css";
+import { initBreakout } from "./breakout";
+import { initCribbage } from "./cribbage";
+
+type GameState =
+  | "platform"
+  | "ready"
+  | "plane-options"
+  | "report-issue"
+  | "running"
+  | "bubble-crash"
+  | "ended"
+  | "snake-menu"
+  | "snake-options"
+  | "snake-running"
+  | "snake-dead"
+  | "bridge-menu"
+  | "bridge-options"
+  | "bridge-running"
+  | "bridge-dead"
+  | "pixel-menu"
+  | "pixel-options"
+  | "pixel-running";
+
+type Obstacle = {
+  x: number;
+  gapY: number;
+  gapHeight: number;
+  scored: boolean;
+  image: HTMLImageElement;
+};
+
+type Bubble = {
+  x: number;
+  y: number;
+  radius: number;
+  speed: number;
+  drift: number;
+  scored: boolean;
+};
+
+type BubblePop = {
+  x: number;
+  y: number;
+  radius: number;
+  age: number;
+  duration: number;
+};
+
+type PopParticle = {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  radius: number;
+  age: number;
+  duration: number;
+};
+
+type SmokePuff = {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  radius: number;
+  age: number;
+  duration: number;
+};
+
+type PlaneDebris = {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  width: number;
+  height: number;
+  rotation: number;
+  spin: number;
+  color: string;
+  age: number;
+  duration: number;
+};
+
+type CrashMotion = "spin" | "flip" | "spiral";
+
+type RollStyle = "forward" | "backward" | "sideways";
+
+type CollisionResult = "none" | "ceiling" | "floor" | "obstacle" | "bubble";
+
+type HighScoreResponse = {
+  todayHighest?: number;
+  todayName?: string;
+  allTimeHighest?: number;
+  allTimeName?: string;
+  todayRecord?: boolean;
+  allTimeRecord?: boolean;
+};
+
+type ScoreLoadOptions = {
+  reconcile?: boolean;
+};
+
+type SnakeDirection = "up" | "down" | "left" | "right";
+
+type SnakePoint = {
+  x: number;
+  y: number;
+};
+
+type SnakeOrb = SnakePoint & {
+  color: string;
+  id: string;
+};
+
+type SnakeProjectile = SnakePoint & {
+  color: string;
+  id: string;
+};
+
+type SnakePlayer = {
+  alive: boolean;
+  bestLength: number;
+  color: string;
+  id: string;
+  orbsCollected: number;
+  score: number;
+  segments: SnakePoint[];
+  shotBank: number;
+};
+
+type SnakeSnapshot = {
+  board: {
+    cellSize: number;
+    height: number;
+    width: number;
+  };
+  maxShotBank?: number;
+  orbs: SnakeOrb[];
+  players: SnakePlayer[];
+  projectiles: SnakeProjectile[];
+  type: "snake-state";
+};
+
+type SnakeWelcome = {
+  board: SnakeSnapshot["board"];
+  id: string;
+  type: "snake-welcome";
+};
+
+type BridgeSide = "left" | "right";
+type BridgeOperation = "+" | "-" | "x" | "/";
+
+type BridgeWheelOutcome = {
+  color?: string;
+  label: string;
+  apply: (points: number) => number;
+  weight: number;
+};
+
+type BridgeHintOutcome = {
+  color?: string;
+  difficultyTierBonus?: number;
+  face?: string;
+  kind: "freebie" | "math";
+  label: string;
+  operation?: BridgeOperation;
+  weight: number;
+};
+
+type BridgeJackpotResponse = {
+  jackpot?: number;
+  odds?: number;
+  seed?: number;
+};
+
+type BridgeJackpotSpinResponse = BridgeJackpotResponse & {
+  award?: number;
+  contributed?: number;
+  hit?: boolean;
+};
+
+type BridgePuzzle = {
+  answers: Record<BridgeSide, number>;
+  correctSide: BridgeSide;
+  operation: BridgeOperation;
+  prompt: string;
+};
+
+type BridgeHint = {
+  kind: "freebie" | "math";
+  pathIndex: number;
+};
+
+type BridgePanelRect = {
+  h: number;
+  pathIndex: number;
+  row: number;
+  side: BridgeSide;
+  w: number;
+  x: number;
+  y: number;
+};
+
+type BridgeAreas = {
+  boardWidth: number;
+  wheelWidth: number;
+  wheelX: number;
+};
+
+type PixelMode = "single" | "multi";
+
+type PixelOwner = "neutral" | "player" | `bot-${number}` | `human-${number}`;
+
+type PixelLane = "left" | "center" | "right";
+
+type PixelPrize = "blank" | "bomb" | "bounce" | "clock" | "turret";
+
+type PixelRunnerAction = "duck" | "jump" | "none";
+
+type PixelTurret = {
+  aiTargetTimer: number;
+  angle: number;
+  autoRotate: boolean;
+  bombShots: number;
+  bouncePower: number;
+  arc: number;
+  color: string;
+  eliminated: boolean;
+  fireCooldown: number;
+  fireSpeedBoosts: number;
+  fireInterval: number;
+  homeAngle: number;
+  id: PixelOwner;
+  isPlayer: boolean;
+  respawnPending: boolean;
+  respawnDelay: number;
+  respawnTimer: number;
+  rotateDirection: number;
+  rotateSpeed: number;
+  shieldHealth: number;
+  spawnXRatio: number | null;
+  spawnYRatio: number | null;
+  x: number;
+  y: number;
+};
+
+type PixelShot = {
+  bouncesRemaining: number;
+  color: string;
+  kind: "bomb" | "normal";
+  lastCell: number;
+  life: number;
+  owner: PixelOwner;
+  vx: number;
+  vy: number;
+  x: number;
+  y: number;
+};
+
+type PixelReel = {
+  finalPrize: PixelPrize;
+  nextPrize: PixelPrize;
+  prize: PixelPrize;
+  spinDuration: number;
+  spinPhase: number;
+  spinTimer: number;
+};
+
+type PixelRunnerPickup = {
+  action: PixelRunnerAction;
+  id: number;
+  kind: "lane" | "special";
+  lane: PixelLane;
+  y: number;
+};
+
+type PixelRunnerObstacle = {
+  id: number;
+  kind: "beam" | "hurdle";
+  lane: PixelLane;
+  y: number;
+};
+
+type PixelBoardLayout = {
+  boardH: number;
+  boardW: number;
+  cellH: number;
+  cellW: number;
+  canvasH: number;
+  canvasW: number;
+  panelX: number;
+  x: number;
+  y: number;
+};
+
+type PixelRect = {
+  h: number;
+  w: number;
+  x: number;
+  y: number;
+};
+
+type PixelRunnerLayout = {
+  duckButton: PixelRect;
+  h: number;
+  jumpButton: PixelRect;
+  laneCenters: number[];
+  playerY: number;
+  slotH: number;
+  slotW: number;
+  slotX: number;
+  slotY: number;
+  spinButton: PixelRect;
+  trackH: number;
+  trackW: number;
+  trackX: number;
+  trackY: number;
+  w: number;
+  x: number;
+  y: number;
+};
+
+type PixelLobby = {
+  aiBots: number;
+  createdAt: string;
+  humanPlayers: number;
+  id: string;
+  playerCount: number;
+  status: "waiting" | "full";
+};
+
+type PixelRemoteTurret = {
+  angle: number;
+  autoRotate?: boolean;
+  bombShots: number;
+  bouncePower?: number;
+  color: string;
+  eliminated: boolean;
+  fireSpeedBoosts: number;
+  id: string;
+  isBot: boolean;
+  respawnPending: boolean;
+  respawnTimer: number;
+  shieldHealth: number;
+  xRatio: number;
+  yRatio: number;
+};
+
+type PixelRemoteShot = {
+  color: string;
+  id: string;
+  kind: PixelShot["kind"];
+  owner: string;
+  xRatio: number;
+  yRatio: number;
+};
+
+type PixelWarsSnapshot = {
+  board: {
+    columns: number;
+    rows: number;
+  };
+  cells: string[];
+  lobby: PixelLobby;
+  shots: PixelRemoteShot[];
+  turrets: PixelRemoteTurret[];
+  type: "pixel-wars-state";
+};
+
+type PixelWarsWelcome = {
+  board: PixelWarsSnapshot["board"];
+  id: string;
+  lobby: PixelLobby;
+  type: "pixel-wars-welcome";
+};
+
+function requireElement<T extends Element>(selector: string) {
+  const element = document.querySelector<T>(selector);
+  if (!element) {
+    throw new Error(`Missing required element: ${selector}`);
+  }
+  return element;
+}
+
+function requireCanvasContext(element: HTMLCanvasElement) {
+  const context = element.getContext("2d");
+  if (!context) {
+    throw new Error("Canvas rendering is not available.");
+  }
+  return context;
+}
+
+const canvas = requireElement<HTMLCanvasElement>("#game");
+const scoreEl = requireElement<HTMLElement>("#score");
+const scoreLabel = requireElement<HTMLElement>(".score-panel .label");
+const localHighEls = Array.from(document.querySelectorAll<HTMLElement>('[data-score="local"]'));
+const todayHighEls = Array.from(document.querySelectorAll<HTMLElement>('[data-score="today"]'));
+const serverHighEls = Array.from(document.querySelectorAll<HTMLElement>('[data-score="server"]'));
+const todayNameEls = Array.from(document.querySelectorAll<HTMLElement>('[data-score-name="today"]'));
+const serverNameEls = Array.from(document.querySelectorAll<HTMLElement>('[data-score-name="server"]'));
+const snakeLocalHighEls = Array.from(document.querySelectorAll<HTMLElement>('[data-snake-score="local"]'));
+const snakeTodayHighEls = Array.from(document.querySelectorAll<HTMLElement>('[data-snake-score="today"]'));
+const snakeServerHighEls = Array.from(document.querySelectorAll<HTMLElement>('[data-snake-score="server"]'));
+const snakeTodayNameEls = Array.from(document.querySelectorAll<HTMLElement>('[data-snake-score-name="today"]'));
+const snakeServerNameEls = Array.from(document.querySelectorAll<HTMLElement>('[data-snake-score-name="server"]'));
+const bridgeLocalTileEls = Array.from(document.querySelectorAll<HTMLElement>('[data-bridge-tile-score="local"]'));
+const bridgeTodayTileEls = Array.from(document.querySelectorAll<HTMLElement>('[data-bridge-tile-score="today"]'));
+const bridgeServerTileEls = Array.from(document.querySelectorAll<HTMLElement>('[data-bridge-tile-score="server"]'));
+const bridgeTodayTileNameEls = Array.from(document.querySelectorAll<HTMLElement>('[data-bridge-tile-score-name="today"]'));
+const bridgeServerTileNameEls = Array.from(document.querySelectorAll<HTMLElement>('[data-bridge-tile-score-name="server"]'));
+const bridgeLocalPointEls = Array.from(document.querySelectorAll<HTMLElement>('[data-bridge-point-score="local"]'));
+const bridgeTodayPointEls = Array.from(document.querySelectorAll<HTMLElement>('[data-bridge-point-score="today"]'));
+const bridgeServerPointEls = Array.from(document.querySelectorAll<HTMLElement>('[data-bridge-point-score="server"]'));
+const bridgeTodayPointNameEls = Array.from(document.querySelectorAll<HTMLElement>('[data-bridge-point-score-name="today"]'));
+const bridgeServerPointNameEls = Array.from(document.querySelectorAll<HTMLElement>('[data-bridge-point-score-name="server"]'));
+const scorePanel = requireElement<HTMLElement>(".score-panel");
+const restartButton = requireElement<HTMLButtonElement>("#restart");
+const startButton = requireElement<HTMLButtonElement>("#start");
+const planeOptionsButton = requireElement<HTMLButtonElement>("#plane-options");
+const planeMenuBackButton = requireElement<HTMLButtonElement>("#plane-menu-back");
+const planeOptionsBackButton = requireElement<HTMLButtonElement>("#plane-options-back");
+const planeSoundToggle = requireElement<HTMLButtonElement>("#plane-sound-toggle");
+const planeReportIssueButton = requireElement<HTMLButtonElement>("#plane-report-issue");
+const selectPlaneButton = requireElement<HTMLButtonElement>("#select-plane");
+const selectSnakeButton = requireElement<HTMLButtonElement>("#select-snake");
+const selectBridgeButton = requireElement<HTMLButtonElement>("#select-bridge");
+const selectPixelButton = requireElement<HTMLButtonElement>("#select-pixel");
+const selectCribbageButton = requireElement<HTMLButtonElement>("#select-cribbage");
+const homeButton = requireElement<HTMLButtonElement>("#home");
+const fullscreenButton = requireElement<HTMLButtonElement>("#fullscreen");
+const rollButton = requireElement<HTMLElement>("#roll");
+const snakeControls = requireElement<HTMLElement>("#snake-controls");
+const snakeJoystick = requireElement<HTMLElement>("#snake-joystick");
+const snakeStartButton = requireElement<HTMLButtonElement>("#snake-start");
+const snakeRestartButton = requireElement<HTMLButtonElement>("#snake-restart");
+const snakeShootButton = requireElement<HTMLButtonElement>("#snake-shoot");
+const snakeInfoBar = requireElement<HTMLElement>("#snake-info-bar");
+const snakeInfoLongest = requireElement<HTMLElement>("#snake-info-longest");
+const snakeInfoLength = requireElement<HTMLElement>("#snake-info-length");
+const snakeInfoPlayers = requireElement<HTMLElement>("#snake-info-players");
+const gameFrame = requireElement<HTMLElement>(".game-frame");
+const overlay = requireElement<HTMLElement>("#overlay");
+const platformPanel = requireElement<HTMLElement>("#platform-panel");
+const gameMenuPanel = requireElement<HTMLElement>("#game-menu-panel");
+const planeOptionsPanel = requireElement<HTMLElement>("#plane-options-panel");
+const crashPanel = requireElement<HTMLElement>("#crash-panel");
+const snakeMenuPanel = requireElement<HTMLElement>("#snake-menu-panel");
+const snakeOptionsPanel = requireElement<HTMLElement>("#snake-options-panel");
+const snakeDeadPanel = requireElement<HTMLElement>("#snake-dead-panel");
+const snakeOptionsButton = requireElement<HTMLButtonElement>("#snake-options");
+const snakeMenuBackButton = requireElement<HTMLButtonElement>("#snake-menu-back");
+const snakeOptionsBackButton = requireElement<HTMLButtonElement>("#snake-options-back");
+const snakeSoundToggle = requireElement<HTMLButtonElement>("#snake-sound-toggle");
+const snakeReportIssueButton = requireElement<HTMLButtonElement>("#snake-report-issue");
+const bridgeMenuPanel = requireElement<HTMLElement>("#bridge-menu-panel");
+const bridgeOptionsPanel = requireElement<HTMLElement>("#bridge-options-panel");
+const bridgeDeadPanel = requireElement<HTMLElement>("#bridge-dead-panel");
+const bridgeStartButton = requireElement<HTMLButtonElement>("#bridge-start");
+const bridgeRestartButton = requireElement<HTMLButtonElement>("#bridge-restart");
+const bridgeOptionsButton = requireElement<HTMLButtonElement>("#bridge-options");
+const bridgeMenuBackButton = requireElement<HTMLButtonElement>("#bridge-menu-back");
+const bridgeOptionsBackButton = requireElement<HTMLButtonElement>("#bridge-options-back");
+const bridgeSoundToggle = requireElement<HTMLButtonElement>("#bridge-sound-toggle");
+const bridgeReportIssueButton = requireElement<HTMLButtonElement>("#bridge-report-issue");
+const bridgeControls = requireElement<HTMLElement>("#bridge-controls");
+const bridgeHintSpinButton = requireElement<HTMLButtonElement>("#bridge-hint-spin");
+const bridgeSpinButton = requireElement<HTMLButtonElement>("#bridge-spin");
+const pixelLocalScoreEls = Array.from(document.querySelectorAll<HTMLElement>('[data-pixel-score="local"]'));
+const pixelMenuPanel = requireElement<HTMLElement>("#pixel-menu-panel");
+const pixelOptionsPanel = requireElement<HTMLElement>("#pixel-options-panel");
+const pixelStartButton = requireElement<HTMLButtonElement>("#pixel-start");
+const pixelOptionsButton = requireElement<HTMLButtonElement>("#pixel-options");
+const pixelMenuBackButton = requireElement<HTMLButtonElement>("#pixel-menu-back");
+const pixelOptionsBackButton = requireElement<HTMLButtonElement>("#pixel-options-back");
+const pixelReportIssueButton = requireElement<HTMLButtonElement>("#pixel-report-issue");
+const pixelModeChoice = requireElement<HTMLElement>("#pixel-mode-choice");
+const pixelSinglePlayerButton = requireElement<HTMLButtonElement>("#pixel-single-player");
+const pixelMultiplayerButton = requireElement<HTMLButtonElement>("#pixel-multiplayer");
+const pixelConfigForm = requireElement<HTMLFormElement>("#pixel-config");
+const pixelBotsInput = requireElement<HTMLInputElement>("#pixel-bots");
+const pixelHumansInput = requireElement<HTMLInputElement>("#pixel-humans");
+const pixelHumansRow = requireElement<HTMLElement>("#pixel-humans-row");
+const pixelLobbyPanel = requireElement<HTMLElement>("#pixel-lobby-panel");
+const pixelLobbyList = requireElement<HTMLElement>("#pixel-lobby-list");
+const pixelRefreshLobbiesButton = requireElement<HTMLButtonElement>("#pixel-refresh-lobbies");
+const pixelCreateLobbyButton = requireElement<HTMLButtonElement>("#pixel-create-lobby");
+const pixelLobbyStatus = requireElement<HTMLElement>("#pixel-lobby-status");
+const pixelMenuTurrets = requireElement<HTMLElement>("#pixel-menu-turrets");
+const pixelRotateNotice = requireElement<HTMLElement>("#pixel-rotate-notice");
+const reportPanel = requireElement<HTMLElement>("#report-panel");
+const issueForm = requireElement<HTMLFormElement>("#issue-form");
+const issueText = requireElement<HTMLTextAreaElement>("#issue-text");
+const issueCancelButton = requireElement<HTMLButtonElement>("#issue-cancel");
+const issueStatus = requireElement<HTMLElement>("#issue-status");
+const snakeMessage = requireElement<HTMLElement>("#snake-message");
+const bridgeMessage = requireElement<HTMLElement>("#bridge-message");
+const crashMessage = requireElement<HTMLElement>("#crash-message");
+const recordDialog = requireElement<HTMLElement>("#record-dialog");
+const recordForm = requireElement<HTMLFormElement>(".record-card");
+const recordMessage = requireElement<HTMLElement>("#record-message");
+const recordNameInput = requireElement<HTMLInputElement>("#record-name");
+const bridgePlayerNameEls = Array.from(document.querySelectorAll<HTMLElement>("[data-bridge-player-name]"));
+const ctx = requireCanvasContext(canvas);
+const breakoutGame = initBreakout();
+const cribbageGame = initCribbage();
+
+const artUrls = [
+  "/assets/girl-with-pearl-earring.jpg",
+  "/assets/mona-lisa.jpg",
+  "/assets/lady-with-ermine.jpg",
+];
+
+const artImages = artUrls.map((src) => {
+  const image = new Image();
+  image.decoding = "async";
+  image.src = src;
+  return image;
+});
+
+const plane = {
+  x: 150,
+  y: 260,
+  radius: 24,
+  velocity: 0,
+  rotation: 0,
+};
+
+const enemyPlane = {
+  x: 820,
+  y: 210,
+  bob: 0,
+};
+
+let state: GameState = "ready";
+let width = 960;
+let height = 540;
+let dpr = 1;
+let renderScale = 1;
+let renderOffsetX = 0;
+let renderOffsetY = 0;
+let lastTime = 0;
+let spawnTimer = 0;
+let bubbleTimer = 0;
+let score = 0;
+let obstacles: Obstacle[] = [];
+let bubbles: Bubble[] = [];
+let bubblePops: BubblePop[] = [];
+let popParticles: PopParticle[] = [];
+let smokePuffs: SmokePuff[] = [];
+let planeDebris: PlaneDebris[] = [];
+let compactPlayfield = false;
+let rollTimer = 0;
+let rollStyle: RollStyle = "forward";
+let freeRollAvailable = true;
+let crashTimer = 0;
+let smokeTimer = 0;
+let crashEndTimer = 0;
+let crashExploded = false;
+let crashMotion: CrashMotion = "spin";
+let crashDuration = 0.86;
+let localHighest = 0;
+let todayHighest = 0;
+let serverHighest = 0;
+let todayHighName = "";
+let serverHighName = "";
+let pendingRecordName: ((name: string) => void) | null = null;
+let planeScoreSyncActive = false;
+let snakeScoreSyncActive = false;
+let bridgeScoreSyncActive = false;
+let audioContext: AudioContext | null = null;
+let snakeSocket: WebSocket | null = null;
+let snakeReconnectTimer = 0;
+let snakeClientId = "";
+let snakeSnapshot: SnakeSnapshot | null = null;
+let snakeConnected = false;
+let snakeStartPending = false;
+let snakeSpawnedThisRun = false;
+let snakeLastAlive = false;
+let snakeLastLength = 0;
+let snakeLastShotBank = 0;
+let snakeJoystickPointerId: number | null = null;
+let snakeJoystickPulseTimer = 0;
+let lastSnakeShootTime = 0;
+let reportGame: "jumpy-plane" | "shooting-snakes" | "glass-bridge" | "pixel-wars" | "breakout" | "digital-cribbage" = "jumpy-plane";
+let reportReturnState: "plane-options" | "snake-options" | "bridge-options" | "pixel-options" | "breakout-options" | "cribbage-options" = "plane-options";
+let snakeLocalLongest = 3;
+let snakeTodayLongest = 0;
+let snakeServerLongest = 0;
+let snakeTodayLongName = "";
+let snakeServerLongName = "";
+let snakeBestThisRun = 3;
+let bridgeLocalTiles = 0;
+let bridgeTodayTiles = 0;
+let bridgeServerTiles = 0;
+let bridgeTodayTileName = "";
+let bridgeServerTileName = "";
+let bridgeLocalPoints = 0;
+let bridgeTodayPoints = 0;
+let bridgeServerPoints = 0;
+let bridgeTodayPointName = "";
+let bridgeServerPointName = "";
+let bridgeSafePath: BridgeSide[] = [];
+let bridgeStep = 0;
+let bridgeTiles = 0;
+let bridgePoints = 0;
+let bridgeHint: BridgeHint | null = null;
+let bridgeBrokenSide: BridgeSide | null = null;
+let bridgePlayerSide: BridgeSide | null = null;
+let bridgeStandingSide: BridgeSide | null = null;
+let bridgePuzzles: BridgePuzzle[] = [];
+let bridgePendingSide: BridgeSide | null = null;
+let bridgeJumpTimer = 0;
+let bridgeSuccessTimer = 0;
+let bridgeScrollTimer = 0;
+let bridgeWheelLabel = "Ready";
+let bridgeWheelTimer = 0;
+let bridgeWheelSpinTimer = 0;
+let bridgeWheelAngle = 0;
+let bridgeWheelStartAngle = 0;
+let bridgeWheelTargetAngle = 0;
+let bridgePendingWheelOutcome: BridgeWheelOutcome | null = null;
+let bridgeWheelRequesting = false;
+let bridgeWheelSpinSequence = 0;
+let bridgeFallTimer = 0;
+let bridgeJackpot = 20;
+let bridgeHintWheelLabel = "Hint";
+let bridgeHintWheelTimer = 0;
+let bridgeHintWheelSpinTimer = 0;
+let bridgeHintWheelAngle = 0;
+let bridgeHintWheelStartAngle = 0;
+let bridgeHintWheelTargetAngle = 0;
+let bridgePendingHintOutcome: BridgeHintOutcome | null = null;
+let bridgeHintWheelRequesting = false;
+let bridgeHintWheelSpinSequence = 0;
+let pixelMode: PixelMode = "single";
+let pixelBotCount = 3;
+let pixelHumanSlots = 1;
+let pixelCells: PixelOwner[] = [];
+let pixelTurrets: PixelTurret[] = [];
+let pixelShots: PixelShot[] = [];
+let pixelAimActive = false;
+let pixelAimPointerId: number | null = null;
+let pixelSelectedTurretIndex = 0;
+let pixelAimX = 0;
+let pixelAimY = 0;
+let pixelTerritory = 0;
+let pixelLocalBest = 0;
+let pixelRunnerLanePosition = 1;
+let pixelRunnerTargetLane = 1;
+let pixelRunnerJumpTimer = 0;
+let pixelRunnerDuckTimer = 0;
+let pixelRunnerPointerId: number | null = null;
+let pixelRunnerSwipeStartX = 0;
+let pixelRunnerSwipeStartY = 0;
+let pixelRunnerStumbleTimer = 0;
+let pixelRunnerPickupTimer = 0;
+let pixelRunnerObstacleTimer = 0;
+let pixelRunnerPickupId = 0;
+let pixelRunnerPickupLaneCursor = 0;
+let pixelRunnerPickups: PixelRunnerPickup[] = [];
+let pixelRunnerObstacles: PixelRunnerObstacle[] = [];
+let pixelRunnerSpecialSpins = 0;
+let pixelRunnerMessage = "";
+let pixelRunnerMessageTimer = 0;
+let pixelMatchOver = false;
+let pixelMatchMessage = "";
+let pixelLobbies: PixelLobby[] = [];
+let pixelJoinedLobbyId = "";
+let pixelLobbyLoading = false;
+let pixelSocket: WebSocket | null = null;
+let pixelClientId = "";
+let pixelRemoteSnapshot: PixelWarsSnapshot | null = null;
+let pixelConnected = false;
+let pixelReelMatchReady = false;
+let pixelReels: Record<PixelLane, PixelReel> = {
+  center: { finalPrize: "blank", nextPrize: "blank", prize: "blank", spinDuration: 0, spinPhase: 0, spinTimer: 0 },
+  left: { finalPrize: "blank", nextPrize: "blank", prize: "blank", spinDuration: 0, spinPhase: 0, spinTimer: 0 },
+  right: { finalPrize: "blank", nextPrize: "blank", prize: "blank", spinDuration: 0, spinPhase: 0, spinTimer: 0 },
+};
+
+const localHighScoreKey = "badant-games-jumpy-plane-high-score";
+const pendingScoreKey = "badant-games-jumpy-plane-pending-score";
+const playerNameKey = "badant-games-player-name";
+const oldSnakeLocalLongestKey = "badant-games-glow-snake-longest";
+const oldSnakePendingScoreKey = "badant-games-glow-snake-pending-longest";
+const snakeLocalLongestKey = "badant-games-shooting-snakes-longest";
+const snakePendingScoreKey = "badant-games-shooting-snakes-pending-longest";
+const bridgeLocalTilesKey = "badant-games-glass-bridge-tiles";
+const bridgeLocalPointsKey = "badant-games-glass-bridge-points";
+const bridgePendingTilesKey = "badant-games-glass-bridge-pending-tiles";
+const bridgePendingPointsKey = "badant-games-glass-bridge-pending-points";
+const pixelLocalBestKey = "badant-games-pixel-wars-best-claim";
+const planeSoundKey = "badant-games-jumpy-plane-sound";
+const snakeSoundKey = "badant-games-shooting-snakes-sound";
+const bridgeSoundKey = "badant-games-glass-bridge-sound";
+const obstacleWidth = 96;
+const obstacleSpeed = 250;
+const spawnEvery = 1.42;
+const bubbleEvery = 1.08;
+const bubbleSpeed = 320;
+const groundHeight = 46;
+const rollDuration = 0.72;
+const rollPointCost = 2;
+const compactGroundHeight = 34;
+const compactWorldWidth = 960;
+const compactWorldHeight = 540;
+const compactObstacleWidth = 58;
+const compactObstacleSpeed = 168;
+const compactSpawnEvery = 1.62;
+const compactBubbleSpeed = 168;
+const compactGapHeight = 190;
+const compactMargin = 54;
+const compactPlaneRadius = 18;
+const compactGravity = 820;
+const compactLift = -360;
+const obstacleEdgeOverflow = 72;
+const ceilingSpikeDepth = 26;
+const snakeFallbackBoard = {
+  cellSize: 24,
+  height: 1920,
+  width: 2880,
+};
+const fallbackSnakeShotBank = 5;
+const snakeCameraZoom = 1 / 1.2;
+const bridgeVisibleRows = 7;
+const bridgeWheelCost = 1;
+const bridgeFallDuration = 0.95;
+const bridgeJumpDuration = 0.34;
+const bridgeSuccessDuration = 0.52;
+const bridgeScrollDuration = 0.34;
+const bridgeWheelPreSpinDuration = 0.62;
+const bridgeWheelPreSpinSpeed = Math.PI * 9;
+const bridgeWheelSpinDuration = 1.25;
+const bridgeNormalWheelOutcomes: BridgeWheelOutcome[] = [
+  { label: "+1", apply: (points) => points + 1, weight: 1 },
+  { label: "+3", apply: (points) => points + 3, weight: 1 },
+  { label: "-1", apply: (points) => points - 1, weight: 1 },
+  { label: "-2", apply: (points) => points - 2, weight: 1 },
+  { label: "x2", apply: (points) => points * 2, weight: 1 },
+  { label: "/2", apply: (points) => Math.floor(points / 2), weight: 1 },
+];
+const bridgeJackpotSegmentIndex = 0;
+const bridgeWheelSegments: BridgeWheelOutcome[] = [
+  { color: "rgba(255, 95, 118, 0.94)", label: "JP", apply: (points) => points, weight: 1 },
+  ...Array.from({ length: 19 }, (_, index) => bridgeNormalWheelOutcomes[index % bridgeNormalWheelOutcomes.length]),
+];
+const bridgeHintWheelSegments: BridgeHintOutcome[] = [
+  { color: "rgba(107, 255, 174, 0.9)", kind: "freebie", label: "Free", weight: 1 },
+  { difficultyTierBonus: 0, face: ":)", kind: "math", label: "Addition", operation: "+", weight: 1 },
+  { difficultyTierBonus: 1, face: ">:(", kind: "math", label: "Addition", operation: "+", weight: 1 },
+  { difficultyTierBonus: 0, face: ":)", kind: "math", label: "Subtraction", operation: "-", weight: 1 },
+  { difficultyTierBonus: 1, face: ">:(", kind: "math", label: "Subtraction", operation: "-", weight: 1 },
+  { difficultyTierBonus: 0, face: ":)", kind: "math", label: "Multiplication", operation: "x", weight: 1 },
+  { difficultyTierBonus: 1, face: ">:(", kind: "math", label: "Multiplication", operation: "x", weight: 1 },
+  { difficultyTierBonus: 0, face: ":)", kind: "math", label: "Division", operation: "/", weight: 1 },
+  { difficultyTierBonus: 1, face: ">:(", kind: "math", label: "Division", operation: "/", weight: 1 },
+];
+const pixelColumns = 54;
+const pixelRows = 36;
+const pixelShotSpeed = 360;
+const pixelMaxPlayers = 9;
+const pixelMaxTurretsPerOwner = 4;
+const pixelBaseFireInterval = 1;
+const pixelShieldMaxHealth = 100;
+const pixelShieldDamage = 10;
+const pixelShieldRadius = 19;
+const pixelCannonLength = pixelShieldRadius;
+const pixelCornerSpawnInset = pixelShieldRadius * 0.42;
+const pixelRespawnShieldClearanceCells = 2;
+const pixelRespawnWindow = 10;
+const pixelRunnerLanes: PixelLane[] = ["left", "center", "right"];
+const pixelRunnerSpeed = 78;
+const pixelRunnerJumpDuration = 0.46;
+const pixelRunnerDuckDuration = 0.44;
+const pixelRunnerSameLaneClearance = pixelRunnerSpeed * 0.58;
+const pixelRunnerActionConflictClearance = pixelRunnerSpeed * 0.9;
+const pixelReelSpinDuration = 0.95;
+const pixelReelStopStagger = 0.24;
+const pixelBombShotAward = 4;
+const pixelOwnerColors: Partial<Record<PixelOwner, string>> & { neutral: string; player: string } = {
+  neutral: "#606773",
+  player: "#35d7ff",
+  "bot-1": "#ff4d75",
+  "bot-2": "#ffd84f",
+  "bot-3": "#6dff80",
+  "bot-4": "#b66dff",
+  "bot-5": "#ff8a3d",
+  "bot-6": "#45ffce",
+  "bot-7": "#ff65dc",
+  "bot-8": "#a5ff45",
+  "bot-9": "#4d75ff",
+  "bot-10": "#ffef8a",
+  "bot-11": "#ff5335",
+  "bot-12": "#72a8ff",
+  "human-2": "#ffffff",
+  "human-3": "#f7a8ff",
+  "human-4": "#a8ffea",
+  "human-5": "#ffc7a8",
+  "human-6": "#c8ff9b",
+  "human-7": "#a8d1ff",
+  "human-8": "#ffb3cb",
+};
+let planeSoundEnabled = localStorage.getItem(planeSoundKey) !== "off";
+let snakeSoundEnabled = localStorage.getItem(snakeSoundKey) !== "off";
+let bridgeSoundEnabled = localStorage.getItem(bridgeSoundKey) !== "off";
+
+type FullscreenFrame = HTMLElement & {
+  webkitRequestFullscreen?: () => Promise<void> | void;
+};
+
+type FullscreenDocument = Document & {
+  webkitFullscreenElement?: Element | null;
+  webkitFullscreenEnabled?: boolean;
+  webkitExitFullscreen?: () => Promise<void> | void;
+};
+
+function resize() {
+  document.documentElement.style.setProperty("--app-height", `${Math.max(1, window.innerHeight)}px`);
+  const box = canvas.getBoundingClientRect();
+  compactPlayfield = true;
+  const cssWidth = Math.max(320, Math.floor(box.width));
+  const cssHeight = Math.max(1, Math.floor(box.height));
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  width = compactWorldWidth;
+  height = compactWorldHeight;
+  renderScale = Math.min(cssWidth / width, cssHeight / height);
+  renderOffsetX = (cssWidth - width * renderScale) / 2;
+  renderOffsetY = (cssHeight - height * renderScale) / 2;
+  canvas.width = Math.floor(cssWidth * dpr);
+  canvas.height = Math.floor(cssHeight * dpr);
+  ctx.setTransform(
+    dpr * renderScale,
+    0,
+    0,
+    dpr * renderScale,
+    dpr * renderOffsetX,
+    dpr * renderOffsetY,
+  );
+  plane.radius = getPlaneRadius();
+  plane.x = getPlayerX();
+  enemyPlane.x = getEnemyX();
+  if (state === "platform" || state === "ready") {
+    plane.y = height * 0.48;
+    enemyPlane.y = height * 0.36;
+  }
+  if (state === "pixel-running") {
+    positionPixelTurrets();
+  }
+  updatePixelOrientationGate();
+  updateFullscreenButton();
+}
+
+function getObstacleWidth() {
+  return compactPlayfield ? compactObstacleWidth : obstacleWidth;
+}
+
+function getObstacleSpeed() {
+  return compactPlayfield ? compactObstacleSpeed : obstacleSpeed;
+}
+
+function getSpawnEvery() {
+  return compactPlayfield ? compactSpawnEvery : spawnEvery;
+}
+
+function getPlaneScale() {
+  return compactPlayfield ? 0.72 : 1;
+}
+
+function getPlaneRadius() {
+  return compactPlayfield ? compactPlaneRadius : 24;
+}
+
+function getPlayerX() {
+  return compactPlayfield ? 82 : Math.max(92, Math.min(156, width * 0.18));
+}
+
+function getEnemyX() {
+  return compactPlayfield
+    ? width - 86
+    : width - Math.max(86, Math.min(138, width * 0.12));
+}
+
+function getGravity() {
+  return compactPlayfield ? compactGravity : 1480;
+}
+
+function getLift() {
+  return compactPlayfield ? compactLift : -475;
+}
+
+function getBubbleEvery() {
+  return compactPlayfield ? 1.55 : bubbleEvery;
+}
+
+function getBubbleSpeed() {
+  return compactPlayfield ? compactBubbleSpeed : bubbleSpeed;
+}
+
+function getBubbleRadius() {
+  return compactPlayfield ? 12 + Math.random() * 3 : 14 + Math.random() * 6;
+}
+
+function getGroundHeight() {
+  return compactPlayfield ? compactGroundHeight : groundHeight;
+}
+
+function getAudioContext() {
+  const audioWindow = window as Window & { webkitAudioContext?: typeof AudioContext };
+  const AudioConstructor = window.AudioContext || audioWindow.webkitAudioContext;
+  if (!AudioConstructor) {
+    return null;
+  }
+
+  if (!audioContext) {
+    audioContext = new AudioConstructor();
+  }
+
+  return audioContext;
+}
+
+function unlockAudio() {
+  const context = getAudioContext();
+  if (context?.state === "suspended") {
+    void context.resume();
+  }
+}
+
+function playTone(
+  frequency: number,
+  duration: number,
+  type: OscillatorType,
+  volume: number,
+  delay = 0,
+  endFrequency = frequency,
+) {
+  const context = getAudioContext();
+  if (!context) {
+    return;
+  }
+
+  const start = context.currentTime + delay;
+  const oscillator = context.createOscillator();
+  const gain = context.createGain();
+  oscillator.type = type;
+  oscillator.frequency.setValueAtTime(frequency, start);
+  oscillator.frequency.exponentialRampToValueAtTime(Math.max(24, endFrequency), start + duration);
+  gain.gain.setValueAtTime(0.0001, start);
+  gain.gain.exponentialRampToValueAtTime(volume, start + 0.018);
+  gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+  oscillator.connect(gain);
+  gain.connect(context.destination);
+  oscillator.start(start);
+  oscillator.stop(start + duration + 0.03);
+}
+
+function playNoiseBurst(duration: number, volume: number, delay = 0) {
+  const context = getAudioContext();
+  if (!context) {
+    return;
+  }
+
+  const sampleCount = Math.max(1, Math.floor(context.sampleRate * duration));
+  const buffer = context.createBuffer(1, sampleCount, context.sampleRate);
+  const samples = buffer.getChannelData(0);
+  for (let index = 0; index < sampleCount; index += 1) {
+    samples[index] = (Math.random() * 2 - 1) * (1 - index / sampleCount);
+  }
+
+  const start = context.currentTime + delay;
+  const source = context.createBufferSource();
+  const filter = context.createBiquadFilter();
+  const gain = context.createGain();
+  filter.type = "lowpass";
+  filter.frequency.setValueAtTime(900, start);
+  filter.frequency.exponentialRampToValueAtTime(120, start + duration);
+  gain.gain.setValueAtTime(volume, start);
+  gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+  source.buffer = buffer;
+  source.connect(filter);
+  filter.connect(gain);
+  gain.connect(context.destination);
+  source.start(start);
+}
+
+function playBubbleShootSound() {
+  if (!planeSoundEnabled) {
+    return;
+  }
+  playTone(360, 0.12, "square", 0.025, 0, 760);
+  playTone(840, 0.06, "triangle", 0.018, 0.05, 520);
+}
+
+function playBubblePopSound() {
+  if (!planeSoundEnabled) {
+    return;
+  }
+  playTone(780, 0.07, "sine", 0.038, 0, 1140);
+  playTone(420, 0.09, "triangle", 0.026, 0.035, 220);
+}
+
+function playFlapSound() {
+  if (!planeSoundEnabled) {
+    return;
+  }
+  playTone(210, 0.055, "triangle", 0.026, 0, 520);
+  playTone(1220, 0.045, "sine", 0.018, 0.035, 760);
+}
+
+function playRollSound() {
+  if (!planeSoundEnabled) {
+    return;
+  }
+  playTone(520, 0.11, "sine", 0.04, 0, 820);
+  playTone(820, 0.12, "triangle", 0.034, 0.08, 460);
+  playTone(440, 0.13, "sine", 0.032, 0.17, 720);
+}
+
+function playCrashFallSound() {
+  if (!planeSoundEnabled) {
+    return;
+  }
+  for (let index = 0; index < 3; index += 1) {
+    const delay = index * 0.18;
+    playTone(620 - index * 90, 0.18, "sawtooth", 0.035, delay, 180 - index * 24);
+    playTone(420 - index * 50, 0.16, "sine", 0.018, delay + 0.04, 130);
+  }
+}
+
+function playExplosionSound() {
+  if (!planeSoundEnabled) {
+    return;
+  }
+  playNoiseBurst(0.36, 0.16);
+  playTone(92, 0.34, "sawtooth", 0.075, 0, 34);
+  playTone(240, 0.12, "square", 0.036, 0.03, 70);
+}
+
+function playSnakeOrbSound() {
+  if (!snakeSoundEnabled) {
+    return;
+  }
+  playTone(300, 0.07, "sine", 0.028, 0, 520);
+  playTone(520, 0.08, "triangle", 0.022, 0.035, 360);
+}
+
+function playSnakeShotPickupSound() {
+  if (!snakeSoundEnabled) {
+    return;
+  }
+  playTone(880, 0.07, "triangle", 0.04, 0, 1320);
+  playTone(1420, 0.06, "sine", 0.026, 0.045, 960);
+  playTone(620, 0.1, "square", 0.018, 0.08, 720);
+}
+
+function playSnakeDeathSound() {
+  if (!snakeSoundEnabled) {
+    return;
+  }
+  playTone(220, 0.11, "sawtooth", 0.05, 0, 74);
+  playTone(92, 0.18, "triangle", 0.038, 0.055, 42);
+  playNoiseBurst(0.16, 0.055, 0.02);
+}
+
+function playSnakeShootSound() {
+  if (!snakeSoundEnabled) {
+    return;
+  }
+  playTone(180, 0.08, "square", 0.032, 0, 680);
+}
+
+function playBridgeStepSound() {
+  if (!bridgeSoundEnabled) {
+    return;
+  }
+  playTone(620, 0.08, "sine", 0.03, 0, 980);
+  playTone(1240, 0.05, "triangle", 0.018, 0.04, 880);
+}
+
+function playBridgeBreakSound() {
+  if (!bridgeSoundEnabled) {
+    return;
+  }
+  playNoiseBurst(0.22, 0.07);
+  playTone(340, 0.12, "sawtooth", 0.04, 0, 72);
+  playTone(1100, 0.05, "square", 0.018, 0.03, 260);
+}
+
+function playBridgeWheelSound() {
+  if (!bridgeSoundEnabled) {
+    return;
+  }
+  playTone(420, 0.07, "triangle", 0.026, 0, 840);
+  playTone(840, 0.07, "sine", 0.022, 0.06, 360);
+}
+
+function getSnakeSocketUrl() {
+  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+  return `${protocol}//${window.location.host}/snake`;
+}
+
+function sendSnakeMessage(message: Record<string, unknown>) {
+  if (snakeSocket?.readyState === WebSocket.OPEN) {
+    snakeSocket.send(JSON.stringify(message));
+  }
+}
+
+function connectSnakeSocket() {
+  if (snakeSocket && (snakeSocket.readyState === WebSocket.OPEN || snakeSocket.readyState === WebSocket.CONNECTING)) {
+    return;
+  }
+
+  snakeSocket = new WebSocket(getSnakeSocketUrl());
+  snakeSocket.addEventListener("open", () => {
+    snakeConnected = true;
+    if (snakeStartPending) {
+      snakeStartPending = false;
+      sendSnakeMessage({ type: "snake-start" });
+    }
+  });
+  snakeSocket.addEventListener("message", (event) => {
+    const message = JSON.parse(event.data as string) as SnakeSnapshot | SnakeWelcome;
+    if (message.type === "snake-welcome") {
+      snakeClientId = message.id;
+      return;
+    }
+
+    snakeSnapshot = message;
+    const self = getLocalSnake();
+    if (state === "snake-running" && self) {
+      if (snakeLastAlive && self.alive) {
+        if (self.shotBank > snakeLastShotBank) {
+          playSnakeShotPickupSound();
+        } else if (self.segments.length > snakeLastLength) {
+          playSnakeOrbSound();
+        }
+      } else if (snakeLastAlive && !self.alive) {
+        playSnakeDeathSound();
+      }
+    }
+    if (self?.alive) {
+      snakeSpawnedThisRun = true;
+    }
+    if (self) {
+      snakeBestThisRun = Math.max(snakeBestThisRun, self.bestLength ?? 0, self.segments.length);
+      writeSnakeLocalLongest(snakeBestThisRun);
+      renderSnakeHighScores();
+    }
+    if (state === "snake-running" && self && !self.alive && snakeSpawnedThisRun) {
+      showSnakeDead();
+    }
+    if (self) {
+      snakeLastAlive = self.alive;
+      snakeLastLength = self.segments.length;
+      snakeLastShotBank = self.shotBank;
+    } else {
+      snakeLastAlive = false;
+      snakeLastLength = 0;
+      snakeLastShotBank = 0;
+    }
+    updateSnakeScore();
+  });
+  snakeSocket.addEventListener("close", () => {
+    snakeConnected = false;
+    snakeSocket = null;
+    if (state === "snake-running") {
+      window.clearTimeout(snakeReconnectTimer);
+      snakeReconnectTimer = window.setTimeout(connectSnakeSocket, 900);
+    }
+  });
+}
+
+function leaveSnakeRoom() {
+  window.clearTimeout(snakeReconnectTimer);
+  snakeStartPending = false;
+  snakeSpawnedThisRun = false;
+  snakeLastAlive = false;
+  snakeLastLength = 0;
+  snakeLastShotBank = 0;
+  snakeConnected = false;
+  snakeClientId = "";
+  snakeSnapshot = null;
+  if (snakeSocket) {
+    snakeSocket.close();
+    snakeSocket = null;
+  }
+}
+
+function getPixelSocketUrl() {
+  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+  return `${protocol}//${window.location.host}/pixel-wars`;
+}
+
+function sendPixelMessage(message: Record<string, unknown>) {
+  if (pixelSocket?.readyState === WebSocket.OPEN) {
+    pixelSocket.send(JSON.stringify(message));
+  }
+}
+
+function applyPixelSnapshot(snapshot: PixelWarsSnapshot) {
+  pixelRemoteSnapshot = snapshot;
+  const humanIds = Array.from(new Set(snapshot.turrets.filter((turret) => !turret.isBot).map((turret) => turret.id)));
+  const ownerMap = new Map<string, PixelOwner>();
+  let otherHumanIndex = 1;
+  humanIds.forEach((id) => {
+    const remoteTurret = snapshot.turrets.find((turret) => turret.id === id);
+    if (id === pixelClientId) {
+      ownerMap.set(id, "player");
+      pixelOwnerColors.player = remoteTurret?.color ?? pixelOwnerColors.player;
+    } else {
+      const localOwner = `human-${otherHumanIndex}` as PixelOwner;
+      ownerMap.set(id, localOwner);
+      if (remoteTurret?.color) {
+        pixelOwnerColors[localOwner] = remoteTurret.color;
+      }
+      otherHumanIndex += 1;
+    }
+  });
+  snapshot.turrets
+    .filter((turret) => turret.isBot)
+    .forEach((turret) => {
+      const localOwner = turret.id as PixelOwner;
+      ownerMap.set(turret.id, localOwner);
+      pixelOwnerColors[localOwner] = turret.color;
+    });
+
+  const layout = pixelLayout();
+  pixelCells = snapshot.cells.map((owner) => (owner === "neutral" ? "neutral" : (ownerMap.get(owner) ?? "neutral")));
+  pixelTurrets = snapshot.turrets.map((remoteTurret) => {
+    const id = ownerMap.get(remoteTurret.id) ?? "neutral";
+    const x = layout.x + remoteTurret.xRatio * layout.boardW;
+    const y = layout.y + remoteTurret.yRatio * layout.boardH;
+    const homeAngle = Math.atan2(layout.y + layout.boardH / 2 - y, layout.x + layout.boardW / 2 - x);
+    return {
+      aiTargetTimer: 0,
+      angle: remoteTurret.angle,
+      autoRotate: remoteTurret.autoRotate ?? false,
+      arc: remoteTurret.isBot ? Math.PI * 0.44 : Math.PI * 0.85,
+      bombShots: remoteTurret.bombShots,
+      bouncePower: remoteTurret.bouncePower ?? 0,
+      color: remoteTurret.color,
+      eliminated: remoteTurret.eliminated,
+      fireCooldown: 0,
+      fireInterval: pixelBaseFireInterval,
+      fireSpeedBoosts: remoteTurret.fireSpeedBoosts,
+      homeAngle,
+      id,
+      isPlayer: remoteTurret.id === pixelClientId,
+      respawnDelay: 0,
+      respawnPending: remoteTurret.respawnPending,
+      respawnTimer: remoteTurret.respawnTimer,
+      rotateDirection: 1,
+      rotateSpeed: 0,
+      shieldHealth: remoteTurret.shieldHealth,
+      spawnXRatio: remoteTurret.xRatio,
+      spawnYRatio: remoteTurret.yRatio,
+      x,
+      y,
+    };
+  });
+  pixelShots = snapshot.shots.map((shot) => ({
+    bouncesRemaining: 0,
+    color: shot.color,
+    kind: shot.kind,
+    lastCell: -1,
+    life: 1,
+    owner: ownerMap.get(shot.owner) ?? "neutral",
+    vx: 0,
+    vy: 0,
+    x: layout.x + shot.xRatio * layout.boardW,
+    y: layout.y + shot.yRatio * layout.boardH,
+  }));
+  pixelHumanSlots = snapshot.lobby.humanPlayers;
+  pixelBotCount = snapshot.lobby.aiBots;
+  updatePixelScore();
+  const selfTurrets = snapshot.turrets.filter((turret) => turret.id === pixelClientId);
+  const selfHasTurret = selfTurrets.some((turret) => !turret.eliminated);
+  const selfPixels = snapshot.cells.reduce((total, owner) => total + (owner === pixelClientId ? 1 : 0), 0);
+  if (selfTurrets.length > 0 && !selfHasTurret && selfPixels <= 0) {
+    pixelMatchOver = true;
+    pixelMatchMessage = "You were eliminated";
+  }
+}
+
+function connectPixelWarsSocket() {
+  if (!pixelJoinedLobbyId || (pixelSocket && (pixelSocket.readyState === WebSocket.OPEN || pixelSocket.readyState === WebSocket.CONNECTING))) {
+    return;
+  }
+
+  pixelSocket = new WebSocket(getPixelSocketUrl());
+  pixelSocket.addEventListener("open", () => {
+    pixelConnected = true;
+    sendPixelMessage({ lobbyId: pixelJoinedLobbyId, type: "pixel-join" });
+    pixelRunnerMessage = "Connected";
+    pixelRunnerMessageTimer = 1;
+  });
+  pixelSocket.addEventListener("message", (event) => {
+    const message = JSON.parse(event.data as string) as PixelWarsSnapshot | PixelWarsWelcome;
+    if (message.type === "pixel-wars-welcome") {
+      pixelClientId = message.id;
+      pixelLobbyStatus.textContent = `Joined game ${message.lobby.id.slice(-4).toUpperCase()}.`;
+      return;
+    }
+    applyPixelSnapshot(message);
+  });
+  pixelSocket.addEventListener("close", () => {
+    pixelConnected = false;
+    pixelSocket = null;
+    if (state === "pixel-running" && pixelMode === "multi" && !pixelMatchOver) {
+      pixelRunnerMessage = "Disconnected";
+      pixelRunnerMessageTimer = 2;
+    }
+  });
+}
+
+function leavePixelWarsNetwork() {
+  pixelClientId = "";
+  pixelConnected = false;
+  pixelRemoteSnapshot = null;
+  if (pixelSocket) {
+    pixelSocket.close();
+    pixelSocket = null;
+  }
+}
+
+function getLocalSnake() {
+  return snakeSnapshot?.players.find((player) => player.id === snakeClientId);
+}
+
+function setSnakeLayout(active: boolean) {
+  gameFrame.classList.toggle("snake-layout", active);
+  snakeInfoBar.hidden = !active;
+  resize();
+}
+
+function clampNumber(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function normalizeAngle(angle: number) {
+  let normalized = angle;
+  while (normalized > Math.PI) {
+    normalized -= Math.PI * 2;
+  }
+  while (normalized < -Math.PI) {
+    normalized += Math.PI * 2;
+  }
+  return normalized;
+}
+
+function pixelOwnerColor(owner: PixelOwner) {
+  return pixelOwnerColors[owner] ?? "#ffffff";
+}
+
+function readPixelLocalBest() {
+  pixelLocalBest = Math.max(0, readStoredNumber(pixelLocalBestKey));
+}
+
+function writePixelLocalBest(value: number) {
+  pixelLocalBest = Math.max(pixelLocalBest, value);
+  writeStoredNumber(pixelLocalBestKey, pixelLocalBest);
+}
+
+function renderPixelScores() {
+  setText(pixelLocalScoreEls, `${formatScore(pixelLocalBest)}%`);
+  pixelMenuTurrets.textContent = `${pixelHumanSlots + pixelBotCount}`;
+}
+
+function setPixelMenuView(view: "choice" | "single" | "lobby") {
+  pixelModeChoice.hidden = view !== "choice";
+  pixelConfigForm.hidden = view === "choice";
+  pixelHumansRow.hidden = view !== "lobby";
+  pixelLobbyPanel.hidden = view !== "lobby";
+  pixelStartButton.hidden = view !== "single";
+  pixelCreateLobbyButton.hidden = view !== "lobby";
+  pixelMenuBackButton.textContent = view === "choice" ? "Back to games" : "Back";
+  if (view === "choice") {
+    pixelLobbyStatus.textContent = "";
+  }
+}
+
+function isWideGameMobilePortrait() {
+  return window.matchMedia("(hover: none) and (pointer: coarse)").matches && window.innerHeight > window.innerWidth;
+}
+
+function updatePixelOrientationGate() {
+  const pixelState = state === "pixel-menu" || state === "pixel-options" || state === "pixel-running";
+  const bridgeState = state === "bridge-menu" || state === "bridge-options" || state === "bridge-running";
+  pixelRotateNotice.hidden = !((pixelState || bridgeState) && isWideGameMobilePortrait());
+}
+
+function syncPixelConfigFromInputs() {
+  pixelHumanSlots =
+    pixelMode === "multi" ? clampNumber(Math.round(Number(pixelHumansInput.value) || 1), 1, pixelMaxPlayers) : 1;
+  pixelBotCount = clampNumber(
+    Math.round(Number(pixelBotsInput.value) || 0),
+    0,
+    Math.max(0, pixelMaxPlayers - pixelHumanSlots),
+  );
+  pixelBotsInput.value = `${pixelBotCount}`;
+  pixelHumansInput.value = `${pixelHumanSlots}`;
+  pixelBotsInput.max = `${Math.max(0, pixelMaxPlayers - pixelHumanSlots)}`;
+  pixelHumansInput.disabled = pixelMode === "single";
+  renderPixelScores();
+}
+
+function renderPixelLobbyList() {
+  if (pixelLobbyLoading) {
+    pixelLobbyList.innerHTML = '<p class="lobby-empty">Loading games...</p>';
+    return;
+  }
+
+  if (pixelLobbies.length === 0) {
+    pixelLobbyList.innerHTML = '<p class="lobby-empty">No waiting games yet.</p>';
+    return;
+  }
+
+  pixelLobbyList.replaceChildren(
+    ...pixelLobbies.map((lobby) => {
+      const row = document.createElement("div");
+      row.className = "lobby-row";
+
+      const details = document.createElement("span");
+      details.className = "lobby-details";
+      const title = document.createElement("strong");
+      title.textContent = `Game ${lobby.id.slice(-4).toUpperCase()}`;
+      const meta = document.createElement("small");
+      meta.textContent = `${lobby.playerCount}/${lobby.humanPlayers} humans - ${lobby.aiBots} AI`;
+      details.append(title, meta);
+
+      const joinButton = document.createElement("button");
+      joinButton.type = "button";
+      joinButton.textContent = lobby.id === pixelJoinedLobbyId ? "Enter" : "Join";
+      joinButton.disabled = lobby.status === "full" && lobby.id !== pixelJoinedLobbyId;
+      joinButton.addEventListener("click", () => {
+        void joinPixelLobby(lobby.id);
+      });
+
+      row.append(details, joinButton);
+      return row;
+    }),
+  );
+}
+
+async function loadPixelLobbies() {
+  pixelLobbyLoading = true;
+  renderPixelLobbyList();
+  try {
+    const response = await fetch("/api/pixel-wars-lobbies", { cache: "no-store" });
+    if (!response.ok) {
+      throw new Error("Lobby list failed.");
+    }
+    const data = (await response.json()) as { lobbies?: PixelLobby[] };
+    pixelLobbies = Array.isArray(data.lobbies) ? data.lobbies : [];
+    pixelLobbyStatus.textContent = pixelLobbies.length > 0 ? "" : "Create a game to open the lobby.";
+  } catch {
+    pixelLobbies = [];
+    pixelLobbyStatus.textContent = "Lobby list unavailable.";
+  } finally {
+    pixelLobbyLoading = false;
+    renderPixelLobbyList();
+  }
+}
+
+function applyPixelLobbySettings(lobby: PixelLobby) {
+  pixelMode = "multi";
+  pixelHumanSlots = clampNumber(Math.round(lobby.humanPlayers), 1, pixelMaxPlayers);
+  pixelBotCount = clampNumber(Math.round(lobby.aiBots), 0, Math.max(0, pixelMaxPlayers - pixelHumanSlots));
+  pixelHumansInput.value = `${pixelHumanSlots}`;
+  pixelBotsInput.value = `${pixelBotCount}`;
+  syncPixelConfigFromInputs();
+}
+
+async function createPixelLobby() {
+  pixelMode = "multi";
+  syncPixelConfigFromInputs();
+  pixelLobbyStatus.textContent = "Creating game...";
+  try {
+    const response = await fetch("/api/pixel-wars-lobbies", {
+      body: JSON.stringify({
+        aiBots: pixelBotCount,
+        humanPlayers: pixelHumanSlots,
+      }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+    if (!response.ok) {
+      throw new Error("Create failed.");
+    }
+    const data = (await response.json()) as { lobby?: PixelLobby };
+    if (!data.lobby) {
+      throw new Error("Missing lobby.");
+    }
+    pixelJoinedLobbyId = data.lobby.id;
+    applyPixelLobbySettings(data.lobby);
+    pixelLobbyStatus.textContent = "Game created.";
+    await loadPixelLobbies();
+    startPixelWars();
+  } catch {
+    pixelLobbyStatus.textContent = "Could not create game.";
+  }
+}
+
+async function joinPixelLobby(lobbyId: string) {
+  const knownLobby = pixelLobbies.find((lobby) => lobby.id === lobbyId);
+  if (knownLobby && knownLobby.id === pixelJoinedLobbyId) {
+    applyPixelLobbySettings(knownLobby);
+    startPixelWars();
+    return;
+  }
+
+  pixelLobbyStatus.textContent = "Joining game...";
+  try {
+    const response = await fetch(`/api/pixel-wars-lobbies/${encodeURIComponent(lobbyId)}/join`, {
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+    if (!response.ok) {
+      throw new Error("Join failed.");
+    }
+    const data = (await response.json()) as { lobby?: PixelLobby };
+    if (!data.lobby) {
+      throw new Error("Missing lobby.");
+    }
+    pixelJoinedLobbyId = data.lobby.id;
+    applyPixelLobbySettings(data.lobby);
+    pixelLobbyStatus.textContent = "Joined game.";
+    startPixelWars();
+  } catch {
+    pixelLobbyStatus.textContent = "Could not join that game.";
+    void loadPixelLobbies();
+  }
+}
+
+function showPixelSingleConfig() {
+  pixelMode = "single";
+  pixelJoinedLobbyId = "";
+  pixelHumansInput.value = "1";
+  syncPixelConfigFromInputs();
+  setPixelMenuView("single");
+}
+
+function showPixelLobby() {
+  pixelMode = "multi";
+  pixelJoinedLobbyId = "";
+  pixelHumansInput.disabled = false;
+  if (Number(pixelHumansInput.value) < 2) {
+    pixelHumansInput.value = "2";
+  }
+  syncPixelConfigFromInputs();
+  setPixelMenuView("lobby");
+  void loadPixelLobbies();
+}
+
+function handlePixelMenuBack() {
+  if (!pixelModeChoice.hidden) {
+    reset("platform");
+    return;
+  }
+  leavePixelWarsNetwork();
+  setPixelMenuView("choice");
+}
+
+function pixelLayout(): PixelBoardLayout {
+  const canvasW = canvas.width / dpr;
+  const canvasH = canvas.height / dpr;
+  const panelX = Math.round(canvasW * 0.58);
+  const padding = Math.max(12, Math.min(28, canvasW * 0.024));
+  const availableW = panelX - padding * 2;
+  const availableH = canvasH - padding * 2;
+  const cellSize = Math.floor(Math.max(5, Math.min(availableW / pixelColumns, availableH / pixelRows)));
+  const boardW = cellSize * pixelColumns;
+  const boardH = cellSize * pixelRows;
+  return {
+    boardH,
+    boardW,
+    canvasH,
+    canvasW,
+    cellH: cellSize,
+    cellW: cellSize,
+    panelX,
+    x: Math.round((panelX - boardW) * 0.5),
+    y: Math.round((canvasH - boardH) * 0.5),
+  };
+}
+
+function clampPixelTurretAngle(turret: PixelTurret, angle: number) {
+  if (turret.arc >= Math.PI) {
+    return normalizeAngle(angle);
+  }
+  const delta = clampNumber(normalizeAngle(angle - turret.homeAngle), -turret.arc, turret.arc);
+  return normalizeAngle(turret.homeAngle + delta);
+}
+
+function playerPixelTurrets() {
+  return pixelTurrets.filter((turret) => turret.isPlayer && !turret.eliminated);
+}
+
+function activePlayerPixelTurret() {
+  const turrets = playerPixelTurrets();
+  return pixelTurretIsActive(turrets[pixelSelectedTurretIndex]) ? turrets[pixelSelectedTurretIndex] : turrets.find((turret) => pixelTurretIsActive(turret));
+}
+
+function pixelTurretAtPoint(x: number, y: number) {
+  const hitRadius = Math.max(16, pixelShieldRadius * 1.45);
+  return playerPixelTurrets().find((turret) => {
+    if (!pixelTurretIsActive(turret)) {
+      return false;
+    }
+    const dx = x - turret.x;
+    const dy = y - turret.y;
+    return dx * dx + dy * dy <= hitRadius * hitRadius;
+  }) || null;
+}
+
+function togglePixelTurretRotation(turret: PixelTurret) {
+  turret.autoRotate = !turret.autoRotate;
+  pixelSelectedTurretIndex = Math.max(0, playerPixelTurrets().indexOf(turret));
+  pixelAimActive = false;
+  pixelAimPointerId = null;
+  if (pixelMode === "multi") {
+    const turretIndex = playerPixelTurrets().indexOf(turret);
+    sendPixelMessage({ autoRotate: turret.autoRotate, turretIndex, type: "pixel-rotation" });
+  }
+  pixelRunnerMessage = turret.autoRotate ? "Turret auto-rotation on" : "Turret stopped — aim it";
+  pixelRunnerMessageTimer = 1.6;
+}
+
+function pointInsidePixelBoard(x: number, y: number, layout: PixelBoardLayout) {
+  return x >= layout.x && x <= layout.x + layout.boardW && y >= layout.y && y <= layout.y + layout.boardH;
+}
+
+function pixelRayIntersectsBoard(turret: PixelTurret, angle = turret.angle, layout = pixelLayout()) {
+  if (
+    turret.x > layout.x &&
+    turret.x < layout.x + layout.boardW &&
+    turret.y > layout.y &&
+    turret.y < layout.y + layout.boardH
+  ) {
+    return true;
+  }
+
+  const dx = Math.cos(angle);
+  const dy = Math.sin(angle);
+  const targets = [
+    dx !== 0 ? (layout.x - turret.x) / dx : Number.POSITIVE_INFINITY,
+    dx !== 0 ? (layout.x + layout.boardW - turret.x) / dx : Number.POSITIVE_INFINITY,
+    dy !== 0 ? (layout.y - turret.y) / dy : Number.POSITIVE_INFINITY,
+    dy !== 0 ? (layout.y + layout.boardH - turret.y) / dy : Number.POSITIVE_INFINITY,
+  ].filter((value) => Number.isFinite(value) && value > 0.001);
+
+  return targets.some((distance) =>
+    pointInsidePixelBoard(turret.x + dx * distance, turret.y + dy * distance, layout),
+  );
+}
+
+function pixelShotStart(turret: PixelTurret, layout: PixelBoardLayout) {
+  const dx = Math.cos(turret.angle);
+  const dy = Math.sin(turret.angle);
+  return {
+    x: clampNumber(turret.x + dx * pixelCannonLength, layout.x + 0.5, layout.x + layout.boardW - 0.5),
+    y: clampNumber(turret.y + dy * pixelCannonLength, layout.y + 0.5, layout.y + layout.boardH - 0.5),
+  };
+}
+
+function pixelSpawnAnchors(layout: PixelBoardLayout) {
+  const left = layout.x;
+  const centerX = layout.x + layout.boardW / 2;
+  const right = layout.x + layout.boardW;
+  const top = layout.y;
+  const centerY = layout.y + layout.boardH / 2;
+  const bottom = layout.y + layout.boardH;
+  const cornerLeft = left + pixelCornerSpawnInset;
+  const cornerRight = right - pixelCornerSpawnInset;
+  const cornerTop = top + pixelCornerSpawnInset;
+  const cornerBottom = bottom - pixelCornerSpawnInset;
+  return [
+    { x: centerX, y: bottom },
+    { x: cornerLeft, y: cornerTop },
+    { x: centerX, y: top },
+    { x: cornerRight, y: cornerTop },
+    { x: right, y: centerY },
+    { x: cornerRight, y: cornerBottom },
+    { x: cornerLeft, y: cornerBottom },
+    { x: left, y: centerY },
+    { x: centerX, y: centerY },
+  ];
+}
+
+function setPixelTurretPosition(turret: PixelTurret, index: number) {
+  const layout = pixelLayout();
+  const centerX = layout.x + layout.boardW / 2;
+  const centerY = layout.y + layout.boardH / 2;
+  const anchor =
+    turret.spawnXRatio !== null && turret.spawnYRatio !== null
+      ? {
+          x: layout.x + layout.boardW * turret.spawnXRatio,
+          y: layout.y + layout.boardH * turret.spawnYRatio,
+        }
+      : pixelSpawnAnchors(layout)[index % pixelMaxPlayers];
+  turret.x = anchor.x;
+  turret.y = anchor.y;
+  const centered = Math.abs(turret.x - centerX) < 1 && Math.abs(turret.y - centerY) < 1;
+  turret.homeAngle = centered ? -Math.PI / 2 : Math.atan2(centerY - turret.y, centerX - turret.x);
+  turret.arc = centered ? Math.PI : turret.isPlayer ? Math.PI / 2 : Math.PI * 0.42;
+  turret.angle = clampPixelTurretAngle(turret, Number.isFinite(turret.angle) ? turret.angle : turret.homeAngle);
+}
+
+function positionPixelTurrets() {
+  pixelTurrets.forEach((turret, index) => setPixelTurretPosition(turret, index));
+}
+
+function pixelSeedCandidates(turret: Pick<PixelTurret, "x" | "y">, layout: PixelBoardLayout) {
+  const candidates: { distance: number; index: number }[] = [];
+  for (let row = 0; row < pixelRows; row += 1) {
+    for (let column = 0; column < pixelColumns; column += 1) {
+      const cellX = layout.x + column * layout.cellW + layout.cellW / 2;
+      const cellY = layout.y + row * layout.cellH + layout.cellH / 2;
+      const dx = cellX - turret.x;
+      const dy = cellY - turret.y;
+      candidates.push({
+        distance: dx * dx + dy * dy,
+        index: row * pixelColumns + column,
+      });
+    }
+  }
+  return candidates.sort((a, b) => a.distance - b.distance);
+}
+
+function pixelStartingSeedCount(layout: PixelBoardLayout) {
+  const sideReference = {
+    x: layout.x + layout.boardW / 2,
+    y: layout.y + layout.boardH,
+  };
+  const radiusSquared = pixelShieldRadius * pixelShieldRadius;
+  return Math.max(
+    1,
+    pixelSeedCandidates(sideReference, layout).filter((candidate) => candidate.distance <= radiusSquared).length,
+  );
+}
+
+function seedPixelTurretTerritory() {
+  const layout = pixelLayout();
+  const seedCount = pixelStartingSeedCount(layout);
+
+  pixelTurrets.forEach((turret) => seedPixelTurretStart(turret, layout, seedCount));
+}
+
+function seedPixelTurretStart(turret: PixelTurret, layout = pixelLayout(), seedCount = pixelStartingSeedCount(layout)) {
+  pixelSeedCandidates(turret, layout).slice(0, seedCount).forEach((candidate) => {
+    pixelCells[candidate.index] = turret.id;
+  });
+}
+
+function createPixelReels(): Record<PixelLane, PixelReel> {
+  const createReel = (): PixelReel => {
+    const prize = pixelRandomPrize();
+    return { finalPrize: "blank", nextPrize: pixelRandomPrize(), prize, spinDuration: 0, spinPhase: 0, spinTimer: 0 };
+  };
+  return {
+    center: createReel(),
+    left: createReel(),
+    right: createReel(),
+  };
+}
+
+function resetPixelRunner() {
+  pixelRunnerLanePosition = 1;
+  pixelRunnerTargetLane = 1;
+  pixelRunnerJumpTimer = 0;
+  pixelRunnerDuckTimer = 0;
+  pixelRunnerPointerId = null;
+  pixelRunnerStumbleTimer = 0;
+  pixelRunnerPickupTimer = 0.7;
+  pixelRunnerObstacleTimer = 1.35;
+  pixelRunnerPickups = [];
+  pixelRunnerObstacles = [];
+  pixelRunnerPickupLaneCursor = 0;
+  pixelRunnerSpecialSpins = 0;
+  pixelRunnerMessage = "Tap turret to stop rotation";
+  pixelRunnerMessageTimer = 2.8;
+  pixelReelMatchReady = false;
+  pixelReels = createPixelReels();
+}
+
+function createPixelTurret(id: PixelOwner, isPlayer: boolean): PixelTurret {
+  const color = pixelOwnerColor(id);
+  return {
+    aiTargetTimer: 0,
+    angle: isPlayer ? -Math.PI / 2 : Math.PI / 2,
+    autoRotate: true,
+    bombShots: 0,
+    bouncePower: 0,
+    arc: isPlayer ? Math.PI * 0.85 : Math.PI * 0.44,
+    color,
+    eliminated: false,
+    fireCooldown: Math.random() * pixelBaseFireInterval,
+    fireSpeedBoosts: 0,
+    fireInterval: pixelBaseFireInterval,
+    homeAngle: isPlayer ? -Math.PI / 2 : Math.PI / 2,
+    id,
+    isPlayer,
+    respawnPending: false,
+    respawnDelay: 0,
+    respawnTimer: 0,
+    rotateDirection: Math.random() < 0.5 ? -1 : 1,
+    rotateSpeed: isPlayer ? 0.8 : 0.55 + Math.random() * 0.5,
+    shieldHealth: pixelShieldMaxHealth,
+    spawnXRatio: null,
+    spawnYRatio: null,
+    x: 0,
+    y: 0,
+  };
+}
+
+function resetPixelWars() {
+  syncPixelConfigFromInputs();
+  pixelCells = Array.from({ length: pixelColumns * pixelRows }, () => "neutral");
+  pixelShots = [];
+  resetPixelRunner();
+  pixelAimActive = false;
+  pixelAimPointerId = null;
+  pixelSelectedTurretIndex = 0;
+  pixelTerritory = 0;
+  pixelMatchOver = false;
+  pixelMatchMessage = "";
+  pixelTurrets = [createPixelTurret("player", true)];
+  for (let human = 2; human <= pixelHumanSlots; human += 1) {
+    pixelTurrets.push(createPixelTurret(`human-${human}` as PixelOwner, false));
+  }
+  for (let bot = 1; bot <= pixelBotCount; bot += 1) {
+    pixelTurrets.push(createPixelTurret(`bot-${bot}` as PixelOwner, false));
+  }
+  positionPixelTurrets();
+  seedPixelTurretTerritory();
+  updatePixelScore();
+}
+
+function updatePixelScore() {
+  if (pixelCells.length === 0) {
+    pixelTerritory = 0;
+    scoreLabel.textContent = "Claim";
+    scoreEl.textContent = "0%";
+    return;
+  }
+  const owned = pixelCells.filter((owner) => owner === "player").length;
+  pixelTerritory = Math.round((owned / pixelCells.length) * 1000) / 10;
+  scoreLabel.textContent = "Claim";
+  scoreEl.textContent = `${formatScore(pixelTerritory)}%`;
+  if (pixelTerritory > pixelLocalBest) {
+    writePixelLocalBest(pixelTerritory);
+    renderPixelScores();
+  }
+}
+
+function pixelOwnedCellCount(owner: PixelOwner) {
+  return pixelCells.reduce((total, currentOwner) => total + (currentOwner === owner ? 1 : 0), 0);
+}
+
+function pixelTurretIsActive(turret: PixelTurret) {
+  return !turret.eliminated && !turret.respawnPending && turret.respawnTimer <= 0 && turret.shieldHealth > 0;
+}
+
+function pixelOwnerHasActiveTurret(owner: PixelOwner) {
+  return pixelTurrets.some((turret) => turret.id === owner && pixelTurretIsActive(turret));
+}
+
+function pixelOwnerCanRespawn(owner: PixelOwner) {
+  return pixelOwnedCellCount(owner) > 0 || pixelOwnerHasActiveTurret(owner);
+}
+
+function pixelPlayerTurretCount() {
+  return pixelTurrets.filter((turret) => turret.isPlayer && !turret.eliminated).length;
+}
+
+function addPixelPlayerTurret() {
+  if (pixelPlayerTurretCount() >= pixelMaxTurretsPerOwner) {
+    pixelRunnerMessage = "Turrets maxed";
+    pixelRunnerMessageTimer = 1.6;
+    return false;
+  }
+  const turret = createPixelTurret("player", true);
+  turret.bouncePower = Math.max(0, ...pixelTurrets.filter((ownedTurret) => ownedTurret.isPlayer).map((ownedTurret) => ownedTurret.bouncePower));
+  turret.respawnPending = true;
+  turret.shieldHealth = 0;
+  turret.fireCooldown = pixelBaseFireInterval;
+  pixelTurrets.push(turret);
+  positionPixelTurrets();
+  pixelRunnerMessage = "New turret ready";
+  pixelRunnerMessageTimer = 1.8;
+  return true;
+}
+
+function eliminatePixelTurret(turret: PixelTurret) {
+  turret.eliminated = true;
+  turret.respawnPending = false;
+  turret.respawnTimer = 0;
+  turret.respawnDelay = 0;
+  turret.shieldHealth = 0;
+  if (turret.isPlayer && !pixelOwnerCanRespawn("player")) {
+    pixelAimActive = false;
+    pixelAimPointerId = null;
+    pixelRunnerMessage = "No pixels left";
+    pixelRunnerMessageTimer = 2;
+  }
+}
+
+function updatePixelRespawnEliminations() {
+  pixelTurrets.forEach((turret) => {
+    if (
+      !turret.eliminated &&
+      (turret.respawnPending || turret.respawnTimer > 0) &&
+      !pixelOwnerCanRespawn(turret.id)
+    ) {
+      eliminatePixelTurret(turret);
+    }
+  });
+}
+
+function knockOutPixelTurret(turret: PixelTurret) {
+  if (turret.eliminated || turret.respawnPending || turret.respawnTimer > 0) {
+    return;
+  }
+
+  turret.shieldHealth = 0;
+  turret.respawnPending = true;
+  turret.respawnTimer = 0;
+  turret.respawnDelay = turret.isPlayer ? 0 : 0.75 + Math.random() * 1.8;
+  turret.fireCooldown = pixelBaseFireInterval;
+  if (turret.isPlayer) {
+    pixelAimActive = false;
+    pixelAimPointerId = null;
+    pixelRunnerMessage = "Tap board edge";
+    pixelRunnerMessageTimer = 2;
+  }
+}
+
+function pixelRespawnPlacementIsClear(turret: PixelTurret, x: number, y: number, layout = pixelLayout()) {
+  const cellClearance = Math.max(layout.cellW, layout.cellH) * pixelRespawnShieldClearanceCells;
+  const minDistance = pixelShieldRadius * 2 + cellClearance;
+  const minDistanceSquared = minDistance * minDistance;
+  return !pixelTurrets.some((otherTurret) => {
+    if (otherTurret === turret || otherTurret.eliminated || otherTurret.respawnPending) {
+      return false;
+    }
+    if (otherTurret.shieldHealth <= 0 && otherTurret.respawnTimer <= 0) {
+      return false;
+    }
+    const dx = x - otherTurret.x;
+    const dy = y - otherTurret.y;
+    return dx * dx + dy * dy < minDistanceSquared;
+  });
+}
+
+function queuePixelRespawn(turret: PixelTurret, x: number, y: number, layout = pixelLayout()) {
+  if (turret.eliminated || !turret.respawnPending) {
+    return false;
+  }
+  if (!pixelOwnerCanRespawn(turret.id)) {
+    eliminatePixelTurret(turret);
+    return false;
+  }
+  if (!pixelRespawnPlacementIsClear(turret, x, y, layout)) {
+    if (turret.isPlayer) {
+      pixelRunnerMessage = "Too close to tower";
+      pixelRunnerMessageTimer = 1.3;
+    }
+    return false;
+  }
+
+  turret.spawnXRatio = clampNumber((x - layout.x) / layout.boardW, 0, 1);
+  turret.spawnYRatio = clampNumber((y - layout.y) / layout.boardH, 0, 1);
+  setPixelTurretPosition(turret, pixelTurrets.indexOf(turret));
+  turret.respawnPending = false;
+  turret.respawnTimer = pixelRespawnWindow;
+  turret.respawnDelay = 0;
+  if (turret.isPlayer) {
+    pixelRunnerMessage = "Respawning";
+    pixelRunnerMessageTimer = 1.4;
+  }
+  return true;
+}
+
+function respawnPixelTurret(turret: PixelTurret) {
+  if (turret.eliminated || turret.respawnPending || turret.respawnTimer > 0) {
+    return;
+  }
+  if (!pixelOwnerCanRespawn(turret.id)) {
+    eliminatePixelTurret(turret);
+    return;
+  }
+
+  turret.shieldHealth = pixelShieldMaxHealth;
+  turret.fireCooldown = 0.35;
+  seedPixelTurretStart(turret);
+  if (turret.isPlayer) {
+    pixelRunnerMessage = "Respawned";
+    pixelRunnerMessageTimer = 1.2;
+  }
+}
+
+function randomPixelPerimeterPoint(layout = pixelLayout()) {
+  const side = Math.floor(Math.random() * 4);
+  const edgePadding = Math.max(layout.cellW, layout.cellH) * 1.5;
+  if (side === 0) {
+    return { x: layout.x + edgePadding + Math.random() * (layout.boardW - edgePadding * 2), y: layout.y };
+  }
+  if (side === 1) {
+    return {
+      x: layout.x + layout.boardW,
+      y: layout.y + edgePadding + Math.random() * (layout.boardH - edgePadding * 2),
+    };
+  }
+  if (side === 2) {
+    return {
+      x: layout.x + edgePadding + Math.random() * (layout.boardW - edgePadding * 2),
+      y: layout.y + layout.boardH,
+    };
+  }
+  return { x: layout.x, y: layout.y + edgePadding + Math.random() * (layout.boardH - edgePadding * 2) };
+}
+
+function updatePixelRespawns(dt: number) {
+  pixelTurrets.forEach((turret) => {
+    if (turret.eliminated) {
+      return;
+    }
+
+    if (turret.respawnPending) {
+      turret.respawnDelay = Math.max(0, turret.respawnDelay - dt);
+      if (!turret.isPlayer && turret.respawnDelay <= 0) {
+        for (let attempt = 0; attempt < 20; attempt += 1) {
+          const point = randomPixelPerimeterPoint();
+          if (queuePixelRespawn(turret, point.x, point.y)) {
+            break;
+          }
+        }
+      }
+      return;
+    }
+
+    if (turret.respawnTimer <= 0) {
+      return;
+    }
+
+    turret.respawnTimer = Math.max(0, turret.respawnTimer - dt);
+    if (turret.respawnTimer <= 0) {
+      respawnPixelTurret(turret);
+    }
+  });
+}
+
+function checkPixelWinCondition() {
+  if (pixelMatchOver || state !== "pixel-running") {
+    return;
+  }
+
+  const playerHasTurret = pixelTurrets.some((turret) => turret.isPlayer && !turret.eliminated);
+  if (!playerHasTurret && pixelOwnedCellCount("player") <= 0) {
+    pixelMatchOver = true;
+    pixelMatchMessage = "You were eliminated";
+    return;
+  }
+
+  if (pixelTerritory >= 100) {
+    pixelMatchOver = true;
+    pixelMatchMessage = "You claimed the board";
+    return;
+  }
+}
+
+function pixelRandomPrize(): PixelPrize {
+  const roll = Math.random() * 100;
+  if (roll < 42) {
+    return "blank";
+  }
+  if (roll < 82) {
+    return "clock";
+  }
+  if (roll < 94) {
+    return "bomb";
+  }
+  if (roll < 97) {
+    return "turret";
+  }
+  return "bounce";
+}
+
+function pixelLaneIndex(lane: PixelLane) {
+  return pixelRunnerLanes.indexOf(lane);
+}
+
+function pixelLaneFromIndex(index: number) {
+  return pixelRunnerLanes[clampNumber(Math.round(index), 0, pixelRunnerLanes.length - 1)] ?? "center";
+}
+
+function pixelRunnerLayout(layout: PixelBoardLayout): PixelRunnerLayout {
+  const panelPadding = Math.max(12, Math.min(22, layout.canvasW * 0.018));
+  const x = layout.panelX + panelPadding;
+  const w = Math.max(170, layout.canvasW - layout.panelX - panelPadding * 2);
+  const slotH = Math.min(116, Math.max(84, layout.canvasH * 0.24));
+  const buttonSize = Math.min(64, Math.max(46, w * 0.24));
+  const trackY = panelPadding + slotH + 58;
+  const trackH = Math.max(150, layout.canvasH - trackY - buttonSize - panelPadding * 1.5);
+  const trackX = x + Math.max(8, w * 0.05);
+  const trackW = w - Math.max(16, w * 0.1);
+  const laneWidth = trackW / 3;
+  const spinButtonW = Math.min(150, w * 0.46);
+  const buttonY = trackY + trackH + 8;
+  return {
+    duckButton: { h: buttonSize, w: buttonSize, x: x + w - buttonSize, y: buttonY },
+    h: layout.canvasH - panelPadding * 2,
+    jumpButton: { h: buttonSize, w: buttonSize, x, y: buttonY },
+    laneCenters: [trackX + laneWidth * 0.5, trackX + laneWidth * 1.5, trackX + laneWidth * 2.5],
+    playerY: trackY + trackH - 36,
+    slotH,
+    slotW: w,
+    slotX: x,
+    slotY: panelPadding,
+    spinButton: { h: 34, w: spinButtonW, x: x + w - spinButtonW, y: panelPadding + slotH + 10 },
+    trackH,
+    trackW,
+    trackX,
+    trackY,
+    w,
+    x,
+    y: panelPadding,
+  };
+}
+
+function pixelSpinReel(lane: PixelLane, duration = pixelReelSpinDuration) {
+  const reel = pixelReels[lane];
+  if (reel.spinTimer > 0) {
+    return false;
+  }
+  reel.finalPrize = pixelRandomPrize();
+  reel.nextPrize = pixelRandomPrize();
+  reel.spinDuration = duration;
+  reel.spinPhase = 0;
+  reel.spinTimer = duration;
+  pixelReelMatchReady = true;
+  return true;
+}
+
+function pixelSpinAllReels(freeSpin = false) {
+  if (!freeSpin) {
+    if (pixelRunnerSpecialSpins <= 0) {
+      pixelRunnerMessage = "Need all-spin";
+      pixelRunnerMessageTimer = 1;
+      return;
+    }
+    if (pixelRunnerLanes.some((lane) => pixelReels[lane].spinTimer > 0)) {
+      pixelRunnerMessage = "Reels still spinning";
+      pixelRunnerMessageTimer = 1.2;
+      return;
+    }
+    pixelRunnerSpecialSpins -= 1;
+  }
+  pixelRunnerLanes.forEach((lane, index) => pixelSpinReel(lane, pixelReelSpinDuration + index * pixelReelStopStagger));
+}
+
+function pixelApplySlotPrize(prize: PixelPrize) {
+  const playerTurrets = pixelTurrets.filter((turret) => turret.isPlayer && !turret.eliminated);
+  if (playerTurrets.length === 0) {
+    return;
+  }
+  if (pixelMode === "multi") {
+    sendPixelMessage({ prize, type: "pixel-prize" });
+    pixelRunnerMessage =
+      prize === "clock"
+        ? "Speed sent"
+        : prize === "bomb"
+          ? "Bomb sent"
+          : prize === "turret"
+            ? "Turret sent"
+            : prize === "bounce"
+              ? "Bounce sent"
+              : "Dud match";
+    pixelRunnerMessageTimer = 1.6;
+    return;
+  }
+  if (prize === "clock") {
+    playerTurrets.forEach((turret) => {
+      turret.fireSpeedBoosts += 1;
+    });
+    pixelRunnerMessage = `Speed +${Math.max(...playerTurrets.map((turret) => turret.fireSpeedBoosts))}`;
+  } else if (prize === "bomb") {
+    playerTurrets.forEach((turret) => {
+      turret.bombShots += pixelBombShotAward;
+    });
+    pixelRunnerMessage = `Bomb shots +${pixelBombShotAward}`;
+  } else if (prize === "turret") {
+    addPixelPlayerTurret();
+  } else if (prize === "bounce") {
+    playerTurrets.forEach((turret) => {
+      turret.bouncePower += 2;
+    });
+    pixelRunnerMessage = `Bounce +${Math.floor(Math.max(...playerTurrets.map((turret) => turret.bouncePower)) / 2)}`;
+  } else {
+    pixelRunnerMessage = "Dud match";
+  }
+  pixelRunnerMessageTimer = 1.6;
+}
+
+function pixelResolveReelMatch() {
+  if (!pixelReelMatchReady || pixelRunnerLanes.some((lane) => pixelReels[lane].spinTimer > 0)) {
+    return;
+  }
+  const [left, center, right] = pixelRunnerLanes.map((lane) => pixelReels[lane].prize);
+  if (left === center && center === right) {
+    pixelApplySlotPrize(left);
+    pixelSpinAllReels(true);
+  } else {
+    pixelReelMatchReady = false;
+  }
+}
+
+function shuffledPixelRunnerLanes() {
+  const lanes = [...pixelRunnerLanes];
+  for (let index = lanes.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [lanes[index], lanes[swapIndex]] = [lanes[swapIndex], lanes[index]];
+  }
+  return lanes;
+}
+
+function pixelObstacleAction(obstacle: Pick<PixelRunnerObstacle, "kind">): PixelRunnerAction {
+  return obstacle.kind === "hurdle" ? "jump" : "duck";
+}
+
+function pixelRunnerActionsConflict(first: PixelRunnerAction, second: PixelRunnerAction) {
+  return first !== "none" && second !== "none" && first !== second;
+}
+
+function pixelRunnerLaneIsClear(lane: PixelLane, y: number, action: PixelRunnerAction) {
+  const pickupBlocked = pixelRunnerPickups.some(
+    (pickup) => pickup.lane === lane && Math.abs(pickup.y - y) < pixelRunnerSameLaneClearance,
+  );
+  if (pickupBlocked) {
+    return false;
+  }
+
+  return !pixelRunnerObstacles.some((obstacle) => {
+    if (obstacle.lane !== lane) {
+      return false;
+    }
+    const distance = Math.abs(obstacle.y - y);
+    return (
+      distance < pixelRunnerSameLaneClearance ||
+      (distance < pixelRunnerActionConflictClearance && pixelRunnerActionsConflict(action, pixelObstacleAction(obstacle)))
+    );
+  });
+}
+
+function pixelChooseRunnerLane(y: number, action: PixelRunnerAction) {
+  return shuffledPixelRunnerLanes().find((lane) => pixelRunnerLaneIsClear(lane, y, action)) ?? null;
+}
+
+function pixelChooseRunnerPickupLane(y: number, action: PixelRunnerAction) {
+  const availableLanes = pixelRunnerLanes.filter(
+    (lane) => pixelReels[lane].spinTimer <= 0 && pixelRunnerLaneIsClear(lane, y, action),
+  );
+  if (availableLanes.length === 0) {
+    return null;
+  }
+  for (let offset = 0; offset < pixelRunnerLanes.length; offset += 1) {
+    const index = (pixelRunnerPickupLaneCursor + offset) % pixelRunnerLanes.length;
+    const lane = pixelRunnerLanes[index];
+    if (availableLanes.includes(lane)) {
+      pixelRunnerPickupLaneCursor = (index + 1) % pixelRunnerLanes.length;
+      return lane;
+    }
+  }
+  return availableLanes[0] ?? null;
+}
+
+function pixelSpawnRunnerPickup(layout: PixelRunnerLayout) {
+  const y = layout.trackY - 24;
+  const actionRoll = Math.random();
+  const action: PixelRunnerAction = actionRoll < 0.14 ? "jump" : actionRoll < 0.28 ? "duck" : "none";
+  const lane = pixelChooseRunnerPickupLane(y, action);
+  if (!lane) {
+    return false;
+  }
+  pixelRunnerPickups.push({
+    action,
+    id: pixelRunnerPickupId,
+    kind: Math.random() < 0.14 ? "special" : "lane",
+    lane,
+    y,
+  });
+  pixelRunnerPickupId += 1;
+  return true;
+}
+
+function pixelSpawnRunnerObstacle(layout: PixelRunnerLayout) {
+  const kind: PixelRunnerObstacle["kind"] = Math.random() < 0.5 ? "hurdle" : "beam";
+  const y = layout.trackY - 18;
+  const lane = pixelChooseRunnerLane(y, pixelObstacleAction({ kind }));
+  if (!lane) {
+    return false;
+  }
+  pixelRunnerObstacles.push({
+    id: pixelRunnerPickupId,
+    kind,
+    lane,
+    y,
+  });
+  pixelRunnerPickupId += 1;
+  return true;
+}
+
+function pixelRunnerActionActive(action: PixelRunnerAction) {
+  if (action === "jump") {
+    return pixelRunnerJumpTimer > 0;
+  }
+  if (action === "duck") {
+    return pixelRunnerDuckTimer > 0;
+  }
+  return true;
+}
+
+function collectPixelRunnerPickup(pickup: PixelRunnerPickup) {
+  if (!pixelRunnerActionActive(pickup.action)) {
+    return false;
+  }
+  if (pickup.kind === "special") {
+    pixelRunnerSpecialSpins += 1;
+    pixelRunnerMessage = "All-spin banked";
+  } else {
+    if (!pixelSpinReel(pickup.lane)) {
+      return false;
+    }
+    pixelRunnerMessage = `${pickup.lane} reel`;
+  }
+  pixelRunnerMessageTimer = 1;
+  return true;
+}
+
+function updatePixelReels(dt: number) {
+  pixelRunnerLanes.forEach((lane) => {
+    const reel = pixelReels[lane];
+    if (reel.spinTimer <= 0) {
+      return;
+    }
+    reel.spinTimer = Math.max(0, reel.spinTimer - dt);
+    if (reel.spinTimer > 0) {
+      const progress = reel.spinDuration > 0 ? 1 - reel.spinTimer / reel.spinDuration : 1;
+      const spinRate = 5.5 + (1 - Math.min(1, progress)) * 8;
+      reel.spinPhase += dt * spinRate;
+      while (reel.spinPhase >= 1) {
+        reel.spinPhase -= 1;
+        reel.prize = reel.nextPrize;
+        reel.nextPrize = pixelRandomPrize();
+      }
+    } else {
+      reel.prize = reel.finalPrize;
+      reel.nextPrize = reel.finalPrize;
+      reel.spinDuration = 0;
+      reel.spinPhase = 0;
+    }
+  });
+  pixelResolveReelMatch();
+}
+
+function updatePixelRunner(dt: number) {
+  const layout = pixelRunnerLayout(pixelLayout());
+  pixelRunnerLanePosition += (pixelRunnerTargetLane - pixelRunnerLanePosition) * Math.min(1, dt * 10);
+  pixelRunnerJumpTimer = Math.max(0, pixelRunnerJumpTimer - dt);
+  pixelRunnerDuckTimer = Math.max(0, pixelRunnerDuckTimer - dt);
+  pixelRunnerStumbleTimer = Math.max(0, pixelRunnerStumbleTimer - dt);
+  pixelRunnerMessageTimer = Math.max(0, pixelRunnerMessageTimer - dt);
+  pixelRunnerPickupTimer -= dt;
+  pixelRunnerObstacleTimer -= dt;
+
+  if (pixelRunnerPickupTimer <= 0) {
+    pixelRunnerPickupTimer = pixelSpawnRunnerPickup(layout) ? 0.82 + Math.random() * 0.72 : 0.22;
+  }
+  if (pixelRunnerObstacleTimer <= 0) {
+    pixelRunnerObstacleTimer = pixelSpawnRunnerObstacle(layout) ? 1.25 + Math.random() * 0.95 : 0.22;
+  }
+
+  const currentLane = pixelLaneFromIndex(pixelRunnerLanePosition);
+  pixelRunnerPickups.forEach((pickup) => {
+    pickup.y += pixelRunnerSpeed * dt;
+  });
+  pixelRunnerObstacles.forEach((obstacle) => {
+    obstacle.y += pixelRunnerSpeed * dt;
+  });
+
+  pixelRunnerPickups = pixelRunnerPickups.filter((pickup) => {
+    const nearPlayer = Math.abs(pickup.y - layout.playerY) < 22;
+    if (nearPlayer && pickup.lane === currentLane && pixelRunnerStumbleTimer <= 0) {
+      return !collectPixelRunnerPickup(pickup);
+    }
+    return pickup.y < layout.trackY + layout.trackH + 34;
+  });
+
+  pixelRunnerObstacles = pixelRunnerObstacles.filter((obstacle) => {
+    const nearPlayer = Math.abs(obstacle.y - layout.playerY) < 20;
+    const avoided = obstacle.kind === "hurdle" ? pixelRunnerJumpTimer > 0 : pixelRunnerDuckTimer > 0;
+    if (nearPlayer && obstacle.lane === currentLane && !avoided && pixelRunnerStumbleTimer <= 0) {
+      pixelRunnerStumbleTimer = 0.75;
+      pixelRunnerMessage = "Bonk";
+      pixelRunnerMessageTimer = 0.85;
+      return false;
+    }
+    return obstacle.y < layout.trackY + layout.trackH + 34;
+  });
+
+  updatePixelReels(dt);
+}
+
+function startPixelWars() {
+  unlockAudio();
+  if (isWideGameMobilePortrait()) {
+    state = "pixel-menu";
+    updatePixelOrientationGate();
+    return;
+  }
+  leaveSnakeRoom();
+  setSnakeLayout(false);
+  resetSnakeJoystick();
+  if (pixelMode === "multi") {
+    if (!pixelJoinedLobbyId) {
+      showPixelLobby();
+      pixelLobbyStatus.textContent = "Create or join a game first.";
+      return;
+    }
+    resetPixelRunner();
+    pixelCells = Array.from({ length: pixelColumns * pixelRows }, () => "neutral");
+    pixelShots = [];
+    pixelTurrets = [];
+    pixelTerritory = 0;
+    pixelMatchOver = false;
+    pixelMatchMessage = "";
+    connectPixelWarsSocket();
+  } else {
+    leavePixelWarsNetwork();
+    resetPixelWars();
+  }
+  state = "pixel-running";
+  overlay.hidden = true;
+  overlay.classList.remove("is-platform");
+  platformPanel.hidden = true;
+  gameMenuPanel.hidden = true;
+  planeOptionsPanel.hidden = true;
+  crashPanel.hidden = true;
+  snakeMenuPanel.hidden = true;
+  snakeOptionsPanel.hidden = true;
+  bridgeMenuPanel.hidden = true;
+  bridgeOptionsPanel.hidden = true;
+  bridgeDeadPanel.hidden = true;
+  pixelMenuPanel.hidden = true;
+  pixelOptionsPanel.hidden = true;
+  reportPanel.hidden = true;
+  snakeDeadPanel.hidden = true;
+  scorePanel.hidden = true;
+  homeButton.hidden = false;
+  startButton.hidden = true;
+  restartButton.hidden = true;
+  snakeControls.hidden = true;
+  bridgeControls.hidden = true;
+  updateRollButton();
+  updatePixelOrientationGate();
+}
+
+function showPixelMenu() {
+  leaveSnakeRoom();
+  leavePixelWarsNetwork();
+  setSnakeLayout(false);
+  resetSnakeJoystick();
+  readPixelLocalBest();
+  pixelMode = "single";
+  pixelJoinedLobbyId = "";
+  syncPixelConfigFromInputs();
+  setPixelMenuView("choice");
+  state = "pixel-menu";
+  overlay.hidden = false;
+  overlay.classList.remove("is-platform");
+  platformPanel.hidden = true;
+  gameMenuPanel.hidden = true;
+  planeOptionsPanel.hidden = true;
+  crashPanel.hidden = true;
+  snakeMenuPanel.hidden = true;
+  snakeOptionsPanel.hidden = true;
+  bridgeMenuPanel.hidden = true;
+  bridgeOptionsPanel.hidden = true;
+  bridgeDeadPanel.hidden = true;
+  pixelMenuPanel.hidden = false;
+  pixelOptionsPanel.hidden = true;
+  reportPanel.hidden = true;
+  snakeDeadPanel.hidden = true;
+  scorePanel.hidden = true;
+  homeButton.hidden = false;
+  startButton.hidden = true;
+  restartButton.hidden = true;
+  snakeControls.hidden = true;
+  bridgeControls.hidden = true;
+  updateRollButton();
+  updatePixelOrientationGate();
+}
+
+function showPixelOptions() {
+  leaveSnakeRoom();
+  setSnakeLayout(false);
+  resetSnakeJoystick();
+  state = "pixel-options";
+  overlay.hidden = false;
+  overlay.classList.remove("is-platform");
+  platformPanel.hidden = true;
+  gameMenuPanel.hidden = true;
+  planeOptionsPanel.hidden = true;
+  crashPanel.hidden = true;
+  snakeMenuPanel.hidden = true;
+  snakeOptionsPanel.hidden = true;
+  bridgeMenuPanel.hidden = true;
+  bridgeOptionsPanel.hidden = true;
+  bridgeDeadPanel.hidden = true;
+  pixelMenuPanel.hidden = true;
+  pixelOptionsPanel.hidden = false;
+  reportPanel.hidden = true;
+  snakeDeadPanel.hidden = true;
+  scorePanel.hidden = true;
+  homeButton.hidden = false;
+  snakeControls.hidden = true;
+  bridgeControls.hidden = true;
+  issueStatus.textContent = "";
+  updateRollButton();
+  updatePixelOrientationGate();
+}
+
+function showPlaneOptions() {
+  leaveSnakeRoom();
+  setSnakeLayout(false);
+  state = "plane-options";
+  overlay.hidden = false;
+  overlay.classList.remove("is-platform");
+  platformPanel.hidden = true;
+  gameMenuPanel.hidden = true;
+  planeOptionsPanel.hidden = false;
+  crashPanel.hidden = true;
+  snakeMenuPanel.hidden = true;
+  snakeOptionsPanel.hidden = true;
+  bridgeMenuPanel.hidden = true;
+  bridgeOptionsPanel.hidden = true;
+  bridgeDeadPanel.hidden = true;
+  pixelMenuPanel.hidden = true;
+  pixelOptionsPanel.hidden = true;
+  reportPanel.hidden = true;
+  snakeDeadPanel.hidden = true;
+  scorePanel.hidden = true;
+  homeButton.hidden = false;
+  startButton.hidden = true;
+  restartButton.hidden = true;
+  snakeControls.hidden = true;
+  bridgeControls.hidden = true;
+  issueStatus.textContent = "";
+  updateSoundButtons();
+  updateRollButton();
+}
+
+function showPlaneMenu() {
+  reset("ready");
+}
+
+function startSnakeGame(restart = false) {
+  unlockAudio();
+  snakeBestThisRun = 3;
+  snakeSpawnedThisRun = false;
+  snakeLastAlive = false;
+  snakeLastLength = 0;
+  snakeLastShotBank = 0;
+  resetSnakeJoystick();
+  state = "snake-running";
+  scoreLabel.textContent = "Length";
+  overlay.hidden = true;
+  overlay.classList.remove("is-platform");
+  platformPanel.hidden = true;
+  gameMenuPanel.hidden = true;
+  planeOptionsPanel.hidden = true;
+  crashPanel.hidden = true;
+  snakeMenuPanel.hidden = true;
+  snakeOptionsPanel.hidden = true;
+  bridgeMenuPanel.hidden = true;
+  bridgeOptionsPanel.hidden = true;
+  bridgeDeadPanel.hidden = true;
+  pixelMenuPanel.hidden = true;
+  pixelOptionsPanel.hidden = true;
+  reportPanel.hidden = true;
+  snakeDeadPanel.hidden = true;
+  scorePanel.hidden = true;
+  homeButton.hidden = false;
+  startButton.hidden = true;
+  restartButton.hidden = true;
+  snakeControls.hidden = false;
+  bridgeControls.hidden = true;
+  setSnakeLayout(true);
+  updateRollButton();
+  connectSnakeSocket();
+  if (snakeSocket?.readyState === WebSocket.OPEN) {
+    sendSnakeMessage({ type: restart ? "snake-restart" : "snake-start" });
+  } else {
+    snakeStartPending = true;
+  }
+  updateSnakeScore();
+}
+
+function showSnakeMenu() {
+  leaveSnakeRoom();
+  setSnakeLayout(false);
+  resetSnakeJoystick();
+  snakeLastAlive = false;
+  snakeLastLength = 0;
+  snakeLastShotBank = 0;
+  readSnakeLocalLongest();
+  renderSnakeHighScores();
+  void loadServerSnakeHighScores();
+  state = "snake-menu";
+  scoreEl.textContent = "0";
+  overlay.hidden = false;
+  overlay.classList.remove("is-platform");
+  platformPanel.hidden = true;
+  gameMenuPanel.hidden = true;
+  planeOptionsPanel.hidden = true;
+  crashPanel.hidden = true;
+  snakeMenuPanel.hidden = false;
+  snakeOptionsPanel.hidden = true;
+  bridgeMenuPanel.hidden = true;
+  bridgeOptionsPanel.hidden = true;
+  bridgeDeadPanel.hidden = true;
+  pixelMenuPanel.hidden = true;
+  pixelOptionsPanel.hidden = true;
+  reportPanel.hidden = true;
+  snakeDeadPanel.hidden = true;
+  scorePanel.hidden = true;
+  homeButton.hidden = false;
+  startButton.hidden = true;
+  restartButton.hidden = true;
+  snakeControls.hidden = true;
+  bridgeControls.hidden = true;
+  updateRollButton();
+}
+
+function showSnakeOptions() {
+  leaveSnakeRoom();
+  setSnakeLayout(false);
+  resetSnakeJoystick();
+  state = "snake-options";
+  overlay.hidden = false;
+  overlay.classList.remove("is-platform");
+  platformPanel.hidden = true;
+  gameMenuPanel.hidden = true;
+  planeOptionsPanel.hidden = true;
+  crashPanel.hidden = true;
+  snakeMenuPanel.hidden = true;
+  snakeOptionsPanel.hidden = false;
+  bridgeMenuPanel.hidden = true;
+  bridgeOptionsPanel.hidden = true;
+  bridgeDeadPanel.hidden = true;
+  pixelMenuPanel.hidden = true;
+  pixelOptionsPanel.hidden = true;
+  reportPanel.hidden = true;
+  snakeDeadPanel.hidden = true;
+  scorePanel.hidden = true;
+  homeButton.hidden = false;
+  startButton.hidden = true;
+  restartButton.hidden = true;
+  snakeControls.hidden = true;
+  bridgeControls.hidden = true;
+  issueStatus.textContent = "";
+  updateSoundButtons();
+  updateRollButton();
+}
+
+function showBridgeMenu() {
+  leaveSnakeRoom();
+  setSnakeLayout(false);
+  resetSnakeJoystick();
+  readBridgeLocalScores();
+  renderBridgeHighScores();
+  void loadServerBridgeHighScores();
+  void loadBridgeJackpot();
+  state = "bridge-menu";
+  scoreEl.textContent = "0";
+  overlay.hidden = false;
+  overlay.classList.remove("is-platform");
+  platformPanel.hidden = true;
+  gameMenuPanel.hidden = true;
+  planeOptionsPanel.hidden = true;
+  crashPanel.hidden = true;
+  snakeMenuPanel.hidden = true;
+  snakeOptionsPanel.hidden = true;
+  bridgeMenuPanel.hidden = false;
+  bridgeOptionsPanel.hidden = true;
+  bridgeDeadPanel.hidden = true;
+  pixelMenuPanel.hidden = true;
+  pixelOptionsPanel.hidden = true;
+  reportPanel.hidden = true;
+  snakeDeadPanel.hidden = true;
+  scorePanel.hidden = true;
+  homeButton.hidden = false;
+  startButton.hidden = true;
+  restartButton.hidden = true;
+  snakeControls.hidden = true;
+  bridgeControls.hidden = true;
+  updateBridgeControls();
+  updateRollButton();
+}
+
+function showBridgeOptions() {
+  leaveSnakeRoom();
+  setSnakeLayout(false);
+  resetSnakeJoystick();
+  state = "bridge-options";
+  overlay.hidden = false;
+  overlay.classList.remove("is-platform");
+  platformPanel.hidden = true;
+  gameMenuPanel.hidden = true;
+  planeOptionsPanel.hidden = true;
+  crashPanel.hidden = true;
+  snakeMenuPanel.hidden = true;
+  snakeOptionsPanel.hidden = true;
+  bridgeMenuPanel.hidden = true;
+  bridgeOptionsPanel.hidden = false;
+  bridgeDeadPanel.hidden = true;
+  pixelMenuPanel.hidden = true;
+  pixelOptionsPanel.hidden = true;
+  reportPanel.hidden = true;
+  snakeDeadPanel.hidden = true;
+  scorePanel.hidden = true;
+  homeButton.hidden = false;
+  snakeControls.hidden = true;
+  bridgeControls.hidden = true;
+  issueStatus.textContent = "";
+  updateSoundButtons();
+  updateRollButton();
+}
+
+function showReportIssue(
+  game: "jumpy-plane" | "shooting-snakes" | "glass-bridge" | "pixel-wars" | "breakout" | "digital-cribbage",
+  returnState: "plane-options" | "snake-options" | "bridge-options" | "pixel-options" | "breakout-options" | "cribbage-options",
+) {
+  reportGame = game;
+  reportReturnState = returnState;
+  leaveSnakeRoom();
+  setSnakeLayout(false);
+  resetSnakeJoystick();
+  state = "report-issue";
+  overlay.hidden = false;
+  overlay.classList.remove("is-platform");
+  platformPanel.hidden = true;
+  gameMenuPanel.hidden = true;
+  planeOptionsPanel.hidden = true;
+  crashPanel.hidden = true;
+  snakeMenuPanel.hidden = true;
+  snakeOptionsPanel.hidden = true;
+  bridgeMenuPanel.hidden = true;
+  bridgeOptionsPanel.hidden = true;
+  bridgeDeadPanel.hidden = true;
+  pixelMenuPanel.hidden = true;
+  pixelOptionsPanel.hidden = true;
+  reportPanel.hidden = false;
+  snakeDeadPanel.hidden = true;
+  scorePanel.hidden = true;
+  homeButton.hidden = false;
+  snakeControls.hidden = true;
+  bridgeControls.hidden = true;
+  issueText.value = "";
+  issueStatus.textContent = "";
+  issueText.focus();
+  updateRollButton();
+}
+
+function returnFromReportIssue() {
+  if (reportReturnState === "breakout-options") {
+    reportPanel.hidden = true;
+    window.dispatchEvent(new CustomEvent("breakout-restore-report"));
+  } else if (reportReturnState === "cribbage-options") {
+    reportPanel.hidden = true;
+    window.dispatchEvent(new CustomEvent("cribbage-restore-report"));
+  } else if (reportReturnState === "pixel-options") {
+    showPixelOptions();
+  } else if (reportReturnState === "bridge-options") {
+    showBridgeOptions();
+  } else if (reportReturnState === "snake-options") {
+    showSnakeOptions();
+  } else {
+    showPlaneOptions();
+  }
+}
+
+function showSnakeDead() {
+  state = "snake-dead";
+  snakeSpawnedThisRun = false;
+  setSnakeLayout(false);
+  resetSnakeJoystick();
+  scoreLabel.textContent = "Longest";
+  overlay.hidden = false;
+  overlay.classList.remove("is-platform");
+  platformPanel.hidden = true;
+  gameMenuPanel.hidden = true;
+  planeOptionsPanel.hidden = true;
+  crashPanel.hidden = true;
+  snakeMenuPanel.hidden = true;
+  snakeOptionsPanel.hidden = true;
+  bridgeMenuPanel.hidden = true;
+  bridgeOptionsPanel.hidden = true;
+  bridgeDeadPanel.hidden = true;
+  pixelMenuPanel.hidden = true;
+  pixelOptionsPanel.hidden = true;
+  reportPanel.hidden = true;
+  snakeDeadPanel.hidden = false;
+  scorePanel.hidden = false;
+  homeButton.hidden = false;
+  startButton.hidden = true;
+  restartButton.hidden = true;
+  snakeControls.hidden = true;
+  bridgeControls.hidden = true;
+  const self = getLocalSnake();
+  const finalLength = Math.max(3, snakeBestThisRun, self?.bestLength ?? 0, self?.segments.length ?? 0);
+  writeSnakeLocalLongest(finalLength);
+  renderSnakeHighScores();
+  void syncFinalSnakeScore(finalLength);
+  scoreEl.textContent = formatScore(finalLength);
+  snakeMessage.textContent = `Longest ${formatScore(finalLength)}.`;
+  updateSnakeShootButton();
+  updateSnakeInfoBar();
+  updateRollButton();
+}
+
+function randomInteger(min: number, max: number) {
+  return min + Math.floor(Math.random() * (max - min + 1));
+}
+
+function randomChoice<T>(items: T[]) {
+  return items[Math.floor(Math.random() * items.length)];
+}
+
+function delay(milliseconds: number) {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, milliseconds);
+  });
+}
+
+function bridgePuzzleDifficulty() {
+  return bridgeTiles * 1.45 + bridgePoints * 0.85;
+}
+
+function bridgePuzzleTier(difficulty: number) {
+  if (difficulty < 5) {
+    return 0;
+  }
+  if (difficulty < 13) {
+    return 1;
+  }
+  if (difficulty < 25) {
+    return 2;
+  }
+  return 3;
+}
+
+function generateBridgePuzzle(
+  correctSide: BridgeSide,
+  difficulty: number,
+  forcedOperation?: BridgeOperation,
+  difficultyTierBonus = 0,
+): BridgePuzzle {
+  const tier = Math.min(3, bridgePuzzleTier(difficulty) + difficultyTierBonus);
+  const operationsByTier: BridgeOperation[][] = [
+    ["+", "-", "+"],
+    ["+", "-", "x"],
+    ["+", "-", "x", "/"],
+    ["+", "-", "x", "/", "x"],
+  ];
+  const operation = forcedOperation ?? randomChoice(operationsByTier[tier]);
+  let left = randomInteger(1, tier === 0 ? 10 : tier === 1 ? 18 : tier === 2 ? 30 : 48);
+  let right = randomInteger(1, tier === 0 ? 10 : tier === 1 ? 18 : tier === 2 ? 30 : 48);
+  let answer = 0;
+  let prompt = "";
+
+  if (operation === "+") {
+    answer = left + right;
+    prompt = `${left} + ${right}`;
+  } else if (operation === "-") {
+    if (right > left) {
+      [left, right] = [right, left];
+    }
+    answer = left - right;
+    prompt = `${left} - ${right}`;
+  } else if (operation === "x") {
+    left = randomInteger(
+      tier === 0 ? 2 : tier === 1 ? 3 : tier === 2 ? 4 : 6,
+      tier === 0 ? 6 : tier === 1 ? 9 : tier === 2 ? 12 : 14,
+    );
+    right = randomInteger(2, tier === 0 ? 6 : tier === 1 ? 9 : tier === 2 ? 11 : 12);
+    answer = left * right;
+    prompt = `${left} x ${right}`;
+  } else {
+    answer = randomInteger(
+      tier === 0 ? 2 : tier === 1 ? 3 : tier === 2 ? 4 : 6,
+      tier === 0 ? 8 : tier === 1 ? 12 : tier === 2 ? 16 : 20,
+    );
+    right = randomInteger(2, tier === 0 ? 6 : tier === 1 ? 9 : tier === 2 ? 10 : 12);
+    left = answer * right;
+    prompt = `${left} / ${right}`;
+  }
+
+  const offsets = tier < 2 ? [-3, -2, -1, 1, 2, 3] : [-8, -5, -3, -2, 2, 3, 5, 8];
+  const offset = randomChoice(offsets);
+  let wrongAnswer = Math.max(0, answer + offset);
+  if (wrongAnswer === answer) {
+    wrongAnswer += 1;
+  }
+
+  return {
+    answers: {
+      left: correctSide === "left" ? answer : wrongAnswer,
+      right: correctSide === "right" ? answer : wrongAnswer,
+    },
+    correctSide,
+    operation,
+    prompt,
+  };
+}
+
+function ensureBridgeRows(count: number) {
+  while (bridgeSafePath.length < count) {
+    const correctSide = Math.random() < 0.5 ? "left" : "right";
+    bridgeSafePath.push(correctSide);
+    bridgePuzzles.push(generateBridgePuzzle(correctSide, bridgePuzzles.length));
+  }
+}
+
+function wheelTotalWeight(segments: { weight: number }[]) {
+  return segments.reduce((total, segment) => total + segment.weight, 0);
+}
+
+function wheelSegmentBounds(segments: { weight: number }[], index: number) {
+  const totalWeight = wheelTotalWeight(segments);
+  const startWeight = segments.slice(0, index).reduce((total, segment) => total + segment.weight, 0);
+  const start = (Math.PI * 2 * startWeight) / totalWeight;
+  const end = start + (Math.PI * 2 * segments[index].weight) / totalWeight;
+  return { center: start + (end - start) / 2, end, start };
+}
+
+function randomWeightedSegmentIndex(segments: { weight: number }[], firstIndex = 0) {
+  const weightedSegments = segments.slice(firstIndex);
+  const totalWeight = wheelTotalWeight(weightedSegments);
+  let roll = Math.random() * totalWeight;
+  for (let index = 0; index < weightedSegments.length; index += 1) {
+    roll -= weightedSegments[index].weight;
+    if (roll <= 0) {
+      return index + firstIndex;
+    }
+  }
+
+  return segments.length - 1;
+}
+
+function randomBridgeNormalWheelIndex() {
+  return randomWeightedSegmentIndex(bridgeWheelSegments, 1);
+}
+
+function wheelLandingTargetAngle(currentAngle: number, segments: { weight: number }[], outcomeIndex: number) {
+  const segmentBounds = wheelSegmentBounds(segments, outcomeIndex);
+  const targetAngle = -Math.PI / 2 - segmentBounds.center;
+  const fullTurn = Math.PI * 2;
+  const catchUpTurns = Math.ceil((currentAngle - targetAngle) / fullTurn);
+  return targetAngle + (catchUpTurns + 4) * fullTurn;
+}
+
+function bridgeHintOutcomeLabel(outcome: BridgeHintOutcome) {
+  return outcome.face ? `${outcome.label} ${outcome.face}` : outcome.label;
+}
+
+function resetBridgeRun() {
+  bridgeSafePath = [];
+  bridgePuzzles = [];
+  bridgeStep = 0;
+  bridgeTiles = 0;
+  bridgePoints = 0;
+  bridgeHint = null;
+  bridgeBrokenSide = null;
+  bridgePlayerSide = null;
+  bridgeStandingSide = null;
+  bridgePendingSide = null;
+  bridgeJumpTimer = 0;
+  bridgeSuccessTimer = 0;
+  bridgeScrollTimer = 0;
+  bridgeWheelLabel = "Ready";
+  bridgeWheelTimer = 0;
+  bridgeWheelSpinTimer = 0;
+  bridgeWheelAngle = 0;
+  bridgeWheelStartAngle = 0;
+  bridgeWheelTargetAngle = 0;
+  bridgePendingWheelOutcome = null;
+  bridgeWheelRequesting = false;
+  bridgeWheelSpinSequence += 1;
+  bridgeHintWheelLabel = "Hint";
+  bridgeHintWheelTimer = 0;
+  bridgeHintWheelSpinTimer = 0;
+  bridgeHintWheelAngle = 0;
+  bridgeHintWheelStartAngle = 0;
+  bridgeHintWheelTargetAngle = 0;
+  bridgePendingHintOutcome = null;
+  bridgeHintWheelRequesting = false;
+  bridgeHintWheelSpinSequence += 1;
+  bridgeFallTimer = 0;
+  ensureBridgeRows(bridgeVisibleRows + 3);
+}
+
+function bridgeWheelBusy() {
+  return (
+    bridgeFallTimer > 0 ||
+    bridgeJumpTimer > 0 ||
+    bridgeSuccessTimer > 0 ||
+    bridgeScrollTimer > 0 ||
+    bridgeWheelRequesting ||
+    bridgeWheelSpinTimer > 0 ||
+    bridgeHintWheelRequesting ||
+    bridgeHintWheelSpinTimer > 0
+  );
+}
+
+function updateBridgeControls() {
+  const bridgeBusy = bridgeWheelBusy();
+  const hasPoints = bridgePoints >= bridgeWheelCost;
+  const hintUsed = bridgeHint?.pathIndex === bridgeStep;
+  bridgeHintSpinButton.disabled = state !== "bridge-running" || bridgeBusy || !hasPoints || hintUsed;
+  bridgeHintSpinButton.textContent = !hasPoints ? "Need 1 point" : hintUsed ? "Hint used" : "Hint wheel (-1)";
+  bridgeSpinButton.disabled = state !== "bridge-running" || bridgeBusy || !hasPoints;
+  bridgeSpinButton.textContent = hasPoints ? "Point wheel (-1)" : "Need 1 point";
+}
+
+function updateBridgeScore() {
+  if (state !== "bridge-running" && state !== "bridge-dead") {
+    return;
+  }
+  scoreLabel.textContent = "Points";
+  scoreEl.textContent = formatScore(bridgePoints);
+  updateBridgeControls();
+}
+
+function showBridgeDead() {
+  state = "bridge-dead";
+  scoreLabel.textContent = "Points";
+  overlay.hidden = false;
+  overlay.classList.remove("is-platform");
+  platformPanel.hidden = true;
+  gameMenuPanel.hidden = true;
+  planeOptionsPanel.hidden = true;
+  crashPanel.hidden = true;
+  snakeMenuPanel.hidden = true;
+  snakeOptionsPanel.hidden = true;
+  bridgeMenuPanel.hidden = true;
+  bridgeOptionsPanel.hidden = true;
+  bridgeDeadPanel.hidden = false;
+  pixelMenuPanel.hidden = true;
+  pixelOptionsPanel.hidden = true;
+  reportPanel.hidden = true;
+  snakeDeadPanel.hidden = true;
+  scorePanel.hidden = false;
+  homeButton.hidden = false;
+  snakeControls.hidden = true;
+  bridgeControls.hidden = true;
+  writeBridgeLocalScores(bridgeTiles, bridgePoints);
+  renderBridgeHighScores();
+  void syncFinalBridgeScores(bridgeTiles, bridgePoints);
+  bridgeMessage.textContent = `Tiles ${formatScore(bridgeTiles)}. Points ${formatScore(bridgePoints)}.`;
+  updateBridgeScore();
+  updateRollButton();
+}
+
+function startBridgeGame() {
+  unlockAudio();
+  if (isWideGameMobilePortrait()) {
+    state = "bridge-menu";
+    updatePixelOrientationGate();
+    return;
+  }
+  leaveSnakeRoom();
+  setSnakeLayout(false);
+  resetSnakeJoystick();
+  resetBridgeRun();
+  void loadBridgeJackpot();
+  scoreLabel.textContent = "Points";
+  state = "bridge-running";
+  overlay.hidden = true;
+  overlay.classList.remove("is-platform");
+  platformPanel.hidden = true;
+  gameMenuPanel.hidden = true;
+  planeOptionsPanel.hidden = true;
+  crashPanel.hidden = true;
+  snakeMenuPanel.hidden = true;
+  snakeOptionsPanel.hidden = true;
+  bridgeMenuPanel.hidden = true;
+  bridgeOptionsPanel.hidden = true;
+  bridgeDeadPanel.hidden = true;
+  pixelMenuPanel.hidden = true;
+  pixelOptionsPanel.hidden = true;
+  reportPanel.hidden = true;
+  snakeDeadPanel.hidden = true;
+  scorePanel.hidden = false;
+  homeButton.hidden = false;
+  startButton.hidden = true;
+  restartButton.hidden = true;
+  snakeControls.hidden = true;
+  bridgeControls.hidden = true;
+  updateBridgeScore();
+  updateRollButton();
+}
+
+function chooseBridgeSide(side: BridgeSide) {
+  if (state !== "bridge-running" || bridgeWheelBusy()) {
+    return;
+  }
+
+  unlockAudio();
+  ensureBridgeRows(bridgeStep + bridgeVisibleRows + 3);
+  bridgePendingSide = side;
+  bridgePlayerSide = side;
+  bridgeBrokenSide = null;
+  bridgeJumpTimer = bridgeJumpDuration;
+  updateBridgeControls();
+}
+
+function resolveBridgeChoice() {
+  if (!bridgePendingSide) {
+    return;
+  }
+
+  const side = bridgePendingSide;
+  bridgePendingSide = null;
+  const safeSide = bridgeSafePath[bridgeStep];
+  if (side === safeSide) {
+    bridgePlayerSide = side;
+    bridgeTiles += 1;
+    bridgePoints += 1;
+    bridgeBrokenSide = null;
+    bridgeWheelLabel = "+1";
+    bridgeWheelTimer = 0.75;
+    bridgeSuccessTimer = bridgeSuccessDuration;
+    playBridgeStepSound();
+    updateBridgeScore();
+    return;
+  }
+
+  bridgeBrokenSide = side;
+  bridgePlayerSide = side;
+  bridgeFallTimer = bridgeFallDuration;
+  playBridgeBreakSound();
+  updateBridgeControls();
+}
+
+async function spinBridgeWheel() {
+  if (state !== "bridge-running" || bridgeWheelBusy() || bridgePoints < bridgeWheelCost) {
+    return;
+  }
+
+  unlockAudio();
+  bridgePoints -= bridgeWheelCost;
+  bridgeWheelRequesting = true;
+  bridgeWheelLabel = "Spinning";
+  const spinSequence = ++bridgeWheelSpinSequence;
+  playBridgeWheelSound();
+  updateBridgeScore();
+
+  const [jackpotSpin] = await Promise.all([
+    submitBridgeJackpotSpin(),
+    delay(bridgeWheelPreSpinDuration * 1000),
+  ]);
+  if (spinSequence !== bridgeWheelSpinSequence || state !== "bridge-running") {
+    return;
+  }
+
+  bridgeWheelRequesting = false;
+  if (!jackpotSpin) {
+    bridgePoints += bridgeWheelCost;
+    bridgeWheelLabel = "Offline";
+    bridgeWheelTimer = 1.4;
+    updateBridgeScore();
+    return;
+  }
+
+  bridgeJackpot = Math.max(0, Number(jackpotSpin.jackpot) || bridgeJackpot);
+  const award = Math.max(0, Math.floor(Number(jackpotSpin.award) || 0));
+  const hitJackpot = jackpotSpin.hit === true && award > 0;
+  const outcomeIndex = hitJackpot ? bridgeJackpotSegmentIndex : randomBridgeNormalWheelIndex();
+  const outcome = hitJackpot
+    ? {
+        color: bridgeWheelSegments[bridgeJackpotSegmentIndex].color,
+        label: `JP +${formatScore(award)}`,
+        apply: (points: number) => points + award,
+        weight: bridgeWheelSegments[bridgeJackpotSegmentIndex].weight,
+      }
+    : bridgeWheelSegments[outcomeIndex];
+  bridgePendingWheelOutcome = outcome;
+  bridgeWheelStartAngle = bridgeWheelAngle;
+  bridgeWheelTargetAngle = wheelLandingTargetAngle(bridgeWheelAngle, bridgeWheelSegments, outcomeIndex);
+  bridgeWheelLabel = "Spinning";
+  bridgeWheelTimer = bridgeWheelSpinDuration;
+  bridgeWheelSpinTimer = bridgeWheelSpinDuration;
+  updateBridgeScore();
+}
+
+async function spinBridgeHintWheel() {
+  if (
+    state !== "bridge-running" ||
+    bridgeWheelBusy() ||
+    bridgePoints < bridgeWheelCost ||
+    bridgeHint?.pathIndex === bridgeStep
+  ) {
+    return;
+  }
+
+  unlockAudio();
+  const difficulty = bridgePuzzleDifficulty();
+  bridgePoints -= bridgeWheelCost;
+  bridgeHintWheelRequesting = true;
+  bridgeHintWheelLabel = "Spinning";
+  const spinSequence = ++bridgeHintWheelSpinSequence;
+  playBridgeWheelSound();
+  updateBridgeScore();
+
+  const [jackpotContribution] = await Promise.all([
+    submitBridgeJackpotContribution(),
+    delay(bridgeWheelPreSpinDuration * 1000),
+  ]);
+  if (spinSequence !== bridgeHintWheelSpinSequence || state !== "bridge-running") {
+    return;
+  }
+
+  bridgeHintWheelRequesting = false;
+  if (!jackpotContribution) {
+    bridgePoints += bridgeWheelCost;
+    bridgeHintWheelLabel = "Offline";
+    bridgeHintWheelTimer = 1.4;
+    updateBridgeScore();
+    return;
+  }
+
+  const outcomeIndex = randomWeightedSegmentIndex(bridgeHintWheelSegments);
+  bridgePendingHintOutcome = bridgeHintWheelSegments[outcomeIndex];
+  if (bridgePendingHintOutcome.kind === "math" && bridgePendingHintOutcome.operation) {
+    bridgePuzzles[bridgeStep] = generateBridgePuzzle(
+      bridgeSafePath[bridgeStep],
+      difficulty,
+      bridgePendingHintOutcome.operation,
+      bridgePendingHintOutcome.difficultyTierBonus ?? 0,
+    );
+  }
+  bridgeHintWheelStartAngle = bridgeHintWheelAngle;
+  bridgeHintWheelTargetAngle = wheelLandingTargetAngle(
+    bridgeHintWheelAngle,
+    bridgeHintWheelSegments,
+    outcomeIndex,
+  );
+  bridgeHintWheelLabel = "Spinning";
+  bridgeHintWheelTimer = bridgeWheelSpinDuration;
+  bridgeHintWheelSpinTimer = bridgeWheelSpinDuration;
+  updateBridgeScore();
+}
+
+function updateBridge(dt: number) {
+  if (state !== "bridge-running" || isWideGameMobilePortrait()) {
+    return;
+  }
+
+  bridgeWheelTimer = Math.max(0, bridgeWheelTimer - dt);
+  if (bridgeWheelRequesting && bridgeWheelSpinTimer <= 0) {
+    bridgeWheelAngle = (bridgeWheelAngle + bridgeWheelPreSpinSpeed * dt) % (Math.PI * 2);
+  }
+  bridgeHintWheelTimer = Math.max(0, bridgeHintWheelTimer - dt);
+  if (bridgeHintWheelRequesting && bridgeHintWheelSpinTimer <= 0) {
+    bridgeHintWheelAngle = (bridgeHintWheelAngle + bridgeWheelPreSpinSpeed * dt) % (Math.PI * 2);
+  }
+  if (bridgeWheelSpinTimer > 0) {
+    bridgeWheelSpinTimer = Math.max(0, bridgeWheelSpinTimer - dt);
+    const progress = 1 - bridgeWheelSpinTimer / bridgeWheelSpinDuration;
+    const eased = 1 - (1 - progress) ** 3;
+    bridgeWheelAngle = bridgeWheelStartAngle + (bridgeWheelTargetAngle - bridgeWheelStartAngle) * eased;
+    if (bridgeWheelSpinTimer <= 0 && bridgePendingWheelOutcome) {
+      bridgeWheelAngle = bridgeWheelTargetAngle;
+      bridgePoints = Math.max(0, bridgePendingWheelOutcome.apply(bridgePoints));
+      bridgeWheelLabel = bridgePendingWheelOutcome.label;
+      bridgePendingWheelOutcome = null;
+      bridgeWheelTimer = 1.4;
+      updateBridgeScore();
+    }
+  }
+  if (bridgeHintWheelSpinTimer > 0) {
+    bridgeHintWheelSpinTimer = Math.max(0, bridgeHintWheelSpinTimer - dt);
+    const progress = 1 - bridgeHintWheelSpinTimer / bridgeWheelSpinDuration;
+    const eased = 1 - (1 - progress) ** 3;
+    bridgeHintWheelAngle =
+      bridgeHintWheelStartAngle + (bridgeHintWheelTargetAngle - bridgeHintWheelStartAngle) * eased;
+    if (bridgeHintWheelSpinTimer <= 0 && bridgePendingHintOutcome) {
+      bridgeHintWheelAngle = bridgeHintWheelTargetAngle;
+      bridgeHint = { kind: bridgePendingHintOutcome.kind, pathIndex: bridgeStep };
+      bridgeHintWheelLabel = bridgeHintOutcomeLabel(bridgePendingHintOutcome);
+      bridgePendingHintOutcome = null;
+      bridgeHintWheelTimer = 1.4;
+      updateBridgeScore();
+    }
+  }
+  if (bridgeJumpTimer > 0) {
+    bridgeJumpTimer = Math.max(0, bridgeJumpTimer - dt);
+    if (bridgeJumpTimer <= 0) {
+      resolveBridgeChoice();
+    }
+  }
+  if (bridgeSuccessTimer > 0) {
+    bridgeSuccessTimer = Math.max(0, bridgeSuccessTimer - dt);
+    if (bridgeSuccessTimer <= 0) {
+      bridgeStandingSide = bridgePlayerSide;
+      bridgeStep += 1;
+      bridgeScrollTimer = bridgeScrollDuration;
+      ensureBridgeRows(bridgeStep + bridgeVisibleRows + 3);
+      updateBridgeScore();
+    }
+  }
+  if (bridgeScrollTimer > 0) {
+    bridgeScrollTimer = Math.max(0, bridgeScrollTimer - dt);
+    if (bridgeScrollTimer <= 0) {
+      updateBridgeScore();
+    }
+  }
+  if (bridgeFallTimer > 0) {
+    bridgeFallTimer = Math.max(0, bridgeFallTimer - dt);
+    if (bridgeFallTimer <= 0) {
+      showBridgeDead();
+    }
+  }
+}
+
+function updateSnakeScore() {
+  if (state !== "snake-running" && state !== "snake-dead") {
+    return;
+  }
+
+  const self = getLocalSnake();
+  const length = Math.max(3, self?.segments.length ?? snakeBestThisRun);
+  scoreEl.textContent = formatScore(state === "snake-dead" ? Math.max(length, snakeBestThisRun) : length);
+  updateSnakeShootButton();
+  updateSnakeInfoBar();
+}
+
+function updateSnakeShootButton() {
+  const self = getLocalSnake();
+  const maxShotBank = Math.max(fallbackSnakeShotBank, snakeSnapshot?.maxShotBank ?? fallbackSnakeShotBank);
+  const shotBank = Math.max(0, Math.min(maxShotBank, self?.shotBank ?? 0));
+  const canShoot = state === "snake-running" && Boolean(self?.alive) && shotBank > 0 && (self?.segments.length ?? 0) > 2;
+  snakeShootButton.textContent = `Shoot (${shotBank}/${maxShotBank})`;
+  snakeShootButton.disabled = !canShoot;
+}
+
+function updateSnakeInfoBar() {
+  if (state !== "snake-running") {
+    return;
+  }
+
+  const self = getLocalSnake();
+  const alivePlayers = snakeSnapshot?.players.filter((player) => player.alive) ?? [];
+  const longestLength = Math.max(
+    3,
+    ...alivePlayers.map((player) => Math.max(player.segments.length, player.bestLength || 3)),
+  );
+  const myLength = Math.max(3, self?.segments.length ?? snakeBestThisRun);
+  snakeInfoLongest.textContent = formatScore(longestLength);
+  snakeInfoLength.textContent = formatScore(myLength);
+  snakeInfoPlayers.textContent = `${alivePlayers.length}`;
+}
+
+function directionFromJoystick(dx: number, dy: number, deadZone: number) {
+  if (Math.hypot(dx, dy) < deadZone) {
+    return null;
+  }
+
+  if (Math.abs(dx) > Math.abs(dy)) {
+    return dx > 0 ? "right" : "left";
+  }
+
+  return dy > 0 ? "down" : "up";
+}
+
+function setSnakeJoystickOffset(x: number, y: number, active = false) {
+  snakeJoystick.style.setProperty("--stick-x", `${x}px`);
+  snakeJoystick.style.setProperty("--stick-y", `${y}px`);
+  snakeJoystick.classList.toggle("is-active", active);
+}
+
+function resetSnakeJoystick() {
+  window.clearTimeout(snakeJoystickPulseTimer);
+  snakeJoystickPulseTimer = 0;
+  setSnakeJoystickOffset(0, 0);
+}
+
+function pulseSnakeJoystick(direction: SnakeDirection) {
+  if (snakeJoystickPointerId !== null) {
+    return;
+  }
+
+  const distance = Math.min(34, snakeJoystick.getBoundingClientRect().width * 0.28);
+  const offsets: Record<SnakeDirection, SnakePoint> = {
+    down: { x: 0, y: distance },
+    left: { x: -distance, y: 0 },
+    right: { x: distance, y: 0 },
+    up: { x: 0, y: -distance },
+  };
+  setSnakeJoystickOffset(offsets[direction].x, offsets[direction].y, true);
+  window.clearTimeout(snakeJoystickPulseTimer);
+  snakeJoystickPulseTimer = window.setTimeout(resetSnakeJoystick, 170);
+}
+
+function updateSnakeJoystickFromPointer(event: PointerEvent) {
+  const rect = snakeJoystick.getBoundingClientRect();
+  const centerX = rect.left + rect.width * 0.5;
+  const centerY = rect.top + rect.height * 0.5;
+  const maxDistance = rect.width * 0.42;
+  const dx = event.clientX - centerX;
+  const dy = event.clientY - centerY;
+  const distance = Math.min(maxDistance, Math.hypot(dx, dy));
+  const angle = Math.atan2(dy, dx);
+  const stickX = Math.cos(angle) * distance;
+  const stickY = Math.sin(angle) * distance;
+  const direction = directionFromJoystick(dx, dy, rect.width * 0.08);
+
+  setSnakeJoystickOffset(stickX, stickY, true);
+  if (direction) {
+    setSnakeDirection(direction);
+  }
+}
+
+function setSnakeDirection(direction: SnakeDirection, reflectJoystick = false) {
+  if (state !== "snake-running") {
+    return;
+  }
+  if (reflectJoystick) {
+    pulseSnakeJoystick(direction);
+  }
+  sendSnakeMessage({ direction, type: "snake-direction" });
+}
+
+function shootSnake() {
+  if (state !== "snake-running") {
+    return;
+  }
+  const now = performance.now();
+  if (now - lastSnakeShootTime < 180) {
+    return;
+  }
+
+  const self = getLocalSnake();
+  if (!self || self.shotBank <= 0 || self.segments.length <= 2) {
+    updateSnakeShootButton();
+    return;
+  }
+
+  lastSnakeShootTime = now;
+  playSnakeShootSound();
+  sendSnakeMessage({ type: "snake-shoot" });
+  updateSnakeShootButton();
+}
+
+function getSnakeBoard() {
+  return snakeSnapshot?.board ?? snakeFallbackBoard;
+}
+
+function snakeCamera(viewWidth: number, viewHeight: number) {
+  const board = getSnakeBoard();
+  const self = getLocalSnake();
+  const head = self?.segments[0] ?? { x: board.width * 0.5, y: board.height * 0.5 };
+  const maxX = Math.max(0, board.width - viewWidth);
+  const maxY = Math.max(0, board.height - viewHeight);
+  return {
+    x: Math.max(0, Math.min(maxX, head.x - viewWidth * 0.5)),
+    y: Math.max(0, Math.min(maxY, head.y - viewHeight * 0.5)),
+  };
+}
+
+function drawSnakeBackground(camera: SnakePoint, viewWidth: number, viewHeight: number, time: number) {
+  const board = getSnakeBoard();
+  const gradient = ctx.createLinearGradient(0, 0, viewWidth, viewHeight);
+  gradient.addColorStop(0, "#071421");
+  gradient.addColorStop(0.55, "#102b30");
+  gradient.addColorStop(1, "#180d2c");
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, viewWidth, viewHeight);
+
+  ctx.save();
+  ctx.translate(-camera.x, -camera.y);
+  ctx.strokeStyle = "rgba(127, 255, 216, 0.14)";
+  ctx.lineWidth = 1;
+  const grid = board.cellSize * 2;
+  const startX = Math.floor(camera.x / grid) * grid;
+  const startY = Math.floor(camera.y / grid) * grid;
+  for (let x = startX; x < camera.x + viewWidth + grid; x += grid) {
+    ctx.beginPath();
+    ctx.moveTo(x, camera.y);
+    ctx.lineTo(x, camera.y + viewHeight);
+    ctx.stroke();
+  }
+  for (let y = startY; y < camera.y + viewHeight + grid; y += grid) {
+    ctx.beginPath();
+    ctx.moveTo(camera.x, y);
+    ctx.lineTo(camera.x + viewWidth, y);
+    ctx.stroke();
+  }
+
+  ctx.strokeStyle = `hsla(${(time * 24) % 360}, 100%, 72%, 0.9)`;
+  ctx.lineWidth = 8;
+  ctx.strokeRect(0, 0, board.width, board.height);
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.26)";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(4, 4, board.width - 8, board.height - 8);
+  ctx.restore();
+}
+
+function drawSnakeOrb(orb: SnakeOrb, camera: SnakePoint, time: number) {
+  const pulse = 1 + Math.sin(time * 5 + orb.x * 0.01) * 0.18;
+  ctx.save();
+  ctx.translate(orb.x - camera.x, orb.y - camera.y);
+  const gradient = ctx.createRadialGradient(0, 0, 2, 0, 0, 18 * pulse);
+  gradient.addColorStop(0, "#ffffff");
+  gradient.addColorStop(0.35, orb.color);
+  gradient.addColorStop(1, "rgba(255, 255, 255, 0)");
+  ctx.fillStyle = gradient;
+  ctx.beginPath();
+  ctx.arc(0, 0, 18 * pulse, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = orb.color;
+  ctx.beginPath();
+  ctx.arc(0, 0, 6 * pulse, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawSnakePlayer(player: SnakePlayer, camera: SnakePoint) {
+  player.segments.forEach((segment, index) => {
+    const radius = Math.max(8, 14 - index * 0.12);
+    ctx.save();
+    ctx.translate(segment.x - camera.x, segment.y - camera.y);
+    ctx.shadowBlur = player.id === snakeClientId ? 16 : 10;
+    ctx.shadowColor = player.color;
+    ctx.fillStyle = index === 0 ? "#f8fff9" : player.color;
+    ctx.strokeStyle = player.color;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, radius * (index === 0 ? 1.16 : 1), radius, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    if (index === 0) {
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = "#10202a";
+      ctx.beginPath();
+      ctx.arc(4, -4, 2.5, 0, Math.PI * 2);
+      ctx.arc(4, 4, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  });
+}
+
+function drawSnakeProjectile(projectile: SnakeProjectile, camera: SnakePoint) {
+  ctx.save();
+  ctx.translate(projectile.x - camera.x, projectile.y - camera.y);
+  ctx.shadowBlur = 18;
+  ctx.shadowColor = projectile.color;
+  ctx.fillStyle = projectile.color;
+  ctx.beginPath();
+  ctx.arc(0, 0, 7, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawSnakeGame(time: number) {
+  const cssWidth = canvas.width / dpr;
+  const cssHeight = canvas.height / dpr;
+  const viewWidth = cssWidth / snakeCameraZoom;
+  const viewHeight = cssHeight / snakeCameraZoom;
+  ctx.setTransform(dpr * snakeCameraZoom, 0, 0, dpr * snakeCameraZoom, 0, 0);
+  const camera = snakeCamera(viewWidth, viewHeight);
+  drawSnakeBackground(camera, viewWidth, viewHeight, time);
+
+  const inView = (point: SnakePoint, margin = 60) =>
+    point.x >= camera.x - margin &&
+    point.x <= camera.x + viewWidth + margin &&
+    point.y >= camera.y - margin &&
+    point.y <= camera.y + viewHeight + margin;
+
+  snakeSnapshot?.orbs.filter((orb) => inView(orb)).forEach((orb) => drawSnakeOrb(orb, camera, time));
+  snakeSnapshot?.projectiles
+    .filter((projectile) => inView(projectile))
+    .forEach((projectile) => drawSnakeProjectile(projectile, camera));
+  snakeSnapshot?.players
+    .filter((player) => player.alive && player.segments.some((segment) => inView(segment, 120)))
+    .forEach((player) => drawSnakePlayer(player, camera));
+
+  if (state === "snake-running" && !snakeConnected) {
+    ctx.fillStyle = "rgba(255, 255, 255, 0.82)";
+    ctx.font = "800 18px Inter, sans-serif";
+    ctx.fillText("Connecting...", 18, 30);
+  }
+}
+
+function pixelCellIndexAt(x: number, y: number, layout = pixelLayout()) {
+  if (x < layout.x || x >= layout.x + layout.boardW || y < layout.y || y >= layout.y + layout.boardH) {
+    return -1;
+  }
+  const column = Math.floor((x - layout.x) / layout.cellW);
+  const row = Math.floor((y - layout.y) / layout.cellH);
+  if (column < 0 || column >= pixelColumns || row < 0 || row >= pixelRows) {
+    return -1;
+  }
+  return row * pixelColumns + column;
+}
+
+function paintPixelCell(index: number, owner: PixelOwner) {
+  if (index < 0 || index >= pixelCells.length) {
+    return;
+  }
+  const currentOwner = pixelCells[index];
+  if (currentOwner === "neutral") {
+    pixelCells[index] = owner;
+  } else if (currentOwner !== owner) {
+    pixelCells[index] = "neutral";
+  }
+}
+
+function explodePixelCells(index: number, owner: PixelOwner) {
+  const centerColumn = index % pixelColumns;
+  const centerRow = Math.floor(index / pixelColumns);
+  for (let rowOffset = -1; rowOffset <= 1; rowOffset += 1) {
+    for (let columnOffset = -1; columnOffset <= 1; columnOffset += 1) {
+      const row = centerRow + rowOffset;
+      const column = centerColumn + columnOffset;
+      if (row >= 0 && row < pixelRows && column >= 0 && column < pixelColumns) {
+        paintPixelCell(row * pixelColumns + column, owner);
+      }
+    }
+  }
+}
+
+function pixelEffectiveFireInterval(turret: PixelTurret) {
+  return turret.fireInterval / (1 + turret.fireSpeedBoosts * 0.25);
+}
+
+function firePixelShot(turret: PixelTurret) {
+  const layout = pixelLayout();
+  if (!pixelTurretIsActive(turret) || !pixelRayIntersectsBoard(turret, turret.angle, layout)) {
+    return;
+  }
+
+  const start = pixelShotStart(turret, layout);
+  const isBomb = turret.bombShots > 0;
+  if (isBomb) {
+    turret.bombShots -= 1;
+  }
+  pixelShots.push({
+    bouncesRemaining: Math.floor(turret.bouncePower / 2),
+    color: turret.color,
+    kind: isBomb ? "bomb" : "normal",
+    lastCell: -1,
+    life: 2.2,
+    owner: turret.id,
+    vx: Math.cos(turret.angle) * pixelShotSpeed,
+    vy: Math.sin(turret.angle) * pixelShotSpeed,
+    x: start.x,
+    y: start.y,
+  });
+}
+
+function pixelShotShieldHit(shot: PixelShot) {
+  for (const turret of pixelTurrets) {
+    if (turret.id === shot.owner || !pixelTurretIsActive(turret)) {
+      continue;
+    }
+
+    const dx = shot.x - turret.x;
+    const dy = shot.y - turret.y;
+    if (dx * dx + dy * dy <= pixelShieldRadius * pixelShieldRadius) {
+      turret.shieldHealth = Math.max(0, turret.shieldHealth - (shot.kind === "bomb" ? pixelShieldDamage * 3 : pixelShieldDamage));
+      if (turret.shieldHealth <= 0) {
+        knockOutPixelTurret(turret);
+      }
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function bouncePixelShot(shot: PixelShot, previousX: number, previousY: number, cellIndex: number) {
+  const column = cellIndex % pixelColumns;
+  const row = Math.floor(cellIndex / pixelColumns);
+  const crossedX = Math.floor(previousX) !== column;
+  const crossedY = Math.floor(previousY) !== row;
+  if (crossedX && !crossedY) {
+    shot.vx *= -1;
+  } else if (crossedY && !crossedX) {
+    shot.vy *= -1;
+  } else if (Math.abs(shot.vx) >= Math.abs(shot.vy)) {
+    shot.vx *= -1;
+  } else {
+    shot.vy *= -1;
+  }
+}
+
+function steerPixelTurret(turret: PixelTurret, dt: number) {
+  if (turret.isPlayer) {
+    if (pixelAimActive && turret === activePlayerPixelTurret()) {
+      turret.angle = clampPixelTurretAngle(turret, Math.atan2(pixelAimY - turret.y, pixelAimX - turret.x));
+      return;
+    }
+    if (!turret.autoRotate) {
+      return;
+    }
+  }
+
+  turret.angle = clampPixelTurretAngle(turret, turret.angle + turret.rotateDirection * turret.rotateSpeed * dt);
+  if (Math.abs(normalizeAngle(turret.angle - turret.homeAngle)) > turret.arc * 0.98) {
+    turret.rotateDirection *= -1;
+  }
+}
+
+function updatePixelWars(dt: number) {
+  if (state !== "pixel-running" || isWideGameMobilePortrait()) {
+    return;
+  }
+
+  if (pixelMode === "multi") {
+    if (!pixelRemoteSnapshot) {
+      pixelRunnerMessage = pixelConnected ? "Waiting for match" : "Connecting";
+      pixelRunnerMessageTimer = 0.3;
+      updatePixelReels(dt);
+      return;
+    }
+    const playerTurret = activePlayerPixelTurret();
+    if (playerTurret) {
+      updatePixelRunner(dt);
+    } else {
+      pixelRunnerMessageTimer = Math.max(0, pixelRunnerMessageTimer - dt);
+      updatePixelReels(dt);
+    }
+    return;
+  }
+
+  positionPixelTurrets();
+  updatePixelRespawnEliminations();
+  updatePixelRespawns(dt);
+  if (pixelMatchOver) {
+    updatePixelScore();
+    return;
+  }
+
+  pixelTurrets.forEach((turret) => {
+    if (!pixelTurretIsActive(turret)) {
+      return;
+    }
+    steerPixelTurret(turret, dt);
+    turret.fireCooldown -= dt;
+    if (turret.fireCooldown <= 0) {
+      firePixelShot(turret);
+      turret.fireCooldown = pixelEffectiveFireInterval(turret) * (0.82 + Math.random() * 0.36);
+    }
+  });
+  const playerTurret = activePlayerPixelTurret();
+  if (playerTurret) {
+    updatePixelRunner(dt);
+  } else {
+    pixelRunnerMessageTimer = Math.max(0, pixelRunnerMessageTimer - dt);
+    updatePixelReels(dt);
+  }
+
+  const layout = pixelLayout();
+  for (let index = pixelShots.length - 1; index >= 0; index -= 1) {
+    const shot = pixelShots[index];
+    shot.life -= dt;
+    let hit = false;
+    const distance = Math.hypot(shot.vx * dt, shot.vy * dt);
+    const steps = Math.max(1, Math.ceil(distance / Math.max(2, Math.min(layout.cellW, layout.cellH) * 0.45)));
+    for (let step = 0; step < steps && !hit; step += 1) {
+      const previousX = shot.x;
+      const previousY = shot.y;
+      shot.x += (shot.vx * dt) / steps;
+      shot.y += (shot.vy * dt) / steps;
+      if (pixelShotShieldHit(shot)) { hit = true; break; }
+      const cellIndex = pixelCellIndexAt(shot.x, shot.y, layout);
+      if (cellIndex !== -1 && cellIndex !== shot.lastCell) {
+        shot.lastCell = cellIndex;
+        if (pixelCells[cellIndex] !== shot.owner) {
+          if (shot.kind === "bomb") explodePixelCells(cellIndex, shot.owner);
+          else paintPixelCell(cellIndex, shot.owner);
+          if (shot.bouncesRemaining > 0) {
+            shot.bouncesRemaining -= 1;
+            bouncePixelShot(shot, previousX, previousY, cellIndex);
+          } else {
+            hit = true;
+          }
+        }
+      }
+    }
+    if (hit) { pixelShots.splice(index, 1); continue; }
+    const outside =
+      shot.x < layout.x ||
+      shot.x > layout.x + layout.boardW ||
+      shot.y < layout.y ||
+      shot.y > layout.y + layout.boardH;
+    if (shot.life <= 0 || outside) {
+      pixelShots.splice(index, 1);
+    }
+  }
+
+  updatePixelScore();
+  updatePixelRespawnEliminations();
+  checkPixelWinCondition();
+}
+
+function drawPixelTileGrid(layout: PixelBoardLayout) {
+  for (let row = 0; row < pixelRows; row += 1) {
+    for (let column = 0; column < pixelColumns; column += 1) {
+      const owner = pixelCells[row * pixelColumns + column] ?? "neutral";
+      ctx.fillStyle = pixelOwnerColor(owner);
+      ctx.globalAlpha = owner === "neutral" ? 0.78 : 0.95;
+      ctx.fillRect(
+        layout.x + column * layout.cellW,
+        layout.y + row * layout.cellH,
+        Math.max(1, layout.cellW - 1),
+        Math.max(1, layout.cellH - 1),
+      );
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawPixelRespawnPerimeterPrompt(layout: PixelBoardLayout, time: number) {
+  const playerTurret = pixelTurrets.find((turret) => turret.isPlayer && turret.respawnPending && !turret.eliminated);
+  if (!playerTurret?.respawnPending) {
+    return;
+  }
+
+  ctx.save();
+  ctx.globalAlpha = 0.6 + Math.sin(time * 5) * 0.18;
+  ctx.strokeStyle = "#ffd84f";
+  ctx.shadowBlur = 18;
+  ctx.shadowColor = "#ffd84f";
+  ctx.lineWidth = 4;
+  ctx.strokeRect(layout.x + 2, layout.y + 2, layout.boardW - 4, layout.boardH - 4);
+  ctx.fillStyle = "#ffd84f";
+  ctx.font = "900 14px Inter, sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText("Tap any board edge to place your new turret", layout.x + layout.boardW / 2, layout.y + 24);
+  ctx.restore();
+}
+
+function pixelHealthSide(turret: PixelTurret, layout: PixelBoardLayout) {
+  const centerX = layout.x + layout.boardW / 2;
+  const centerY = layout.y + layout.boardH / 2;
+  const dx = turret.x - centerX;
+  const dy = turret.y - centerY;
+  if (Math.abs(dx) > Math.abs(dy)) {
+    return dx < 0 ? "left" : "right";
+  }
+  return dy < 0 ? "top" : "bottom";
+}
+
+function drawPixelTurretHealth(turret: PixelTurret, layout: PixelBoardLayout) {
+  const shieldRatio = turret.shieldHealth / pixelShieldMaxHealth;
+  const side = pixelHealthSide(turret, layout);
+  const shortSide = 5;
+  const longSide = 34;
+  let x = turret.x - longSide / 2;
+  let y = turret.y - pixelShieldRadius - 12;
+  let w = longSide;
+  let h = shortSide;
+
+  if (side === "bottom") {
+    y = turret.y + pixelShieldRadius + 7;
+  } else if (side === "left" || side === "right") {
+    w = shortSide;
+    h = longSide;
+    x = side === "left" ? turret.x - pixelShieldRadius - 12 : turret.x + pixelShieldRadius + 7;
+    y = turret.y - longSide / 2;
+  }
+
+  x = clampNumber(x, 3, layout.canvasW - w - 3);
+  y = clampNumber(y, 3, layout.canvasH - h - 3);
+  ctx.save();
+  ctx.fillStyle = "rgba(3, 7, 16, 0.82)";
+  ctx.fillRect(x, y, w, h);
+  ctx.fillStyle = turret.shieldHealth > 35 ? "#78ffca" : "#ff6f6f";
+  if (side === "left" || side === "right") {
+    const filled = h * shieldRatio;
+    ctx.fillRect(x, y + h - filled, w, filled);
+  } else {
+    ctx.fillRect(x, y, w * shieldRatio, h);
+  }
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.42)";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x, y, w, h);
+  ctx.restore();
+}
+
+function pixelColorHue(color: string) {
+  const hex = color.replace("#", "");
+  if (hex.length !== 6) {
+    return 190;
+  }
+  const red = Number.parseInt(hex.slice(0, 2), 16) / 255;
+  const green = Number.parseInt(hex.slice(2, 4), 16) / 255;
+  const blue = Number.parseInt(hex.slice(4, 6), 16) / 255;
+  const max = Math.max(red, green, blue);
+  const min = Math.min(red, green, blue);
+  const delta = max - min;
+  if (delta === 0) {
+    return 190;
+  }
+  let hue = 0;
+  if (max === red) {
+    hue = ((green - blue) / delta) % 6;
+  } else if (max === green) {
+    hue = (blue - red) / delta + 2;
+  } else {
+    hue = (red - green) / delta + 4;
+  }
+  return (hue * 60 + 360) % 360;
+}
+
+function pixelShieldGlowColor(turret: PixelTurret, time: number, offset = 0, alpha = 1) {
+  const hue = (pixelColorHue(turret.color) + Math.sin(time * 1.6 + offset) * 28 + offset * 18 + 360) % 360;
+  return `hsla(${hue}, 92%, 66%, ${alpha})`;
+}
+
+function drawPixelShield(turret: PixelTurret, time: number) {
+  const shieldRatio = clampNumber(turret.shieldHealth / pixelShieldMaxHealth, 0, 1);
+  const direction = turret.rotateDirection || 1;
+  const rotation = time * 1.15 * direction;
+  const ringAlpha = turret.shieldHealth > 0 ? 0.84 : 0.18;
+
+  ctx.save();
+  ctx.translate(turret.x, turret.y);
+  const glow = ctx.createRadialGradient(0, 0, pixelShieldRadius * 0.2, 0, 0, pixelShieldRadius * 1.22);
+  glow.addColorStop(0, pixelShieldGlowColor(turret, time, 0.3, 0.06 * shieldRatio));
+  glow.addColorStop(0.68, pixelShieldGlowColor(turret, time, 1.2, 0.14 * shieldRatio));
+  glow.addColorStop(1, pixelShieldGlowColor(turret, time, 2.1, 0));
+  ctx.fillStyle = glow;
+  ctx.beginPath();
+  ctx.arc(0, 0, pixelShieldRadius * 1.28, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.globalCompositeOperation = "lighter";
+  ctx.lineCap = "round";
+  ctx.shadowBlur = 14 + 10 * shieldRatio;
+  for (let arcIndex = 0; arcIndex < 3; arcIndex += 1) {
+    const start = rotation + arcIndex * ((Math.PI * 2) / 3);
+    const end = start + Math.PI * 0.76;
+    ctx.shadowColor = pixelShieldGlowColor(turret, time, arcIndex, 0.62 * ringAlpha);
+    ctx.strokeStyle = pixelShieldGlowColor(turret, time, arcIndex, ringAlpha);
+    ctx.lineWidth = 2.8;
+    ctx.beginPath();
+    ctx.arc(0, 0, pixelShieldRadius, start, end);
+    ctx.stroke();
+  }
+
+  ctx.shadowBlur = 6;
+  ctx.strokeStyle = pixelShieldGlowColor(turret, time, 4.4, 0.34 * ringAlpha);
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.arc(0, 0, pixelShieldRadius - 3, -rotation * 0.72, Math.PI * 2 - rotation * 0.72);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawPixelRespawnTimer(turret: PixelTurret) {
+  if (turret.eliminated || (!turret.respawnPending && turret.respawnTimer <= 0)) {
+    return;
+  }
+
+  ctx.save();
+  ctx.translate(turret.x, turret.y);
+  ctx.fillStyle = "rgba(5, 9, 20, 0.78)";
+  ctx.strokeStyle = turret.isPlayer ? "#ffd84f" : "rgba(255, 255, 255, 0.62)";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  roundedRectPath(-28, -19, 56, 38, 8);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = turret.isPlayer ? "#ffd84f" : "rgba(255, 255, 255, 0.86)";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  if (turret.respawnPending) {
+    ctx.font = "900 12px Inter, sans-serif";
+    ctx.fillText(turret.isPlayer ? "PICK" : "WAIT", 0, -4);
+    ctx.font = "800 8px Inter, sans-serif";
+    ctx.fillText("EDGE", 0, 11);
+  } else {
+    ctx.font = "900 18px Inter, sans-serif";
+    ctx.fillText(`${Math.ceil(turret.respawnTimer)}`, 0, -3);
+    ctx.font = "800 8px Inter, sans-serif";
+    ctx.fillText("RESPAWN", 0, 12);
+  }
+  ctx.restore();
+}
+
+function drawPixelTurret(turret: PixelTurret, layout: PixelBoardLayout, time: number) {
+  const radius = turret.isPlayer ? 8 : 7;
+  drawPixelTurretHealth(turret, layout);
+  drawPixelShield(turret, time);
+  if (!pixelTurretIsActive(turret)) {
+    drawPixelRespawnTimer(turret);
+    return;
+  }
+
+  ctx.save();
+  ctx.translate(turret.x, turret.y);
+  ctx.rotate(turret.angle);
+  ctx.fillStyle = "#05070d";
+  ctx.beginPath();
+  roundedRectPath(0, -2.5, pixelCannonLength, 5, 3);
+  ctx.fill();
+  ctx.restore();
+
+  ctx.save();
+  ctx.translate(turret.x, turret.y);
+  ctx.shadowBlur = turret.isPlayer ? 18 : 10;
+  ctx.shadowColor = turret.color;
+  ctx.fillStyle = turret.color;
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.74)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(0, 0, radius, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "rgba(7, 12, 22, 0.9)";
+  ctx.beginPath();
+  ctx.arc(0, 0, radius * 0.42, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = turret.autoRotate ? "rgba(255, 216, 79, .95)" : "rgba(255, 255, 255, .95)";
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash(turret.autoRotate ? [3, 3] : []);
+  ctx.beginPath();
+  ctx.arc(0, 0, radius + 4, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function pixelPrizeLabel(prize: PixelPrize) {
+  if (prize === "clock") {
+    return "Clock";
+  }
+  if (prize === "bomb") {
+    return "Bomb";
+  }
+  if (prize === "turret") {
+    return "Jackpot";
+  }
+  if (prize === "bounce") {
+    return "Bounce";
+  }
+  return "Blank";
+}
+
+function pixelPrizeColor(prize: PixelPrize) {
+  if (prize === "clock") {
+    return "#78ffca";
+  }
+  if (prize === "bomb") {
+    return "#ff6f6f";
+  }
+  if (prize === "turret") {
+    return "#ffd84f";
+  }
+  if (prize === "bounce") {
+    return "#b78cff";
+  }
+  return "#9aa3b5";
+}
+
+function drawPixelPrizeIcon(prize: PixelPrize, x: number, y: number, size: number) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.lineWidth = Math.max(2, size * 0.08);
+  ctx.strokeStyle = pixelPrizeColor(prize);
+  ctx.fillStyle = pixelPrizeColor(prize);
+  ctx.shadowBlur = 12;
+  ctx.shadowColor = pixelPrizeColor(prize);
+  if (prize === "clock") {
+    ctx.beginPath();
+    ctx.arc(0, 0, size * 0.34, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(0, -size * 0.22);
+    ctx.moveTo(0, 0);
+    ctx.lineTo(size * 0.18, size * 0.08);
+    ctx.stroke();
+    ctx.font = `900 ${Math.max(9, size * 0.16)}px Inter, sans-serif`;
+    ctx.textAlign = "center";
+    ctx.fillText("25%", 0, size * 0.56);
+  } else if (prize === "bomb") {
+    ctx.beginPath();
+    ctx.arc(0, size * 0.05, size * 0.28, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "#ffd84f";
+    ctx.beginPath();
+    ctx.moveTo(size * 0.16, -size * 0.17);
+    ctx.quadraticCurveTo(size * 0.28, -size * 0.42, size * 0.46, -size * 0.28);
+    ctx.stroke();
+  } else if (prize === "turret") {
+    ctx.shadowBlur = 18;
+    ctx.lineCap = "round";
+    ctx.lineWidth = Math.max(3, size * 0.12);
+    ctx.beginPath();
+    ctx.moveTo(size * 0.02, -size * 0.04);
+    ctx.lineTo(size * 0.38, -size * 0.24);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(-size * 0.08, size * 0.02, size * 0.28, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.78)";
+    ctx.lineWidth = Math.max(1.5, size * 0.045);
+    ctx.stroke();
+    ctx.fillStyle = "rgba(5, 9, 20, 0.9)";
+    ctx.beginPath();
+    ctx.arc(-size * 0.08, size * 0.02, size * 0.1, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (prize === "bounce") {
+    ctx.lineCap = "round";
+    ctx.lineWidth = Math.max(3, size * 0.1);
+    ctx.beginPath();
+    ctx.moveTo(-size * 0.38, -size * 0.28);
+    ctx.lineTo(size * 0.08, 0);
+    ctx.lineTo(-size * 0.38, size * 0.28);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(-size * 0.02, -size * 0.28);
+    ctx.lineTo(size * 0.44, 0);
+    ctx.lineTo(-size * 0.02, size * 0.28);
+    ctx.stroke();
+  } else {
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.34)";
+    ctx.beginPath();
+    ctx.arc(0, 0, size * 0.28, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(-size * 0.2, size * 0.2);
+    ctx.lineTo(size * 0.2, -size * 0.2);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawPixelButton(rect: PixelRect, label: string, active = true) {
+  ctx.save();
+  ctx.globalAlpha = active ? 1 : 0.48;
+  ctx.fillStyle = active ? "rgba(13, 22, 38, 0.92)" : "rgba(13, 22, 38, 0.66)";
+  ctx.strokeStyle = active ? "rgba(168, 232, 255, 0.72)" : "rgba(255, 255, 255, 0.24)";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  roundedRectPath(rect.x, rect.y, rect.w, rect.h, 8);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "rgba(255, 255, 255, 0.88)";
+  ctx.font = `900 ${Math.max(11, Math.min(14, rect.w * 0.16))}px Inter, sans-serif`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(label, rect.x + rect.w / 2, rect.y + rect.h / 2);
+  ctx.restore();
+}
+
+function drawPixelSlot(runner: PixelRunnerLayout, time: number) {
+  const reelGap = 7;
+  const titleY = runner.slotY + 20;
+  const reelY = runner.slotY + 32;
+  const reelH = runner.slotH - 40;
+  const reelW = (runner.slotW - reelGap * 2) / 3;
+  ctx.save();
+  ctx.fillStyle = "rgba(6, 10, 22, 0.9)";
+  ctx.strokeStyle = "rgba(168, 232, 255, 0.62)";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  roundedRectPath(runner.slotX, runner.slotY, runner.slotW, runner.slotH, 8);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "rgba(255, 255, 255, 0.86)";
+  ctx.font = "900 15px Inter, sans-serif";
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
+  ctx.fillText("Slot boosts", runner.slotX + 12, titleY);
+  ctx.font = "800 12px Inter, sans-serif";
+  ctx.fillStyle = "rgba(255, 255, 255, 0.58)";
+  ctx.fillText(`Claim ${formatScore(pixelTerritory)}%`, runner.slotX + runner.slotW - 92, titleY);
+
+  pixelRunnerLanes.forEach((lane, index) => {
+    const reel = pixelReels[lane];
+    const x = runner.slotX + index * (reelW + reelGap);
+    const shake = reel.spinTimer > 0 ? Math.sin(time * 45 + index) * 3 : 0;
+    ctx.fillStyle = "rgba(255, 255, 255, 0.06)";
+    ctx.strokeStyle = reel.spinTimer > 0 ? pixelPrizeColor(reel.prize) : "rgba(255, 255, 255, 0.22)";
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    roundedRectPath(x, reelY, reelW, reelH, 7);
+    ctx.fill();
+    ctx.stroke();
+    const symbolX = x + reelW / 2;
+    const symbolY = reelY + reelH * 0.48 + shake;
+    const symbolSize = Math.min(reelW, reelH) * 0.72;
+    ctx.save();
+    ctx.beginPath();
+    roundedRectPath(x + 1, reelY + 1, reelW - 2, reelH - 2, 6);
+    ctx.clip();
+    if (reel.spinTimer > 0) {
+      const travel = reel.spinPhase * reelH;
+      drawPixelPrizeIcon(reel.prize, symbolX, symbolY - travel, symbolSize);
+      drawPixelPrizeIcon(reel.nextPrize, symbolX, symbolY + reelH - travel, symbolSize);
+    } else {
+      drawPixelPrizeIcon(reel.prize, symbolX, symbolY, symbolSize);
+    }
+    ctx.restore();
+    ctx.fillStyle = "rgba(255, 255, 255, 0.1)";
+    ctx.fillRect(x + 2, symbolY - 1, reelW - 4, 2);
+    ctx.fillStyle = "rgba(255, 255, 255, 0.74)";
+    ctx.font = "800 10px Inter, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(pixelPrizeLabel(reel.prize), x + reelW / 2, reelY + reelH - 20);
+    ctx.fillText(lane.toUpperCase(), x + reelW / 2, reelY + reelH - 8);
+  });
+
+  const reelsIdle = pixelRunnerLanes.every((lane) => pixelReels[lane].spinTimer <= 0);
+  drawPixelButton(runner.spinButton, `ALL x${pixelRunnerSpecialSpins}`, pixelRunnerSpecialSpins > 0 && reelsIdle);
+  ctx.font = "800 12px Inter, sans-serif";
+  ctx.fillStyle = "rgba(255, 255, 255, 0.62)";
+  ctx.textAlign = "left";
+  const playerTurrets = pixelTurrets.filter((turret) => turret.isPlayer && !turret.eliminated);
+  const fireBoost = Math.max(0, ...playerTurrets.map((turret) => turret.fireSpeedBoosts));
+  const bombShots = playerTurrets.reduce((total, turret) => total + turret.bombShots, 0);
+  const bounceCount = Math.max(0, ...playerTurrets.map((turret) => Math.floor(turret.bouncePower / 2)));
+  const message =
+    pixelRunnerMessageTimer > 0
+      ? pixelRunnerMessage
+      : `Speed +${fireBoost}  Bomb ${bombShots}  Bounce ${bounceCount}  Turrets ${playerTurrets.length}/${pixelMaxTurretsPerOwner}`;
+  ctx.fillText(message, runner.slotX, runner.slotY + runner.slotH + 30);
+  ctx.restore();
+}
+
+function pixelRunnerTrackMetrics(runner: PixelRunnerLayout) {
+  const horizonY = runner.trackY + 8;
+  const bottomY = runner.playerY + 28;
+  const vanishX = runner.trackX + runner.trackW / 2;
+  const topW = runner.trackW * 0.24;
+  const bottomW = runner.trackW;
+  return {
+    bottomW,
+    bottomY,
+    horizonY,
+    topW,
+    vanishX,
+  };
+}
+
+function pixelRunnerDepth(runner: PixelRunnerLayout, y: number) {
+  return clampNumber((y - runner.trackY) / Math.max(1, runner.playerY - runner.trackY), 0, 1);
+}
+
+function pixelRunnerPerspective(depth: number) {
+  return Math.pow(clampNumber(depth, 0, 1), 1.62);
+}
+
+function pixelRunnerTrackWidth(runner: PixelRunnerLayout, perspective: number) {
+  const metrics = pixelRunnerTrackMetrics(runner);
+  return metrics.topW + (metrics.bottomW - metrics.topW) * perspective;
+}
+
+function pixelRunnerProject(runner: PixelRunnerLayout, lanePosition: number, y: number) {
+  const metrics = pixelRunnerTrackMetrics(runner);
+  const depth = pixelRunnerDepth(runner, y);
+  const perspective = pixelRunnerPerspective(depth);
+  const width = pixelRunnerTrackWidth(runner, perspective);
+  const left = metrics.vanishX - width / 2;
+  const laneWidth = width / 3;
+  return {
+    depth,
+    laneWidth,
+    perspective,
+    scale: 0.28 + perspective * 0.96,
+    x: left + laneWidth * (lanePosition + 0.5),
+    y: metrics.horizonY + (runner.playerY - metrics.horizonY) * perspective,
+  };
+}
+
+function pixelRunnerTrackPath(runner: PixelRunnerLayout) {
+  const metrics = pixelRunnerTrackMetrics(runner);
+  ctx.moveTo(metrics.vanishX - metrics.topW / 2, metrics.horizonY);
+  ctx.lineTo(metrics.vanishX + metrics.topW / 2, metrics.horizonY);
+  ctx.lineTo(runner.trackX + runner.trackW, runner.trackY + runner.trackH);
+  ctx.lineTo(runner.trackX, runner.trackY + runner.trackH);
+  ctx.closePath();
+}
+
+function drawPixelRunnerPickup(pickup: PixelRunnerPickup, runner: PixelRunnerLayout) {
+  const laneIndex = pixelLaneIndex(pickup.lane);
+  const projected = pixelRunnerProject(runner, laneIndex, pickup.y);
+  if (projected.depth <= 0) {
+    return;
+  }
+  const radius = (pickup.kind === "special" ? 10 : 8) * projected.scale;
+  ctx.save();
+  ctx.translate(projected.x, projected.y);
+  ctx.shadowBlur = pickup.kind === "special" ? 18 : 10;
+  ctx.shadowColor = pickup.kind === "special" ? "#ffd84f" : "#50d7ff";
+  ctx.fillStyle = pickup.kind === "special" ? "#ffd84f" : "#50d7ff";
+  ctx.beginPath();
+  ctx.arc(0, 0, radius, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "rgba(5, 9, 20, 0.92)";
+  ctx.font = `900 ${Math.max(5, 8 * projected.scale)}px Inter, sans-serif`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(pickup.kind === "special" ? "ALL" : pickup.lane[0].toUpperCase(), 0, 0);
+  if (pickup.action !== "none") {
+    ctx.fillStyle = "rgba(255, 255, 255, 0.82)";
+    ctx.font = `800 ${Math.max(5, 9 * projected.scale)}px Inter, sans-serif`;
+    ctx.fillText(pickup.action.toUpperCase(), 0, -17 * projected.scale);
+  }
+  ctx.restore();
+}
+
+function drawPixelRunnerObstacle(obstacle: PixelRunnerObstacle, runner: PixelRunnerLayout) {
+  const laneIndex = pixelLaneIndex(obstacle.lane);
+  const projected = pixelRunnerProject(runner, laneIndex, obstacle.y);
+  if (projected.depth <= 0) {
+    return;
+  }
+  const obstacleW = Math.max(10, projected.laneWidth * 0.74);
+  ctx.save();
+  ctx.fillStyle = obstacle.kind === "hurdle" ? "rgba(255, 111, 111, 0.9)" : "rgba(255, 216, 79, 0.9)";
+  ctx.shadowBlur = 10 * projected.scale;
+  ctx.shadowColor = ctx.fillStyle;
+  if (obstacle.kind === "hurdle") {
+    const h = Math.max(5, 12 * projected.scale);
+    const y = projected.y + 13 * projected.scale;
+    ctx.fillRect(projected.x - obstacleW / 2, y - h / 2, obstacleW, h);
+    ctx.fillStyle = "rgba(255, 175, 175, 0.82)";
+    ctx.beginPath();
+    ctx.moveTo(projected.x - obstacleW / 2, y - h / 2);
+    ctx.lineTo(projected.x - obstacleW * 0.36, y - h * 1.25);
+    ctx.lineTo(projected.x + obstacleW * 0.64, y - h * 1.25);
+    ctx.lineTo(projected.x + obstacleW / 2, y - h / 2);
+    ctx.closePath();
+    ctx.fill();
+  } else {
+    const h = Math.max(4, 9 * projected.scale);
+    const y = projected.y - 34 * projected.scale;
+    ctx.fillRect(projected.x - obstacleW / 2, y - h / 2, obstacleW, h);
+    ctx.fillStyle = "rgba(255, 245, 167, 0.86)";
+    ctx.fillRect(projected.x - obstacleW / 2, y - h * 1.4, obstacleW, h * 0.45);
+    ctx.strokeStyle = "rgba(255, 216, 79, 0.48)";
+    ctx.lineWidth = Math.max(1, 2 * projected.scale);
+    ctx.beginPath();
+    ctx.moveTo(projected.x - obstacleW / 2, y);
+    ctx.lineTo(projected.x - obstacleW / 2, projected.y + 18 * projected.scale);
+    ctx.moveTo(projected.x + obstacleW / 2, y);
+    ctx.lineTo(projected.x + obstacleW / 2, projected.y + 18 * projected.scale);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawPixelRunnerStickFigure(jumpOffset: number, sliding: boolean, time: number, color: string) {
+  const stride = Math.sin(time * 13) * 4;
+  ctx.save();
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.shadowBlur = 16;
+  ctx.shadowColor = color;
+  ctx.strokeStyle = "#dff9ff";
+  ctx.fillStyle = color;
+  ctx.lineWidth = 3;
+
+  if (sliding) {
+    ctx.translate(0, 8);
+    ctx.rotate(-0.16);
+    ctx.beginPath();
+    ctx.arc(-14, -9, 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(-8, -7);
+    ctx.lineTo(11, -2);
+    ctx.moveTo(-3, -5);
+    ctx.lineTo(-14, 5);
+    ctx.moveTo(4, -3);
+    ctx.lineTo(18, -10);
+    ctx.moveTo(9, -1);
+    ctx.lineTo(24, 2);
+    ctx.moveTo(9, -1);
+    ctx.lineTo(21, 9);
+    ctx.stroke();
+    ctx.globalAlpha = 0.24;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.ellipse(8, 12, 27, 5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.restore();
+    return;
+  }
+
+  const jumpPose = jumpOffset > 1;
+  ctx.beginPath();
+  ctx.arc(0, -25, 5.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(0, -19);
+  ctx.lineTo(0, -5);
+  if (jumpPose) {
+    ctx.moveTo(0, -15);
+    ctx.lineTo(-12, -22);
+    ctx.moveTo(0, -15);
+    ctx.lineTo(12, -22);
+    ctx.moveTo(0, -5);
+    ctx.lineTo(-10, 4);
+    ctx.lineTo(-18, -2);
+    ctx.moveTo(0, -5);
+    ctx.lineTo(11, 2);
+    ctx.lineTo(18, -5);
+  } else {
+    ctx.moveTo(0, -15);
+    ctx.lineTo(-10, -7 + stride * 0.25);
+    ctx.moveTo(0, -15);
+    ctx.lineTo(10, -8 - stride * 0.25);
+    ctx.moveTo(0, -5);
+    ctx.lineTo(-8, 11 + stride);
+    ctx.moveTo(0, -5);
+    ctx.lineTo(8, 11 - stride);
+  }
+  ctx.stroke();
+  ctx.globalAlpha = 0.18;
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.ellipse(0, 16, 18, 4, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+  ctx.restore();
+}
+
+function drawPixelRunner(runner: PixelRunnerLayout, time: number) {
+  const metrics = pixelRunnerTrackMetrics(runner);
+  ctx.save();
+  const trackGradient = ctx.createLinearGradient(0, metrics.horizonY, 0, runner.trackY + runner.trackH);
+  trackGradient.addColorStop(0, "rgba(15, 25, 49, 0.62)");
+  trackGradient.addColorStop(1, "rgba(6, 10, 22, 0.9)");
+  ctx.fillStyle = trackGradient;
+  ctx.strokeStyle = "rgba(168, 232, 255, 0.42)";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  pixelRunnerTrackPath(runner);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.save();
+  ctx.beginPath();
+  pixelRunnerTrackPath(runner);
+  ctx.clip();
+
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.15)";
+  ctx.lineWidth = 1;
+  for (let lane = 1; lane < 3; lane += 1) {
+    const bottomX = runner.trackX + (runner.trackW / 3) * lane;
+    const topX = metrics.vanishX + (bottomX - metrics.vanishX) * 0.24;
+    ctx.beginPath();
+    ctx.moveTo(topX, metrics.horizonY + 2);
+    ctx.lineTo(bottomX, runner.trackY + runner.trackH - 4);
+    ctx.stroke();
+  }
+
+  for (let marker = 1; marker < 9; marker += 1) {
+    const perspective = marker / 9;
+    const width = pixelRunnerTrackWidth(runner, perspective);
+    const y = metrics.horizonY + (runner.trackY + runner.trackH - metrics.horizonY) * perspective;
+    ctx.strokeStyle = `rgba(80, 215, 255, ${0.06 + perspective * 0.09})`;
+    ctx.beginPath();
+    ctx.moveTo(metrics.vanishX - width / 2, y);
+    ctx.lineTo(metrics.vanishX + width / 2, y);
+    ctx.stroke();
+  }
+
+  [...pixelRunnerPickups].sort((a, b) => a.y - b.y).forEach((pickup) => drawPixelRunnerPickup(pickup, runner));
+  [...pixelRunnerObstacles].sort((a, b) => a.y - b.y).forEach((obstacle) => drawPixelRunnerObstacle(obstacle, runner));
+
+  const playerProjection = pixelRunnerProject(runner, pixelRunnerLanePosition, runner.playerY);
+  const playerX = playerProjection.x;
+  const jumpOffset = pixelRunnerJumpTimer > 0 ? Math.sin((pixelRunnerJumpTimer / pixelRunnerJumpDuration) * Math.PI) * 28 : 0;
+  ctx.translate(playerX, playerProjection.y - jumpOffset);
+  ctx.globalAlpha = pixelRunnerStumbleTimer > 0 ? 0.56 + Math.sin(time * 40) * 0.24 : 1;
+  const playerTurret = activePlayerPixelTurret();
+  drawPixelRunnerStickFigure(jumpOffset, pixelRunnerDuckTimer > 0, time, playerTurret?.color ?? pixelOwnerColor("player"));
+  ctx.restore();
+  ctx.restore();
+
+  drawPixelButton(runner.jumpButton, "JUMP", pixelRunnerJumpTimer <= 0);
+  drawPixelButton(runner.duckButton, "DUCK", pixelRunnerDuckTimer <= 0);
+}
+
+function drawPixelWars(time: number) {
+  const layout = pixelLayout();
+  const runner = pixelRunnerLayout(layout);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const background = ctx.createLinearGradient(0, 0, layout.canvasW, layout.canvasH);
+  background.addColorStop(0, "#111827");
+  background.addColorStop(0.56, "#172033");
+  background.addColorStop(1, "#231b32");
+  ctx.fillStyle = background;
+  ctx.fillRect(0, 0, layout.canvasW, layout.canvasH);
+
+  ctx.save();
+  ctx.globalAlpha = 0.28;
+  ctx.strokeStyle = "#50d7ff";
+  ctx.lineWidth = 1;
+  const gridOffset = (time * 18) % 32;
+  for (let x = -gridOffset; x < layout.canvasW; x += 32) {
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, layout.canvasH);
+    ctx.stroke();
+  }
+  for (let y = -gridOffset; y < layout.canvasH; y += 32) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(layout.canvasW, y);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  ctx.fillStyle = "rgba(3, 7, 16, 0.5)";
+  ctx.fillRect(layout.panelX, 0, layout.canvasW - layout.panelX, layout.canvasH);
+  drawPixelSlot(runner, time);
+  drawPixelRunner(runner, time);
+
+  ctx.save();
+  ctx.shadowBlur = 24;
+  ctx.shadowColor = "rgba(80, 215, 255, 0.42)";
+  ctx.fillStyle = "rgba(11, 16, 28, 0.92)";
+  ctx.strokeStyle = "rgba(168, 232, 255, 0.72)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  roundedRectPath(layout.x - 3, layout.y - 3, layout.boardW + 6, layout.boardH + 6, 8);
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+
+  drawPixelTileGrid(layout);
+  drawPixelRespawnPerimeterPrompt(layout, time);
+
+  ctx.save();
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
+  ctx.lineWidth = 1;
+  for (let column = 0; column <= pixelColumns; column += 6) {
+    const x = layout.x + column * layout.cellW;
+    ctx.beginPath();
+    ctx.moveTo(x, layout.y);
+    ctx.lineTo(x, layout.y + layout.boardH);
+    ctx.stroke();
+  }
+  for (let row = 0; row <= pixelRows; row += 6) {
+    const y = layout.y + row * layout.cellH;
+    ctx.beginPath();
+    ctx.moveTo(layout.x, y);
+    ctx.lineTo(layout.x + layout.boardW, y);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  pixelShots.forEach((shot) => {
+    ctx.save();
+    ctx.shadowBlur = shot.kind === "bomb" ? 22 : 14;
+    ctx.shadowColor = shot.kind === "bomb" ? "#ff6f6f" : shot.color;
+    ctx.fillStyle = shot.kind === "bomb" ? "#ff6f6f" : shot.color;
+    ctx.beginPath();
+    ctx.arc(shot.x, shot.y, shot.kind === "bomb" ? 6 : 4, 0, Math.PI * 2);
+    ctx.fill();
+    if (shot.kind === "bomb") {
+      ctx.strokeStyle = "#ffd84f";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(shot.x + 2, shot.y - 4);
+      ctx.lineTo(shot.x + 7, shot.y - 9);
+      ctx.stroke();
+    }
+    ctx.restore();
+  });
+  pixelTurrets.forEach((turret) => drawPixelTurret(turret, layout, time));
+
+  if (pixelMatchOver) {
+    ctx.save();
+    ctx.fillStyle = "rgba(5, 9, 20, 0.68)";
+    ctx.fillRect(layout.x, layout.y, layout.boardW, layout.boardH);
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = "#f7fbff";
+    ctx.font = "900 34px Inter, sans-serif";
+    ctx.fillText(pixelMatchMessage, layout.x + layout.boardW / 2, layout.y + layout.boardH / 2 - 14);
+    ctx.fillStyle = "rgba(217, 248, 255, 0.86)";
+    ctx.font = "800 14px Inter, sans-serif";
+    ctx.fillText("Tap the board to restart", layout.x + layout.boardW / 2, layout.y + layout.boardH / 2 + 24);
+    ctx.restore();
+  }
+
+  if (state === "pixel-menu" || state === "pixel-options") {
+    ctx.fillStyle = "rgba(5, 9, 20, 0.48)";
+    ctx.fillRect(0, 0, layout.canvasW, layout.canvasH);
+  }
+}
+
+function roundedRectPath(x: number, y: number, rectWidth: number, rectHeight: number, radius: number) {
+  const r = Math.min(radius, rectWidth / 2, rectHeight / 2);
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + rectWidth - r, y);
+  ctx.quadraticCurveTo(x + rectWidth, y, x + rectWidth, y + r);
+  ctx.lineTo(x + rectWidth, y + rectHeight - r);
+  ctx.quadraticCurveTo(x + rectWidth, y + rectHeight, x + rectWidth - r, y + rectHeight);
+  ctx.lineTo(x + r, y + rectHeight);
+  ctx.quadraticCurveTo(x, y + rectHeight, x, y + rectHeight - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+}
+
+function bridgeAreas(canvasWidth: number): BridgeAreas {
+  const wheelWidth = Math.min(300, Math.max(150, canvasWidth * 0.32));
+  return {
+    boardWidth: canvasWidth - wheelWidth,
+    wheelWidth,
+    wheelX: canvasWidth - wheelWidth,
+  };
+}
+
+function bridgePanelRects(canvasWidth: number, canvasHeight: number) {
+  const areas = bridgeAreas(canvasWidth);
+  const panelWidth = Math.min(170, areas.boardWidth * 0.32);
+  const visibleAheadRows = canvasHeight < 320 ? 4 : 6;
+  const firstRow = bridgeStep > 0 ? -1 : 0;
+  const lastRow = visibleAheadRows - 1;
+  const rowCount = lastRow - firstRow + 1;
+  const topMargin = Math.max(50, canvasHeight * 0.14);
+  const bottomClearance = Math.max(62, canvasHeight * 0.2);
+  const bottomY = canvasHeight - bottomClearance;
+  const basePanelHeight = Math.min(68, Math.max(26, canvasHeight * 0.12));
+  const rowPitch = Math.max(20, (bottomY - topMargin - basePanelHeight) / Math.max(1, rowCount - 1));
+  const panelHeight = Math.min(basePanelHeight, Math.max(18, rowPitch * 0.76));
+  const scrollOffset = bridgeScrollTimer > 0 ? -rowPitch * (bridgeScrollTimer / bridgeScrollDuration) : 0;
+  const gap = Math.min(38, areas.boardWidth * 0.06);
+  const centerX = areas.boardWidth / 2;
+  const leftX = centerX - panelWidth - gap / 2;
+  const rightX = centerX + gap / 2;
+  const rects: BridgePanelRect[] = [];
+
+  for (let row = firstRow; row <= lastRow; row += 1) {
+    const pathIndex = bridgeStep + row;
+    const y = bottomY - panelHeight - (row - firstRow) * rowPitch + scrollOffset;
+    const scale = Math.max(0.72, 1 - row * 0.045);
+    const offsetX = (1 - scale) * panelWidth * 0.5;
+    (["left", "right"] as BridgeSide[]).forEach((side) => {
+      rects.push({
+        h: panelHeight * scale,
+        pathIndex,
+        row,
+        side,
+        w: panelWidth * scale,
+        x: (side === "left" ? leftX : rightX) + offsetX,
+        y,
+      });
+    });
+  }
+
+  return rects;
+}
+
+function bridgePanelAtPoint(x: number, y: number) {
+  return bridgePanelRects(canvas.width / dpr, canvas.height / dpr).find(
+    (panel) =>
+      panel.row === 0 &&
+      x >= panel.x &&
+      x <= panel.x + panel.w &&
+      y >= panel.y &&
+      y <= panel.y + panel.h,
+  );
+}
+
+function bridgeWheelButtonRects(canvasHeight: number, areas: BridgeAreas) {
+  const padding = Math.max(8, Math.min(14, areas.wheelWidth * 0.06));
+  const gap = canvasHeight < 430 ? 6 : 8;
+  const h = Math.min(38, Math.max(28, canvasHeight * 0.075));
+  const w = areas.wheelWidth - padding * 2;
+  const x = areas.wheelX + padding;
+  const pointY = canvasHeight - padding - h;
+  return {
+    hint: { h, w, x, y: pointY - gap - h },
+    point: { h, w, x, y: pointY },
+  };
+}
+
+function bridgeWheelActionAtPoint(x: number, y: number) {
+  const canvasWidth = canvas.width / dpr;
+  const canvasHeight = canvas.height / dpr;
+  const areas = bridgeAreas(canvasWidth);
+  if (x < areas.wheelX) {
+    return null;
+  }
+
+  const buttons = bridgeWheelButtonRects(canvasHeight, areas);
+  if (pixelRectContains(buttons.hint, x, y)) {
+    return "hint";
+  }
+  if (pixelRectContains(buttons.point, x, y)) {
+    return "point";
+  }
+  return null;
+}
+
+function drawBridgeWheelButton(rect: PixelRect, label: string, active: boolean) {
+  ctx.save();
+  ctx.globalAlpha = active ? 1 : 0.46;
+  ctx.fillStyle = active ? "rgba(213, 245, 255, 0.78)" : "rgba(213, 245, 255, 0.32)";
+  ctx.strokeStyle = active ? "rgba(231, 251, 255, 0.72)" : "rgba(231, 251, 255, 0.28)";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  roundedRectPath(rect.x, rect.y, rect.w, rect.h, 8);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "#10253d";
+  ctx.font = `900 ${Math.max(10, Math.min(14, rect.h * 0.36))}px Inter, sans-serif`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(label, rect.x + rect.w / 2, rect.y + rect.h / 2);
+  ctx.restore();
+}
+
+function drawBridgeWheelFace<T extends { color?: string; label: string; weight: number }>(
+  segments: T[],
+  angle: number,
+  centerX: number,
+  centerY: number,
+  radius: number,
+  isPointWheel: boolean,
+  labelLines: (segment: T, index: number) => string[],
+) {
+  ctx.save();
+  ctx.translate(centerX, centerY);
+  ctx.rotate(angle);
+  segments.forEach((segment, index) => {
+    const { center, end, start } = wheelSegmentBounds(segments, index);
+    ctx.fillStyle =
+      segment.color ?? (index % 2 === 0 ? "rgba(127, 223, 255, 0.82)" : "rgba(255, 216, 90, 0.86)");
+    ctx.strokeStyle = "rgba(8, 18, 32, 0.72)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.arc(0, 0, radius, start, end);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    const lines = labelLines(segment, index);
+    ctx.save();
+    ctx.rotate(center);
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = index === bridgeJackpotSegmentIndex && isPointWheel ? "#ffffff" : "#10253d";
+    ctx.font = `900 ${Math.max(7, radius * (isPointWheel ? 0.11 : 0.1))}px Inter, sans-serif`;
+    if (index === bridgeJackpotSegmentIndex && isPointWheel) {
+      ctx.font = `900 ${Math.max(7, radius * 0.1)}px Inter, sans-serif`;
+      ctx.strokeStyle = "rgba(58, 4, 16, 0.78)";
+      ctx.lineWidth = 3;
+    }
+    lines.forEach((line, lineIndex) => {
+      const offset = (lineIndex - (lines.length - 1) / 2) * Math.max(9, radius * 0.12);
+      const textX = index === bridgeJackpotSegmentIndex && isPointWheel ? radius * 0.52 : radius * 0.66;
+      if (index === bridgeJackpotSegmentIndex && isPointWheel) {
+        ctx.strokeText(line, textX, offset);
+      }
+      ctx.fillText(line, textX, offset);
+    });
+    ctx.restore();
+  });
+  ctx.restore();
+
+  ctx.fillStyle = "#ff5f76";
+  ctx.beginPath();
+  ctx.moveTo(centerX, centerY - radius - 6);
+  ctx.lineTo(centerX - 8, centerY - radius - 20);
+  ctx.lineTo(centerX + 8, centerY - radius - 20);
+  ctx.closePath();
+  ctx.fill();
+}
+
+function drawBridgeWheelPanel(canvasHeight: number, areas: BridgeAreas) {
+  const compact = canvasHeight < 430;
+  ctx.fillStyle = "rgba(4, 10, 20, 0.74)";
+  ctx.fillRect(areas.wheelX, 0, areas.wheelWidth, canvasHeight);
+  ctx.strokeStyle = "rgba(205, 249, 255, 0.24)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(areas.wheelX, 0);
+  ctx.lineTo(areas.wheelX, canvasHeight);
+  ctx.stroke();
+
+  const centerX = areas.wheelX + areas.wheelWidth / 2;
+  const radius = Math.min(compact ? 48 : 64, areas.wheelWidth * 0.28, canvasHeight * (compact ? 0.105 : 0.12));
+  const pointWheelY = Math.max(radius + (compact ? 25 : 36), canvasHeight * (compact ? 0.18 : 0.2));
+  const hintWheelY = Math.max(pointWheelY + radius * 2 + (compact ? 38 : 54), canvasHeight * (compact ? 0.51 : 0.5));
+  const buttons = bridgeWheelButtonRects(canvasHeight, areas);
+
+  drawBridgeWheelFace(bridgeWheelSegments, bridgeWheelAngle, centerX, pointWheelY, radius, true, (outcome, index) =>
+    index === bridgeJackpotSegmentIndex ? ["Jackpot"] : [outcome.label],
+  );
+  drawBridgeWheelFace(bridgeHintWheelSegments, bridgeHintWheelAngle, centerX, hintWheelY, radius, false, (outcome) => [
+    outcome.label,
+    outcome.face ?? "",
+  ].filter(Boolean));
+
+  ctx.fillStyle = "rgba(255, 255, 255, 0.94)";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "alphabetic";
+  ctx.font = `900 ${compact ? 12 : 15}px Inter, sans-serif`;
+  ctx.fillText("Point Wheel", centerX, Math.max(compact ? 15 : 22, pointWheelY - radius - (compact ? 15 : 28)));
+  ctx.font = `900 ${compact ? 13 : 17}px Inter, sans-serif`;
+  ctx.fillText(
+    bridgeWheelRequesting || bridgeWheelSpinTimer > 0 ? "Spinning" : bridgeWheelLabel,
+    centerX,
+    pointWheelY + radius + (compact ? 15 : 24),
+  );
+  ctx.font = `900 ${compact ? 12 : 15}px Inter, sans-serif`;
+  ctx.fillText("Hint Wheel", centerX, hintWheelY - radius - (compact ? 12 : 22));
+  ctx.font = `900 ${compact ? 13 : 17}px Inter, sans-serif`;
+  ctx.fillText(
+    bridgeHintWheelRequesting || bridgeHintWheelSpinTimer > 0 ? "Spinning" : bridgeHintWheelLabel,
+    centerX,
+    hintWheelY + radius + (compact ? 14 : 24),
+  );
+  ctx.fillStyle = "#ffd85a";
+  ctx.font = `900 ${compact ? 10 : 12}px Inter, sans-serif`;
+  ctx.fillText(`Jackpot ${formatScore(bridgeJackpot)}`, centerX, pointWheelY + radius + (compact ? 29 : 42));
+
+  const puzzle = bridgePuzzles[bridgeStep];
+  const activeHint = bridgeHint?.pathIndex === bridgeStep ? bridgeHint : null;
+  const promptH = compact ? 42 : 96;
+  const promptBottom = buttons.hint.y - (compact ? 6 : 10);
+  const promptY = compact
+    ? Math.max(hintWheelY + radius + 18, Math.min(promptBottom - promptH, canvasHeight * 0.68))
+    : Math.min(promptBottom - promptH, hintWheelY + radius + 44);
+  ctx.fillStyle = "rgba(213, 245, 255, 0.12)";
+  ctx.strokeStyle = "rgba(205, 249, 255, 0.32)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  roundedRectPath(areas.wheelX + 14, promptY, areas.wheelWidth - 28, promptH, 8);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = "#d9f8ff";
+  ctx.font = `900 ${compact ? 10 : 12}px Inter, sans-serif`;
+  ctx.fillText(activeHint ? "Hint" : "Choice", centerX, promptY + (compact ? 14 : 23));
+  ctx.fillStyle = "#ffffff";
+  ctx.font = activeHint?.kind === "math"
+    ? `900 ${compact ? 14 : 22}px Inter, sans-serif`
+    : `900 ${compact ? 12 : 16}px Inter, sans-serif`;
+  ctx.fillText(activeHint?.kind === "math" ? `${puzzle?.prompt ?? "?"} = ?` : "Pick a glass tile", centerX, promptY + (compact ? 30 : 54));
+  ctx.fillStyle = "#afefff";
+  ctx.font = `800 ${compact ? 9 : 12}px Inter, sans-serif`;
+  if (!compact) {
+    ctx.fillText(activeHint?.kind === "freebie" ? "Safe tile is glowing" : "Tap left or right glass", centerX, promptY + 78);
+  }
+  const bridgeBusy = bridgeWheelBusy();
+  const hasPoints = bridgePoints >= bridgeWheelCost;
+  const hintUsed = bridgeHint?.pathIndex === bridgeStep;
+  drawBridgeWheelButton(buttons.hint, !hasPoints ? "Need 1" : hintUsed ? "Hint used" : "Hint -1", !bridgeBusy && hasPoints && !hintUsed);
+  drawBridgeWheelButton(buttons.point, hasPoints ? "Point -1" : "Need 1", !bridgeBusy && hasPoints);
+  ctx.textAlign = "left";
+}
+
+function drawBridgeGame(time: number) {
+  const canvasWidth = canvas.width / dpr;
+  const canvasHeight = canvas.height / dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ensureBridgeRows(bridgeStep + bridgeVisibleRows + 2);
+
+  const background = ctx.createLinearGradient(0, 0, 0, canvasHeight);
+  background.addColorStop(0, "#10253d");
+  background.addColorStop(0.48, "#243b63");
+  background.addColorStop(1, "#080d18");
+  ctx.fillStyle = background;
+  ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+  ctx.fillStyle = "rgba(255, 255, 255, 0.08)";
+  for (let index = 0; index < 28; index += 1) {
+    const x = (index * 97 + time * 18) % (canvasWidth + 120) - 60;
+    const y = (index * 53 + Math.sin(time + index) * 12) % canvasHeight;
+    ctx.beginPath();
+    ctx.arc(x, y, 1.5 + (index % 3), 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  const areas = bridgeAreas(canvasWidth);
+  drawBridgeWheelPanel(canvasHeight, areas);
+
+  const centerX = areas.boardWidth / 2;
+  const panels = bridgePanelRects(canvasWidth, canvasHeight);
+  const panelBounds = panels.reduce(
+    (bounds, panel) => ({
+      bottom: Math.max(bounds.bottom, panel.y + panel.h),
+      left: Math.min(bounds.left, panel.x),
+      right: Math.max(bounds.right, panel.x + panel.w),
+      top: Math.min(bounds.top, panel.y),
+    }),
+    { bottom: -Infinity, left: Infinity, right: -Infinity, top: Infinity },
+  );
+
+  ctx.fillStyle = "rgba(3, 7, 15, 0.48)";
+  ctx.fillRect(
+    panelBounds.left - 32,
+    panelBounds.top - 32,
+    panelBounds.right - panelBounds.left + 64,
+    panelBounds.bottom - panelBounds.top + 84,
+  );
+
+  for (const panel of panels.sort((a, b) => b.row - a.row)) {
+    const puzzle = bridgePuzzles[panel.pathIndex];
+    const isBroken = panel.pathIndex === bridgeStep && bridgeBrokenSide === panel.side;
+    const isLanded = panel.pathIndex === bridgeStep && bridgeSuccessTimer > 0 && bridgePlayerSide === panel.side;
+    const isJumpTarget = panel.pathIndex === bridgeStep && bridgeJumpTimer > 0 && bridgePlayerSide === panel.side;
+    const isTraversed = panel.row === -1 && panel.pathIndex === bridgeStep - 1 && bridgeStandingSide === panel.side;
+    const isCurrent = panel.row === 0;
+    const activeHint = bridgeHint?.pathIndex === panel.pathIndex ? bridgeHint : null;
+    const isFreebieSafe =
+      isCurrent && activeHint?.kind === "freebie" && bridgeSafePath[panel.pathIndex] === panel.side;
+    const tint = "rgba(196, 242, 255, 0.34)";
+    const x = panel.x;
+    const y = panel.y;
+    const w = panel.w;
+    const h = panel.h;
+    const scale = Math.max(0.72, 1 - panel.row * 0.045);
+    if (panel.side === "left" && panel.pathIndex >= 0) {
+      ctx.save();
+      ctx.textAlign = "right";
+      ctx.textBaseline = "middle";
+      ctx.fillStyle = isCurrent ? "#ffd85a" : isTraversed ? "#84ffb5" : "rgba(217, 248, 255, 0.8)";
+      ctx.font = `900 ${Math.max(12, h * 0.28)}px Inter, sans-serif`;
+      ctx.shadowColor = "rgba(0, 0, 0, 0.55)";
+      ctx.shadowBlur = 8;
+      ctx.fillText(`${panel.pathIndex + 1}`, x - Math.max(10, 14 * scale), y + h * 0.5);
+      ctx.restore();
+    }
+
+    const glass = ctx.createLinearGradient(x, y, x + w, y + h);
+    glass.addColorStop(0, "rgba(255, 255, 255, 0.78)");
+    glass.addColorStop(0.45, tint);
+    glass.addColorStop(1, "rgba(44, 179, 211, 0.28)");
+    ctx.fillStyle = isBroken
+      ? "rgba(255, 95, 118, 0.22)"
+      : isLanded
+        ? "rgba(85, 255, 150, 0.58)"
+        : isFreebieSafe
+          ? "rgba(85, 255, 150, 0.46)"
+        : isTraversed
+          ? "rgba(85, 255, 150, 0.36)"
+          : glass;
+    ctx.strokeStyle = isBroken
+      ? "rgba(255, 95, 118, 0.95)"
+      : isLanded
+        ? "rgba(85, 255, 150, 0.98)"
+        : isFreebieSafe
+          ? "rgba(85, 255, 150, 0.98)"
+        : isTraversed
+          ? "rgba(85, 255, 150, 0.76)"
+          : isJumpTarget
+            ? "rgba(255, 220, 102, 0.95)"
+            : isCurrent
+              ? "rgba(255, 220, 102, 0.9)"
+              : "rgba(205, 249, 255, 0.54)";
+    ctx.lineWidth = isCurrent || isJumpTarget || isLanded || isTraversed ? 3 : 2;
+    ctx.beginPath();
+    roundedRectPath(x, y, w, h, 8);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.42)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x + 12 * scale, y + h * 0.28);
+    ctx.lineTo(x + w - 18 * scale, y + h * 0.12);
+    ctx.stroke();
+
+    if (isCurrent && activeHint?.kind === "math" && puzzle) {
+      const choiceLabel = panel.side === "left" ? "A" : "B";
+      ctx.fillStyle = isBroken ? "#ffe0e5" : isLanded ? "#072817" : "#10253d";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.font = `900 ${Math.max(12, h * 0.2)}px Inter, sans-serif`;
+      ctx.fillText(choiceLabel, x + w * 0.24, y + h * 0.5);
+      ctx.font = `900 ${Math.max(18, h * 0.34)}px Inter, sans-serif`;
+      ctx.fillText(`${puzzle.answers[panel.side]}`, x + w * 0.62, y + h * 0.5);
+      ctx.textAlign = "left";
+      ctx.textBaseline = "alphabetic";
+    }
+
+    if (isBroken) {
+      ctx.strokeStyle = "#f7fbff";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(x + w * 0.18, y + h * 0.18);
+      ctx.lineTo(x + w * 0.52, y + h * 0.48);
+      ctx.lineTo(x + w * 0.36, y + h * 0.82);
+      ctx.moveTo(x + w * 0.52, y + h * 0.48);
+      ctx.lineTo(x + w * 0.86, y + h * 0.24);
+      ctx.moveTo(x + w * 0.52, y + h * 0.48);
+      ctx.lineTo(x + w * 0.82, y + h * 0.78);
+      ctx.stroke();
+    }
+  }
+
+  const targetPanel = panels.find((panel) => panel.row === 0 && panel.side === (bridgeBrokenSide || bridgePlayerSide));
+  const previousPanel = panels.find((panel) => panel.row === -1 && panel.side === bridgeStandingSide);
+  const fallbackPanel = panels.find((panel) => panel.row === 0);
+  const fallProgress = bridgeFallTimer > 0 ? 1 - bridgeFallTimer / bridgeFallDuration : 0;
+  const jumpProgress = bridgeJumpTimer > 0 ? 1 - bridgeJumpTimer / bridgeJumpDuration : 0;
+  const startX = previousPanel ? previousPanel.x + previousPanel.w / 2 : centerX;
+  const startY = previousPanel
+    ? previousPanel.y + previousPanel.h * 0.48
+    : (fallbackPanel?.y ?? canvasHeight * 0.7) + (fallbackPanel?.h ?? 60) + 38;
+  const targetX = targetPanel ? targetPanel.x + targetPanel.w / 2 : startX;
+  const targetY = targetPanel ? targetPanel.y + targetPanel.h * 0.48 : startY;
+  let playerX = startX;
+  let playerY = startY + Math.sin(time * 5) * 3;
+
+  if (bridgeJumpTimer > 0) {
+    playerX = startX + (targetX - startX) * jumpProgress;
+    playerY = startY + (targetY - startY) * jumpProgress - Math.sin(jumpProgress * Math.PI) * 42;
+  } else if (bridgeFallTimer > 0 && targetPanel) {
+    playerX = targetX;
+    playerY = targetY + fallProgress * canvasHeight * 0.42;
+  } else if (bridgeSuccessTimer > 0 && targetPanel) {
+    playerX = targetX;
+    playerY = targetY + Math.sin(time * 12) * 2;
+  } else if (previousPanel) {
+    playerX = startX;
+    playerY = startY + Math.sin(time * 5) * 2;
+  }
+  ctx.save();
+  ctx.translate(playerX, playerY);
+  ctx.rotate(bridgeFallTimer > 0 ? fallProgress * 8 : bridgeJumpTimer > 0 ? Math.sin(jumpProgress * Math.PI) * 0.22 : 0);
+  ctx.globalAlpha = bridgeFallTimer > 0 ? Math.max(0.28, 1 - fallProgress * 0.45) : 1;
+  ctx.fillStyle = "#ffd85a";
+  ctx.strokeStyle = "#342503";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(0, -10, 11, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "#ff6e7f";
+  ctx.beginPath();
+  roundedRectPath(-12, 4, 24, 30, 8);
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+
+  ctx.fillStyle = "rgba(255, 255, 255, 0.92)";
+  ctx.font = "900 18px Inter, sans-serif";
+  ctx.fillText(`Traversed ${formatScore(bridgeTiles)}`, 18, 34);
+  ctx.fillText(`Points ${formatScore(bridgePoints)}`, 18, 60);
+  ctx.textAlign = "right";
+  ctx.fillText(`Jackpot ${formatScore(bridgeJackpot)}`, canvasWidth - 18, 34);
+  ctx.textAlign = "left";
+}
+
+function drawViewportBackground(canvasWidth: number, canvasHeight: number) {
+  const wall = ctx.createLinearGradient(0, 0, 0, canvasHeight);
+  wall.addColorStop(0, "#cdbf9f");
+  wall.addColorStop(0.62, "#eee6d2");
+  wall.addColorStop(1, "#a99066");
+  ctx.fillStyle = wall;
+  ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+}
+
+function formatScore(value: number) {
+  return Number.isInteger(value) ? `${value}` : value.toFixed(1);
+}
+
+function readStoredNumber(key: string, fallback = 0) {
+  try {
+    const storedValue = localStorage.getItem(key);
+    const storedNumber = storedValue === null ? fallback : Number(storedValue);
+    return Number.isFinite(storedNumber) ? storedNumber : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function writeStoredNumber(key: string, value: number) {
+  try {
+    localStorage.setItem(key, `${value}`);
+  } catch {
+    // Local scores are best-effort on browsers that restrict storage.
+  }
+}
+
+function readStoredPlaneHighest() {
+  return Math.max(
+    0,
+    readStoredNumber(localHighScoreKey),
+    readStoredNumber(pendingScoreKey),
+  );
+}
+
+function readLocalHighest() {
+  const storedScore = readStoredPlaneHighest();
+  localHighest = Math.max(localHighest, storedScore);
+  if (storedScore > 0) {
+    writeStoredNumber(localHighScoreKey, localHighest);
+  }
+}
+
+function writeLocalHighest(nextScore: number) {
+  localHighest = Math.max(localHighest, readStoredPlaneHighest(), nextScore);
+  writeStoredNumber(localHighScoreKey, localHighest);
+}
+
+function setText(elements: HTMLElement[], text: string) {
+  elements.forEach((element) => {
+    element.textContent = text;
+  });
+}
+
+function scoreNumber(value: unknown, fallback: number) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function updateSoundButtons() {
+  planeSoundToggle.textContent = planeSoundEnabled ? "Sound on" : "Sound off";
+  planeSoundToggle.setAttribute("aria-pressed", `${planeSoundEnabled}`);
+  snakeSoundToggle.textContent = snakeSoundEnabled ? "Sound on" : "Sound off";
+  snakeSoundToggle.setAttribute("aria-pressed", `${snakeSoundEnabled}`);
+  bridgeSoundToggle.textContent = bridgeSoundEnabled ? "Sound on" : "Sound off";
+  bridgeSoundToggle.setAttribute("aria-pressed", `${bridgeSoundEnabled}`);
+}
+
+function setPlaneSound(enabled: boolean) {
+  planeSoundEnabled = enabled;
+  localStorage.setItem(planeSoundKey, enabled ? "on" : "off");
+  updateSoundButtons();
+}
+
+function setSnakeSound(enabled: boolean) {
+  snakeSoundEnabled = enabled;
+  localStorage.setItem(snakeSoundKey, enabled ? "on" : "off");
+  updateSoundButtons();
+}
+
+function setBridgeSound(enabled: boolean) {
+  bridgeSoundEnabled = enabled;
+  localStorage.setItem(bridgeSoundKey, enabled ? "on" : "off");
+  updateSoundButtons();
+}
+
+async function submitIssue(game: "jumpy-plane" | "shooting-snakes" | "glass-bridge" | "pixel-wars" | "breakout" | "digital-cribbage", message: string) {
+  const response = await fetch(`/api/issues/${game}`, {
+    body: JSON.stringify({
+      message,
+      page: window.location.href,
+      referrer: document.referrer,
+      screen: `${window.screen.width}x${window.screen.height}`,
+      viewport: `${window.innerWidth}x${window.innerHeight}`,
+      language: navigator.language,
+      platform: navigator.platform,
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      online: navigator.onLine,
+      userAgent: navigator.userAgent,
+    }),
+    cache: "no-store",
+    headers: { "Content-Type": "application/json" },
+    method: "POST",
+  });
+
+  if (!response.ok) {
+    throw new Error("Issue report failed.");
+  }
+}
+
+function renderHighScores() {
+  setText(localHighEls, formatScore(localHighest));
+  setText(todayHighEls, formatScore(todayHighest));
+  setText(serverHighEls, formatScore(serverHighest));
+  setText(todayNameEls, todayHighName || (todayHighest > 0 ? "Unknown scorer" : "No scorer yet"));
+  setText(serverNameEls, serverHighName || (serverHighest > 0 ? "Unknown scorer" : "No scorer yet"));
+}
+
+function readSnakeLocalLongest() {
+  const storedValue = localStorage.getItem(snakeLocalLongestKey) ?? localStorage.getItem(oldSnakeLocalLongestKey) ?? "3";
+  const storedScore = Number(storedValue);
+  snakeLocalLongest = Number.isFinite(storedScore) ? Math.max(3, storedScore) : 3;
+  if (localStorage.getItem(snakeLocalLongestKey) === null && localStorage.getItem(oldSnakeLocalLongestKey) !== null) {
+    localStorage.setItem(snakeLocalLongestKey, `${snakeLocalLongest}`);
+  }
+}
+
+function writeSnakeLocalLongest(nextLength: number) {
+  snakeLocalLongest = Math.max(3, snakeLocalLongest, nextLength);
+  localStorage.setItem(snakeLocalLongestKey, `${snakeLocalLongest}`);
+}
+
+function renderSnakeHighScores() {
+  setText(snakeLocalHighEls, formatScore(Math.max(3, snakeLocalLongest)));
+  setText(snakeTodayHighEls, formatScore(Math.max(3, snakeTodayLongest)));
+  setText(snakeServerHighEls, formatScore(Math.max(3, snakeServerLongest)));
+  setText(snakeTodayNameEls, snakeTodayLongName || (snakeTodayLongest > 0 ? "Unknown scorer" : "No scorer yet"));
+  setText(snakeServerNameEls, snakeServerLongName || (snakeServerLongest > 0 ? "Unknown scorer" : "No scorer yet"));
+}
+
+function readBridgeLocalScores() {
+  bridgeLocalTiles = Math.max(0, readStoredNumber(bridgeLocalTilesKey), readStoredNumber(bridgePendingTilesKey));
+  bridgeLocalPoints = Math.max(0, readStoredNumber(bridgeLocalPointsKey), readStoredNumber(bridgePendingPointsKey));
+  writeStoredNumber(bridgeLocalTilesKey, bridgeLocalTiles);
+  writeStoredNumber(bridgeLocalPointsKey, bridgeLocalPoints);
+}
+
+function writeBridgeLocalScores(tiles: number, points: number) {
+  bridgeLocalTiles = Math.max(bridgeLocalTiles, tiles);
+  bridgeLocalPoints = Math.max(bridgeLocalPoints, points);
+  writeStoredNumber(bridgeLocalTilesKey, bridgeLocalTiles);
+  writeStoredNumber(bridgeLocalPointsKey, bridgeLocalPoints);
+}
+
+function renderBridgeHighScores() {
+  setText(bridgePlayerNameEls, localStorage.getItem(playerNameKey)?.trim() || "Player 1");
+  setText(bridgeLocalTileEls, formatScore(bridgeLocalTiles));
+  setText(bridgeTodayTileEls, formatScore(bridgeTodayTiles));
+  setText(bridgeServerTileEls, formatScore(bridgeServerTiles));
+  setText(bridgeTodayTileNameEls, bridgeTodayTileName || (bridgeTodayTiles > 0 ? "Unknown scorer" : "No scorer yet"));
+  setText(bridgeServerTileNameEls, bridgeServerTileName || (bridgeServerTiles > 0 ? "Unknown scorer" : "No scorer yet"));
+  setText(bridgeLocalPointEls, formatScore(bridgeLocalPoints));
+  setText(bridgeTodayPointEls, formatScore(bridgeTodayPoints));
+  setText(bridgeServerPointEls, formatScore(bridgeServerPoints));
+  setText(bridgeTodayPointNameEls, bridgeTodayPointName || (bridgeTodayPoints > 0 ? "Unknown scorer" : "No scorer yet"));
+  setText(bridgeServerPointNameEls, bridgeServerPointName || (bridgeServerPoints > 0 ? "Unknown scorer" : "No scorer yet"));
+}
+
+async function loadServerHighScores(options: ScoreLoadOptions = {}) {
+  try {
+    const response = await fetch("/api/high-scores", { cache: "no-store" });
+    if (!response.ok) {
+      return;
+    }
+
+    const scores = await response.json();
+    todayHighest = scoreNumber(scores.todayHighest, 0);
+    todayHighName = typeof scores.todayName === "string" ? scores.todayName : "";
+    serverHighest = scoreNumber(scores.allTimeHighest, 0);
+    serverHighName = typeof scores.allTimeName === "string" ? scores.allTimeName : "";
+    renderHighScores();
+    if (options.reconcile !== false) {
+      void retryPendingServerScore();
+      void reconcileLocalHighScore();
+    }
+  } catch {
+    // The game should still work offline or from a static dev server.
+  }
+}
+
+function applyServerHighScores(scores: HighScoreResponse) {
+  todayHighest = scoreNumber(scores.todayHighest, todayHighest);
+  todayHighName = typeof scores.todayName === "string" ? scores.todayName : todayHighName;
+  serverHighest = scoreNumber(scores.allTimeHighest, serverHighest);
+  serverHighName = typeof scores.allTimeName === "string" ? scores.allTimeName : serverHighName;
+  renderHighScores();
+}
+
+function applyServerSnakeHighScores(scores: HighScoreResponse) {
+  snakeTodayLongest = scoreNumber(scores.todayHighest, snakeTodayLongest);
+  snakeTodayLongName = typeof scores.todayName === "string" ? scores.todayName : snakeTodayLongName;
+  snakeServerLongest = scoreNumber(scores.allTimeHighest, snakeServerLongest);
+  snakeServerLongName = typeof scores.allTimeName === "string" ? scores.allTimeName : snakeServerLongName;
+  renderSnakeHighScores();
+}
+
+function applyServerBridgeTileScores(scores: HighScoreResponse) {
+  bridgeTodayTiles = scoreNumber(scores.todayHighest, bridgeTodayTiles);
+  bridgeTodayTileName = typeof scores.todayName === "string" ? scores.todayName : bridgeTodayTileName;
+  bridgeServerTiles = scoreNumber(scores.allTimeHighest, bridgeServerTiles);
+  bridgeServerTileName = typeof scores.allTimeName === "string" ? scores.allTimeName : bridgeServerTileName;
+  renderBridgeHighScores();
+}
+
+function applyServerBridgePointScores(scores: HighScoreResponse) {
+  bridgeTodayPoints = scoreNumber(scores.todayHighest, bridgeTodayPoints);
+  bridgeTodayPointName = typeof scores.todayName === "string" ? scores.todayName : bridgeTodayPointName;
+  bridgeServerPoints = scoreNumber(scores.allTimeHighest, bridgeServerPoints);
+  bridgeServerPointName = typeof scores.allTimeName === "string" ? scores.allTimeName : bridgeServerPointName;
+  renderBridgeHighScores();
+}
+
+async function submitServerHighScore(finalScore: number, name = "") {
+  try {
+    const response = await fetch("/api/high-scores", {
+      body: JSON.stringify({ name, score: finalScore }),
+      cache: "no-store",
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+    if (!response.ok) {
+      return;
+    }
+
+    const scores = await response.json() as HighScoreResponse;
+    applyServerHighScores(scores);
+    if (Number(scores.todayHighest) >= finalScore || Number(scores.allTimeHighest) >= finalScore) {
+      localStorage.removeItem(pendingScoreKey);
+    }
+    return scores;
+  } catch {
+    // Ignore score sync failures; the local score still persists.
+  }
+}
+
+async function loadServerSnakeHighScores(options: ScoreLoadOptions = {}) {
+  try {
+    const response = await fetch("/api/snake-high-scores", { cache: "no-store" });
+    if (!response.ok) {
+      return;
+    }
+
+    const scores = await response.json() as HighScoreResponse;
+    applyServerSnakeHighScores(scores);
+    if (options.reconcile !== false) {
+      void retryPendingServerSnakeScore();
+      void reconcileSnakeLocalHighScore();
+    }
+  } catch {
+    // Snake can still run locally if the score endpoint is unavailable.
+  }
+}
+
+async function submitServerSnakeHighScore(finalScore: number, name = "") {
+  try {
+    const response = await fetch("/api/snake-high-scores", {
+      body: JSON.stringify({ name, score: finalScore }),
+      cache: "no-store",
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+    if (!response.ok) {
+      return;
+    }
+
+    const scores = await response.json() as HighScoreResponse;
+    applyServerSnakeHighScores(scores);
+    if (Number(scores.todayHighest) >= finalScore || Number(scores.allTimeHighest) >= finalScore) {
+      localStorage.removeItem(snakePendingScoreKey);
+      localStorage.removeItem(oldSnakePendingScoreKey);
+    }
+    return scores;
+  } catch {
+    // Ignore sync failures; the browser's longest snake still persists.
+  }
+}
+
+async function loadServerBridgeHighScores(options: ScoreLoadOptions = {}) {
+  try {
+    const [tileResponse, pointResponse] = await Promise.all([
+      fetch("/api/glass-bridge-tile-scores", { cache: "no-store" }),
+      fetch("/api/glass-bridge-point-scores", { cache: "no-store" }),
+    ]);
+    if (tileResponse.ok) {
+      applyServerBridgeTileScores(await tileResponse.json() as HighScoreResponse);
+    }
+    if (pointResponse.ok) {
+      applyServerBridgePointScores(await pointResponse.json() as HighScoreResponse);
+    }
+    if (options.reconcile !== false) {
+      void retryPendingServerBridgeScores();
+      void reconcileBridgeLocalScores();
+    }
+  } catch {
+    // Glass Bridge can still run locally if the score endpoints are unavailable.
+  }
+}
+
+function applyBridgeJackpot(response: BridgeJackpotResponse) {
+  bridgeJackpot = Math.max(0, Number(response.jackpot) || bridgeJackpot);
+}
+
+async function loadBridgeJackpot() {
+  try {
+    const response = await fetch("/api/glass-bridge-jackpot", { cache: "no-store" });
+    if (!response.ok) {
+      return;
+    }
+
+    applyBridgeJackpot(await response.json() as BridgeJackpotResponse);
+  } catch {
+    // The game can still run if the jackpot endpoint is temporarily unavailable.
+  }
+}
+
+async function submitBridgeJackpotSpin() {
+  try {
+    const response = await fetch("/api/glass-bridge-jackpot-spin", {
+      cache: "no-store",
+      method: "POST",
+    });
+    if (!response.ok) {
+      return null;
+    }
+
+    const spin = await response.json() as BridgeJackpotSpinResponse;
+    applyBridgeJackpot(spin);
+    return spin;
+  } catch {
+    return null;
+  }
+}
+
+async function submitBridgeJackpotContribution() {
+  try {
+    const response = await fetch("/api/glass-bridge-jackpot-contribution", {
+      cache: "no-store",
+      method: "POST",
+    });
+    if (!response.ok) {
+      return null;
+    }
+
+    const contribution = await response.json() as BridgeJackpotResponse;
+    applyBridgeJackpot(contribution);
+    return contribution;
+  } catch {
+    return null;
+  }
+}
+
+async function submitServerBridgeTileScore(finalScore: number, name = "") {
+  try {
+    const response = await fetch("/api/glass-bridge-tile-scores", {
+      body: JSON.stringify({ name, score: finalScore }),
+      cache: "no-store",
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+    if (!response.ok) {
+      return;
+    }
+
+    const scores = await response.json() as HighScoreResponse;
+    applyServerBridgeTileScores(scores);
+    if (Number(scores.todayHighest) >= finalScore || Number(scores.allTimeHighest) >= finalScore) {
+      localStorage.removeItem(bridgePendingTilesKey);
+    }
+    return scores;
+  } catch {
+    // Ignore sync failures; the browser's bridge record still persists.
+  }
+}
+
+async function submitServerBridgePointScore(finalScore: number, name = "") {
+  try {
+    const response = await fetch("/api/glass-bridge-point-scores", {
+      body: JSON.stringify({ name, score: finalScore }),
+      cache: "no-store",
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+    if (!response.ok) {
+      return;
+    }
+
+    const scores = await response.json() as HighScoreResponse;
+    applyServerBridgePointScores(scores);
+    if (Number(scores.todayHighest) >= finalScore || Number(scores.allTimeHighest) >= finalScore) {
+      localStorage.removeItem(bridgePendingPointsKey);
+    }
+    return scores;
+  } catch {
+    // Ignore sync failures; the browser's bridge record still persists.
+  }
+}
+
+function rememberPendingServerScore(finalScore: number) {
+  const pendingScore = Number(localStorage.getItem(pendingScoreKey) || 0);
+  if (!Number.isFinite(pendingScore) || finalScore > pendingScore) {
+    localStorage.setItem(pendingScoreKey, `${finalScore}`);
+  }
+}
+
+function rememberPendingServerSnakeScore(finalScore: number) {
+  const pendingScore = Number(localStorage.getItem(snakePendingScoreKey) || 0);
+  if (!Number.isFinite(pendingScore) || finalScore > pendingScore) {
+    localStorage.setItem(snakePendingScoreKey, `${finalScore}`);
+  }
+}
+
+function rememberPendingServerBridgeScores(tiles: number, points: number) {
+  const pendingTiles = Number(localStorage.getItem(bridgePendingTilesKey) || 0);
+  if (!Number.isFinite(pendingTiles) || tiles > pendingTiles) {
+    localStorage.setItem(bridgePendingTilesKey, `${tiles}`);
+  }
+  const pendingPoints = Number(localStorage.getItem(bridgePendingPointsKey) || 0);
+  if (!Number.isFinite(pendingPoints) || points > pendingPoints) {
+    localStorage.setItem(bridgePendingPointsKey, `${points}`);
+  }
+}
+
+async function retryPendingServerScore() {
+  const pendingScore = Number(localStorage.getItem(pendingScoreKey) || 0);
+  if (Number.isFinite(pendingScore) && pendingScore > 0) {
+    await syncFinalScore(pendingScore);
+  }
+}
+
+async function retryPendingServerSnakeScore() {
+  const pendingScore = Math.max(
+    Number(localStorage.getItem(snakePendingScoreKey) || 0),
+    Number(localStorage.getItem(oldSnakePendingScoreKey) || 0),
+  );
+  if (Number.isFinite(pendingScore) && pendingScore > 0) {
+    await syncFinalSnakeScore(pendingScore);
+  }
+}
+
+async function retryPendingServerBridgeScores() {
+  const pendingTiles = Number(localStorage.getItem(bridgePendingTilesKey) || 0);
+  const pendingPoints = Number(localStorage.getItem(bridgePendingPointsKey) || 0);
+  if (Number.isFinite(pendingTiles) && pendingTiles > 0) {
+    await syncFinalBridgeScores(pendingTiles, pendingPoints);
+  } else if (Number.isFinite(pendingPoints) && pendingPoints > 0) {
+    await syncFinalBridgeScores(pendingTiles, pendingPoints);
+  }
+}
+
+async function reconcileLocalHighScore() {
+  if (localHighest > todayHighest || localHighest > serverHighest) {
+    await syncFinalScore(localHighest);
+  }
+}
+
+async function reconcileSnakeLocalHighScore() {
+  if (localStorage.getItem(snakeLocalLongestKey) === null && localStorage.getItem(oldSnakeLocalLongestKey) === null) {
+    return;
+  }
+
+  if (snakeLocalLongest > snakeTodayLongest || snakeLocalLongest > snakeServerLongest) {
+    await syncFinalSnakeScore(snakeLocalLongest);
+  }
+}
+
+async function reconcileBridgeLocalScores() {
+  const tileRecord =
+    bridgeLocalTiles > bridgeTodayTiles ||
+    bridgeLocalTiles > bridgeServerTiles;
+  const pointRecord =
+    bridgeLocalPoints > bridgeTodayPoints ||
+    bridgeLocalPoints > bridgeServerPoints;
+  if (tileRecord || pointRecord) {
+    await syncFinalBridgeScores(bridgeLocalTiles, bridgeLocalPoints);
+  }
+}
+
+function askForRecordName(finalScore: number, recordLabels: string[], unitLabel = "points") {
+  const savedName = localStorage.getItem(playerNameKey)?.trim();
+  if (savedName) {
+    return Promise.resolve(savedName);
+  }
+  recordMessage.textContent = `You set ${recordLabels.join(" and ")} with ${formatScore(finalScore)} ${unitLabel}.`;
+  recordNameInput.value = "Player 1";
+  recordDialog.hidden = false;
+  recordNameInput.focus();
+
+  return new Promise<string>((resolve) => {
+    pendingRecordName = resolve;
+  });
+}
+
+async function syncFinalScore(finalScore: number) {
+  if (planeScoreSyncActive) {
+    return;
+  }
+  planeScoreSyncActive = true;
+  try {
+    rememberPendingServerScore(finalScore);
+    const savedName = localStorage.getItem(playerNameKey)?.trim() || "";
+    const result = await submitServerHighScore(finalScore, savedName);
+    if (!result) {
+      return;
+    }
+
+    const recordLabels: string[] = [];
+    if (result.todayRecord) {
+      recordLabels.push("today's top score");
+    }
+    if (result.allTimeRecord) {
+      recordLabels.push("the server top score");
+    }
+
+    if (recordLabels.length === 0) {
+      return;
+    }
+
+    if (!savedName) {
+      const name = await askForRecordName(finalScore, recordLabels);
+      await submitServerHighScore(finalScore, name);
+    }
+  } finally {
+    planeScoreSyncActive = false;
+  }
+}
+
+async function syncFinalSnakeScore(finalScore: number) {
+  if (snakeScoreSyncActive) {
+    return;
+  }
+  snakeScoreSyncActive = true;
+  try {
+    rememberPendingServerSnakeScore(finalScore);
+    const savedName = localStorage.getItem(playerNameKey)?.trim() || "";
+    const result = await submitServerSnakeHighScore(finalScore, savedName);
+    if (!result) {
+      return;
+    }
+
+    const recordLabels: string[] = [];
+    if (result.todayRecord) {
+      recordLabels.push("today's longest snake");
+    }
+    if (result.allTimeRecord) {
+      recordLabels.push("the server longest snake");
+    }
+
+    if (recordLabels.length === 0) {
+      return;
+    }
+
+    if (!savedName) {
+      const name = await askForRecordName(finalScore, recordLabels, "segments");
+      await submitServerSnakeHighScore(finalScore, name);
+    }
+  } finally {
+    snakeScoreSyncActive = false;
+  }
+}
+
+async function syncFinalBridgeScores(finalTiles: number, finalPoints: number) {
+  if (bridgeScoreSyncActive) {
+    return;
+  }
+  bridgeScoreSyncActive = true;
+  try {
+    rememberPendingServerBridgeScores(finalTiles, finalPoints);
+    const savedName = localStorage.getItem(playerNameKey)?.trim() || "";
+    const [tileResult, pointResult] = await Promise.all([
+      submitServerBridgeTileScore(finalTiles, savedName),
+      submitServerBridgePointScore(finalPoints, savedName),
+    ]);
+
+    const recordLabels: string[] = [];
+    if (tileResult?.todayRecord) {
+      recordLabels.push("today's bridge tile record");
+    }
+    if (tileResult?.allTimeRecord) {
+      recordLabels.push("the server bridge tile record");
+    }
+    if (pointResult?.todayRecord) {
+      recordLabels.push("today's bridge point record");
+    }
+    if (pointResult?.allTimeRecord) {
+      recordLabels.push("the server bridge point record");
+    }
+
+    if (recordLabels.length === 0) {
+      return;
+    }
+
+    if (!savedName) {
+      const name = await askForRecordName(Math.max(finalTiles, finalPoints), recordLabels, "best result");
+      await Promise.all([
+        submitServerBridgeTileScore(finalTiles, name),
+        submitServerBridgePointScore(finalPoints, name),
+      ]);
+    }
+  } finally {
+    bridgeScoreSyncActive = false;
+  }
+}
+
+function refreshVisibleServerScores() {
+  if (document.visibilityState === "hidden") {
+    return;
+  }
+
+  if (
+    state === "platform" ||
+    state === "ready" ||
+    state === "plane-options" ||
+    state === "running" ||
+    state === "bubble-crash"
+  ) {
+    void loadServerHighScores({ reconcile: false });
+  }
+
+  if (state === "platform" || state === "snake-menu" || state === "snake-options" || state === "snake-dead") {
+    void loadServerSnakeHighScores({ reconcile: false });
+  }
+
+  if (state === "platform" || state === "bridge-menu" || state === "bridge-options" || state === "bridge-dead") {
+    void loadServerBridgeHighScores({ reconcile: false });
+  }
+}
+
+function addScore(points: number) {
+  score += points;
+  scoreEl.textContent = formatScore(score);
+}
+
+function updateRollButton() {
+  const ready = state === "running" && rollTimer <= 0 && (freeRollAvailable || score >= rollPointCost);
+  rollButton.hidden = state !== "running";
+  rollButton.classList.toggle("is-disabled", !ready);
+  rollButton.setAttribute("aria-disabled", `${!ready}`);
+  rollButton.textContent = freeRollAvailable ? "roll (free)" : "roll (-2 points)";
+}
+
+function reset(nextState: GameState) {
+  readLocalHighest();
+  snakeSpawnedThisRun = false;
+  snakeLastAlive = false;
+  snakeLastLength = 0;
+  snakeLastShotBank = 0;
+  resetSnakeJoystick();
+  readSnakeLocalLongest();
+  readBridgeLocalScores();
+  readPixelLocalBest();
+  renderHighScores();
+  renderSnakeHighScores();
+  renderBridgeHighScores();
+  renderPixelScores();
+  score = 0;
+  obstacles = [];
+  bubbles = [];
+  bubblePops = [];
+  popParticles = [];
+  smokePuffs = [];
+  planeDebris = [];
+  spawnTimer = 0.45;
+  bubbleTimer = compactPlayfield ? 1.45 : 1;
+  rollTimer = 0;
+  rollStyle = "forward";
+  freeRollAvailable = true;
+  crashTimer = 0;
+  smokeTimer = 0;
+  crashEndTimer = 0;
+  crashExploded = false;
+  crashMotion = "spin";
+  crashDuration = 0.86;
+  plane.y = height * 0.48;
+  plane.velocity = 0;
+  plane.rotation = 0;
+  enemyPlane.y = height * 0.36;
+  enemyPlane.bob = 0;
+  state = nextState;
+  setSnakeLayout(false);
+  scoreLabel.textContent = "Score";
+  scoreEl.textContent = formatScore(score);
+  scorePanel.hidden = nextState !== "running";
+  homeButton.hidden = nextState === "platform";
+  restartButton.hidden = true;
+  startButton.hidden = nextState !== "ready";
+  overlay.hidden = nextState === "running";
+  overlay.classList.toggle("is-platform", nextState === "platform");
+  platformPanel.hidden = nextState !== "platform";
+  gameMenuPanel.hidden = nextState !== "ready";
+  planeOptionsPanel.hidden = nextState !== "plane-options";
+  crashPanel.hidden = true;
+  snakeMenuPanel.hidden = true;
+  snakeOptionsPanel.hidden = true;
+  bridgeMenuPanel.hidden = true;
+  bridgeOptionsPanel.hidden = true;
+  bridgeDeadPanel.hidden = true;
+  pixelMenuPanel.hidden = true;
+  pixelOptionsPanel.hidden = true;
+  reportPanel.hidden = true;
+  snakeDeadPanel.hidden = true;
+  snakeControls.hidden = true;
+  bridgeControls.hidden = true;
+  updateSoundButtons();
+  updateSnakeShootButton();
+  updateBridgeControls();
+  updateRollButton();
+}
+
+function flap() {
+  unlockAudio();
+  if (state === "ready") {
+    reset("running");
+    overlay.hidden = true;
+  }
+
+  if (state === "running") {
+    playFlapSound();
+    plane.velocity = getLift();
+  }
+}
+
+function spawnObstacle() {
+  const playableHeight = height - getGroundHeight();
+  const gapHeight = compactPlayfield ? compactGapHeight : Math.max(150, Math.min(210, height * 0.34));
+  const margin = compactPlayfield ? compactMargin : 82;
+  const gapY = margin + Math.random() * (playableHeight - gapHeight - margin * 2);
+  const image = artImages[Math.floor(Math.random() * artImages.length)];
+  obstacles.push({
+    x: width + 40,
+    gapY,
+    gapHeight,
+    image,
+    scored: false,
+  });
+}
+
+function drawBackground(time: number) {
+  const wall = ctx.createLinearGradient(0, 0, 0, height);
+  wall.addColorStop(0, "#cdbf9f");
+  wall.addColorStop(0.52, "#f0e7d1");
+  wall.addColorStop(1, "#d1bd91");
+  ctx.fillStyle = wall;
+  ctx.fillRect(0, 0, width, height);
+
+  ctx.save();
+  ctx.globalAlpha = 0.38;
+  ctx.strokeStyle = "#b59f76";
+  ctx.lineWidth = 2;
+  const wallPanelOffset = (time * 30) % 176;
+  for (let x = 88 - wallPanelOffset; x < width + 176; x += 176) {
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, height);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 0.26;
+  ctx.fillStyle = "#ffffff";
+  const galleryLightOffset = (time * 22) % 176;
+  for (let x = 132 - galleryLightOffset; x < width + 176; x += 176) {
+    ctx.fillRect(x, 48, 54, 8);
+    ctx.beginPath();
+    ctx.moveTo(x + 6, 56);
+    ctx.lineTo(x - 18, 118);
+    ctx.moveTo(x + 48, 56);
+    ctx.lineTo(x + 72, 118);
+    ctx.strokeStyle = "#7e6a48";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  const groundHeight = getGroundHeight();
+  const groundY = height - groundHeight;
+  ctx.fillStyle = "#6b5840";
+  ctx.fillRect(0, groundY, width, groundHeight);
+  ctx.fillStyle = "#b79d6a";
+  ctx.fillRect(0, groundY, width, 10);
+  ctx.fillStyle = "#4b3a2a";
+  ctx.fillRect(0, groundY + 10, width, groundHeight);
+
+  ctx.save();
+  ctx.globalAlpha = 0.32;
+  ctx.strokeStyle = "#80603c";
+  ctx.lineWidth = 2;
+  const floorOffset = (time * 84) % 72;
+  for (let x = -floorOffset; x < width + 72; x += 72) {
+    ctx.beginPath();
+    ctx.moveTo(x, groundY + 12);
+    ctx.lineTo(x - 18, height);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawCeilingSpikes() {
+  const spikeWidth = compactPlayfield ? 34 : 42;
+  const spikeDepth = compactPlayfield ? 20 : ceilingSpikeDepth;
+
+  ctx.save();
+  ctx.fillStyle = "#6f6758";
+  ctx.strokeStyle = "rgba(44, 37, 28, 0.48)";
+  ctx.lineWidth = 2;
+  ctx.fillRect(0, 0, width, 8);
+  for (let x = -spikeWidth; x < width + spikeWidth; x += spikeWidth) {
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x + spikeWidth * 0.5, spikeDepth);
+    ctx.lineTo(x + spikeWidth, 0);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawRoundedRect(x: number, y: number, w: number, h: number, r: number) {
+  const radius = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + radius, y);
+  ctx.arcTo(x + w, y, x + w, y + h, radius);
+  ctx.arcTo(x + w, y + h, x, y + h, radius);
+  ctx.arcTo(x, y + h, x, y, radius);
+  ctx.arcTo(x, y, x + w, y, radius);
+  ctx.closePath();
+}
+
+function drawImageCover(image: HTMLImageElement, x: number, y: number, w: number, h: number) {
+  if (!image.complete || image.naturalWidth === 0) {
+    ctx.fillStyle = "#efe2c7";
+    ctx.fillRect(x, y, w, h);
+    return;
+  }
+
+  const scale = Math.max(w / image.naturalWidth, h / image.naturalHeight);
+  const sw = w / scale;
+  const sh = h / scale;
+  const sx = (image.naturalWidth - sw) / 2;
+  const sy = (image.naturalHeight - sh) / 2;
+  ctx.drawImage(image, sx, sy, sw, sh, x, y, w, h);
+}
+
+function drawObstacle(obstacle: Obstacle) {
+  const width = getObstacleWidth();
+  const topHeight = obstacle.gapY;
+  const bottomY = obstacle.gapY + obstacle.gapHeight;
+  const bottomHeight = height - getGroundHeight() - bottomY;
+
+  drawObstacleSegment(
+    obstacle.x,
+    -obstacleEdgeOverflow,
+    width,
+    topHeight + obstacleEdgeOverflow,
+    obstacle.image,
+    true,
+  );
+  drawObstacleSegment(
+    obstacle.x,
+    bottomY,
+    width,
+    bottomHeight + getGroundHeight() + obstacleEdgeOverflow,
+    obstacle.image,
+    false,
+  );
+}
+
+function drawObstacleSegment(
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  image: HTMLImageElement,
+  flip: boolean,
+) {
+  if (h <= 0) {
+    return;
+  }
+
+  ctx.save();
+  drawRoundedRect(x, y, w, h, 18);
+  ctx.clip();
+
+  if (flip) {
+    ctx.translate(x + w, y + h);
+    ctx.rotate(Math.PI);
+    drawImageCover(image, 0, 0, w, h);
+  } else {
+    drawImageCover(image, x, y, w, h);
+  }
+
+  ctx.restore();
+
+  ctx.save();
+  drawRoundedRect(x, y, w, h, 18);
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = "#fff4d1";
+  ctx.stroke();
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = "rgba(75, 48, 25, 0.28)";
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawPlaneBody(
+  x: number,
+  y: number,
+  rotation: number,
+  bodyColor: string,
+  wingColor: string,
+  tailColor: string,
+  cockpitColor: string,
+  direction: 1 | -1,
+  scale = 1,
+  verticalScale = 1,
+) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(direction * scale, scale * verticalScale);
+  ctx.rotate(rotation);
+
+  ctx.fillStyle = "rgba(30, 38, 50, 0.18)";
+  ctx.beginPath();
+  ctx.ellipse(-2, 30, 38, 8, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = bodyColor;
+  ctx.strokeStyle = "#7f5f00";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 36, 17, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = tailColor;
+  ctx.beginPath();
+  ctx.moveTo(-17, -11);
+  ctx.lineTo(-44, -30);
+  ctx.lineTo(-34, 1);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = wingColor;
+  ctx.beginPath();
+  ctx.moveTo(-2, -8);
+  ctx.lineTo(26, -34);
+  ctx.lineTo(18, -2);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = wingColor;
+  ctx.beginPath();
+  ctx.moveTo(-4, 9);
+  ctx.lineTo(26, 31);
+  ctx.lineTo(17, 3);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = cockpitColor;
+  ctx.beginPath();
+  ctx.ellipse(14, -4, 11, 8, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.strokeStyle = "#3a2b16";
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.moveTo(37, 0);
+  ctx.lineTo(58, 0);
+  ctx.stroke();
+
+  ctx.strokeStyle = "rgba(58, 43, 22, 0.52)";
+  ctx.lineWidth = 3;
+  const propSpin = performance.now() / 95;
+  ctx.save();
+  ctx.translate(61, 0);
+  ctx.rotate(propSpin);
+  ctx.beginPath();
+  ctx.moveTo(-1, -22);
+  ctx.lineTo(1, 22);
+  ctx.moveTo(-22, -1);
+  ctx.lineTo(22, 1);
+  ctx.stroke();
+  ctx.restore();
+
+  ctx.restore();
+}
+
+function drawPlane() {
+  const rollProgress = rollTimer > 0 ? 1 - rollTimer / rollDuration : 0;
+  let rollRotation = 0;
+  let rollVerticalScale = 1;
+  if (rollTimer > 0) {
+    if (rollStyle === "sideways") {
+      rollRotation = Math.sin(rollProgress * Math.PI * 2) * 0.18;
+      rollVerticalScale = Math.cos(rollProgress * Math.PI * 2);
+    } else {
+      const direction = rollStyle === "backward" ? -1 : 1;
+      rollRotation = Math.PI * 2 * rollProgress * direction;
+    }
+  }
+  if (crashExploded) {
+    return;
+  }
+
+  drawPlaneBody(
+    plane.x,
+    plane.y,
+    plane.rotation + rollRotation,
+    "#ffd232",
+    "#ffe891",
+    "#f4a51c",
+    "#6fc8ff",
+    1,
+    getPlaneScale(),
+    rollVerticalScale,
+  );
+}
+
+function getPlaneTailPosition() {
+  const scale = getPlaneScale();
+  return {
+    x: plane.x - Math.cos(plane.rotation) * 42 * scale,
+    y: plane.y - Math.sin(plane.rotation) * 42 * scale,
+  };
+}
+
+function drawCrashFlames(time: number) {
+  const tail = getPlaneTailPosition();
+  const scale = getPlaneScale();
+  const flicker = 1 + Math.sin(time * 38) * 0.16;
+  ctx.save();
+  ctx.translate(tail.x, tail.y);
+  ctx.rotate(plane.rotation);
+
+  const flameLength = 34 * scale * flicker;
+  const flameHeight = 18 * scale;
+  const gradient = ctx.createRadialGradient(-flameLength * 0.34, 0, 2, -flameLength * 0.34, 0, flameLength);
+  gradient.addColorStop(0, "rgba(255, 248, 142, 0.96)");
+  gradient.addColorStop(0.4, "rgba(255, 126, 30, 0.92)");
+  gradient.addColorStop(1, "rgba(204, 30, 18, 0)");
+  ctx.fillStyle = gradient;
+  ctx.beginPath();
+  ctx.moveTo(4 * scale, 0);
+  ctx.bezierCurveTo(-flameLength * 0.22, -flameHeight, -flameLength, -flameHeight * 0.5, -flameLength * 1.18, 0);
+  ctx.bezierCurveTo(-flameLength, flameHeight * 0.54, -flameLength * 0.2, flameHeight, 4 * scale, 0);
+  ctx.fill();
+
+  ctx.fillStyle = "rgba(255, 242, 108, 0.9)";
+  ctx.beginPath();
+  ctx.moveTo(1 * scale, 0);
+  ctx.bezierCurveTo(-flameLength * 0.24, -flameHeight * 0.52, -flameLength * 0.64, -flameHeight * 0.22, -flameLength * 0.72, 0);
+  ctx.bezierCurveTo(-flameLength * 0.56, flameHeight * 0.28, -flameLength * 0.18, flameHeight * 0.46, 1 * scale, 0);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawEnemyPlane(time: number) {
+  const wobble = Math.sin(time * 3.2) * 0.08;
+  drawPlaneBody(enemyPlane.x, enemyPlane.y, wobble, "#2f80ed", "#9bd4ff", "#174e9a", "#d8f7ff", -1, getPlaneScale());
+}
+
+function drawBubbles() {
+  bubbles.forEach((bubble) => {
+    const shine = bubble.radius * 0.36;
+    const gradient = ctx.createRadialGradient(
+      bubble.x - shine,
+      bubble.y - shine,
+      1,
+      bubble.x,
+      bubble.y,
+      bubble.radius,
+    );
+    gradient.addColorStop(0, "rgba(255, 255, 255, 0.95)");
+    gradient.addColorStop(0.42, "rgba(143, 225, 255, 0.55)");
+    gradient.addColorStop(1, "rgba(43, 135, 230, 0.28)");
+
+    ctx.save();
+    ctx.fillStyle = gradient;
+    ctx.strokeStyle = "rgba(28, 99, 185, 0.68)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(bubble.x, bubble.y, bubble.radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = "rgba(255, 255, 255, 0.78)";
+    ctx.beginPath();
+    ctx.arc(bubble.x - bubble.radius * 0.34, bubble.y - bubble.radius * 0.34, bubble.radius * 0.22, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  });
+}
+
+function drawBubblePops() {
+  bubblePops.forEach((pop) => {
+    const progress = Math.min(1, pop.age / pop.duration);
+    ctx.save();
+    ctx.globalAlpha = 1 - progress;
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.92)";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(pop.x, pop.y, pop.radius + progress * pop.radius * 1.6, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.strokeStyle = "rgba(69, 159, 238, 0.7)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(pop.x, pop.y, pop.radius * 0.55 + progress * pop.radius * 1.15, progress * 5, Math.PI * 1.4 + progress * 5);
+    ctx.stroke();
+    ctx.restore();
+  });
+
+  popParticles.forEach((particle) => {
+    const progress = Math.min(1, particle.age / particle.duration);
+    ctx.save();
+    ctx.globalAlpha = 1 - progress;
+    ctx.fillStyle = "rgba(225, 248, 255, 0.86)";
+    ctx.beginPath();
+    ctx.arc(particle.x, particle.y, particle.radius * (1 - progress * 0.35), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  });
+}
+
+function drawSmokeTrail() {
+  smokePuffs.forEach((puff) => {
+    const progress = Math.min(1, puff.age / puff.duration);
+    ctx.save();
+    ctx.globalAlpha = (1 - progress) * 0.62;
+    ctx.fillStyle = progress < 0.35 ? "rgba(38, 38, 38, 0.72)" : "rgba(102, 100, 96, 0.54)";
+    ctx.beginPath();
+    ctx.arc(puff.x, puff.y, puff.radius * (1 + progress * 1.35), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  });
+}
+
+function drawPlaneDebris() {
+  planeDebris.forEach((piece) => {
+    const progress = Math.min(1, piece.age / piece.duration);
+    ctx.save();
+    ctx.globalAlpha = 1 - Math.max(0, progress - 0.55) / 0.45;
+    ctx.translate(piece.x, piece.y);
+    ctx.rotate(piece.rotation);
+    ctx.fillStyle = piece.color;
+    ctx.strokeStyle = "rgba(58, 43, 22, 0.5)";
+    ctx.lineWidth = 1.5;
+    ctx.fillRect(-piece.width / 2, -piece.height / 2, piece.width, piece.height);
+    ctx.strokeRect(-piece.width / 2, -piece.height / 2, piece.width, piece.height);
+    ctx.restore();
+  });
+}
+
+function fireBubble() {
+  playBubbleShootSound();
+  bubbles.push({
+    x: enemyPlane.x - 58 * getPlaneScale(),
+    y: enemyPlane.y + 4,
+    radius: getBubbleRadius(),
+    speed: getBubbleSpeed() + Math.random() * 18,
+    drift: compactPlayfield ? -24 + Math.random() * 48 : -35 + Math.random() * 70,
+    scored: false,
+  });
+}
+
+function roll() {
+  unlockAudio();
+  if (state !== "running" || rollTimer > 0 || (!freeRollAvailable && score < rollPointCost)) {
+    return;
+  }
+
+  playRollSound();
+  const rollChoice = Math.random();
+  rollStyle = rollChoice < 0.42 ? "forward" : rollChoice < 0.84 ? "backward" : "sideways";
+  rollTimer = rollDuration;
+  if (freeRollAvailable) {
+    freeRollAvailable = false;
+  } else {
+    addScore(-rollPointCost);
+  }
+  updateRollButton();
+}
+
+function collide(): CollisionResult {
+  const groundHeight = getGroundHeight();
+  const spikeDepth = compactPlayfield ? 20 : ceilingSpikeDepth;
+  if (plane.y - plane.radius < spikeDepth) {
+    return "ceiling";
+  }
+  if (plane.y + plane.radius > height - groundHeight) {
+    return "floor";
+  }
+
+  const hitObstacle = obstacles.some((obstacle) => {
+    const width = getObstacleWidth();
+    const closestX = Math.max(obstacle.x, Math.min(plane.x, obstacle.x + width));
+    const inTop = plane.y < obstacle.gapY;
+    const inBottom = plane.y > obstacle.gapY + obstacle.gapHeight;
+    if (!inTop && !inBottom) {
+      return false;
+    }
+    const segmentY = inTop ? 0 : obstacle.gapY + obstacle.gapHeight;
+    const segmentHeight = inTop ? obstacle.gapY : height - groundHeight - segmentY;
+    const closestY = Math.max(segmentY, Math.min(plane.y, segmentY + segmentHeight));
+    const dx = plane.x - closestX;
+    const dy = plane.y - closestY;
+    return dx * dx + dy * dy < plane.radius * plane.radius * 0.78;
+  });
+
+  if (hitObstacle) {
+    return "obstacle";
+  }
+
+  if (rollTimer > 0) {
+    return "none";
+  }
+
+  const hitBubble = bubbles.find((bubble) => {
+    const dx = plane.x - bubble.x;
+    const dy = plane.y - bubble.y;
+    const hitRadius = plane.radius * 0.82 + bubble.radius;
+    return dx * dx + dy * dy < hitRadius * hitRadius;
+  });
+  if (hitBubble) {
+    startBubbleCrash(hitBubble);
+    return "bubble";
+  }
+
+  return "none";
+}
+
+function startBubbleCrash(hitBubble: Bubble) {
+  playBubblePopSound();
+  bubbles = bubbles.filter((bubble) => bubble !== hitBubble);
+  bubblePops.push({
+    x: hitBubble.x,
+    y: hitBubble.y,
+    radius: hitBubble.radius,
+    age: 0,
+    duration: 0.46,
+  });
+
+  for (let index = 0; index < 14; index += 1) {
+    const angle = (Math.PI * 2 * index) / 14 + Math.random() * 0.25;
+    const speed = 110 + Math.random() * 90;
+    popParticles.push({
+      x: hitBubble.x,
+      y: hitBubble.y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      radius: 2.4 + Math.random() * 2.8,
+      age: 0,
+      duration: 0.42 + Math.random() * 0.22,
+    });
+  }
+
+  startRandomCrash({ lift: true });
+}
+
+function startImpactCrash() {
+  startRandomCrash();
+}
+
+function startFloorCrash() {
+  const groundY = height - getGroundHeight();
+  plane.y = Math.min(plane.y, groundY - plane.radius - Math.max(58, height * 0.14));
+  startRandomCrash({ downward: true });
+}
+
+function startCeilingCrash() {
+  startRandomCrash({ downward: true });
+}
+
+function startRandomCrash(options: { downward?: boolean; lift?: boolean } = {}) {
+  const motions: CrashMotion[] = ["spin", "flip", "spiral"];
+  playCrashFallSound();
+  state = "bubble-crash";
+  crashTimer = 0;
+  smokeTimer = 0;
+  crashEndTimer = 0;
+  crashExploded = false;
+  crashMotion = motions[Math.floor(Math.random() * motions.length)];
+  crashDuration = 0.68 + Math.random() * 0.5;
+  rollTimer = 0;
+  if (options.lift) {
+    plane.velocity = Math.min(plane.velocity, -125);
+  } else if (options.downward) {
+    plane.velocity = Math.max(plane.velocity, 140);
+  } else {
+    plane.velocity = Math.max(plane.velocity, 40 + Math.random() * 120);
+  }
+  plane.rotation = Math.max(plane.rotation, 0.46 + Math.random() * 0.32);
+}
+
+function updateEffects(dt: number) {
+  bubblePops.forEach((pop) => {
+    pop.age += dt;
+  });
+  bubblePops = bubblePops.filter((pop) => pop.age < pop.duration);
+
+  popParticles.forEach((particle) => {
+    particle.age += dt;
+    particle.x += particle.vx * dt;
+    particle.y += particle.vy * dt;
+    particle.vy += 170 * dt;
+  });
+  popParticles = popParticles.filter((particle) => particle.age < particle.duration);
+
+  smokePuffs.forEach((puff) => {
+    puff.age += dt;
+    puff.x += puff.vx * dt;
+    puff.y += puff.vy * dt;
+    puff.vy -= 16 * dt;
+  });
+  smokePuffs = smokePuffs.filter((puff) => puff.age < puff.duration);
+
+  planeDebris.forEach((piece) => {
+    piece.age += dt;
+    piece.x += piece.vx * dt;
+    piece.y += piece.vy * dt;
+    piece.vy += getGravity() * 0.54 * dt;
+    piece.rotation += piece.spin * dt;
+  });
+  planeDebris = planeDebris.filter((piece) => piece.age < piece.duration);
+}
+
+function addSmokePuff() {
+  const tail = getPlaneTailPosition();
+  const scale = getPlaneScale();
+  smokePuffs.push({
+    x: tail.x + (Math.random() - 0.5) * 10 * scale,
+    y: tail.y + (Math.random() - 0.5) * 10 * scale,
+    vx: -44 * scale + (Math.random() - 0.5) * 36,
+    vy: -18 + (Math.random() - 0.5) * 42,
+    radius: (7 + Math.random() * 7) * scale,
+    age: 0,
+    duration: 0.9 + Math.random() * 0.45,
+  });
+}
+
+function updateBubbleCrash(dt: number) {
+  crashTimer += dt;
+  updateEffects(dt);
+
+  if (crashExploded) {
+    crashEndTimer -= dt;
+    if (crashEndTimer <= 0) {
+      endGame();
+    }
+    return;
+  }
+
+  plane.velocity += getGravity() * 1.16 * dt;
+  plane.y += plane.velocity * dt;
+  if (crashMotion === "spiral") {
+    plane.x += Math.sin(crashTimer * 13) * 52 * dt;
+    plane.rotation += (compactPlayfield ? 6.8 : 7.8) * dt;
+  } else if (crashMotion === "flip") {
+    plane.x += Math.sin(crashTimer * 8) * 18 * dt;
+    plane.rotation += (compactPlayfield ? 9.2 : 10.6) * dt;
+  } else {
+    plane.x += Math.cos(crashTimer * 18) * 24 * dt;
+    plane.rotation += (compactPlayfield ? 12.5 : 14) * dt;
+  }
+
+  smokeTimer -= dt;
+  while (smokeTimer <= 0) {
+    addSmokePuff();
+    smokeTimer += 0.055;
+  }
+
+  const groundY = height - getGroundHeight();
+  if (plane.y + plane.radius >= groundY || crashTimer > crashDuration) {
+    if (crashTimer < 0.52) {
+      plane.y = groundY - plane.radius - 3;
+      plane.velocity = Math.min(plane.velocity, -90);
+    } else {
+      plane.y = Math.min(plane.y, groundY - plane.radius * 0.45);
+      explodePlane();
+    }
+  }
+}
+
+function explodePlane() {
+  if (crashExploded) {
+    return;
+  }
+
+  playExplosionSound();
+  crashExploded = true;
+  crashEndTimer = 0.86;
+  smokeTimer = 0;
+
+  const scale = getPlaneScale();
+  const colors = ["#ffd232", "#ffe891", "#f4a51c", "#6fc8ff", "#3a2b16", "#fff1b3"];
+  for (let index = 0; index < 34; index += 1) {
+    const angle = -Math.PI + (Math.PI * 2 * index) / 34 + (Math.random() - 0.5) * 0.4;
+    const speed = (135 + Math.random() * 260) * scale;
+    planeDebris.push({
+      x: plane.x + (Math.random() - 0.5) * 28 * scale,
+      y: plane.y + (Math.random() - 0.5) * 20 * scale,
+      vx: Math.cos(angle) * speed + 40 * scale,
+      vy: Math.sin(angle) * speed - 100 * scale,
+      width: (8 + Math.random() * 16) * scale,
+      height: (6 + Math.random() * 12) * scale,
+      rotation: Math.random() * Math.PI,
+      spin: (Math.random() - 0.5) * 15,
+      color: colors[index % colors.length],
+      age: 0,
+      duration: 1.08 + Math.random() * 0.52,
+    });
+  }
+
+  for (let index = 0; index < 10; index += 1) {
+    addSmokePuff();
+  }
+}
+
+function endGame() {
+  writeLocalHighest(score);
+  renderHighScores();
+  void syncFinalScore(score);
+  state = "ended";
+  scorePanel.hidden = false;
+  homeButton.hidden = false;
+  restartButton.hidden = false;
+  overlay.hidden = false;
+  overlay.classList.remove("is-platform");
+  platformPanel.hidden = true;
+  gameMenuPanel.hidden = true;
+  planeOptionsPanel.hidden = true;
+  crashPanel.hidden = false;
+  snakeMenuPanel.hidden = true;
+  snakeOptionsPanel.hidden = true;
+  reportPanel.hidden = true;
+  snakeDeadPanel.hidden = true;
+  crashPanel.querySelector("h1")!.textContent = "You Crashed";
+  crashMessage.textContent = `Score ${formatScore(score)}.`;
+  startButton.hidden = true;
+  updateRollButton();
+}
+
+function isFullscreen() {
+  const fullscreenDocument = document as FullscreenDocument;
+  return (
+    document.fullscreenElement === gameFrame ||
+    fullscreenDocument.webkitFullscreenElement === gameFrame ||
+    gameFrame.classList.contains("fullscreen-fallback")
+  );
+}
+
+function updateFullscreenButton() {
+  const label = compactPlayfield
+    ? isFullscreen()
+      ? "Exit"
+      : "Full"
+    : isFullscreen()
+      ? "Exit full screen"
+      : "Full screen";
+  fullscreenButton.textContent = label;
+  fullscreenButton.setAttribute(
+    "aria-label",
+    isFullscreen() ? "Exit full screen mode" : "Enter full screen mode",
+  );
+}
+
+async function toggleFullscreen() {
+  const fullscreenFrame = gameFrame as FullscreenFrame;
+  const fullscreenDocument = document as FullscreenDocument;
+
+  if (isFullscreen()) {
+    if (document.fullscreenElement) {
+      await document.exitFullscreen();
+    } else if (fullscreenDocument.webkitFullscreenElement && fullscreenDocument.webkitExitFullscreen) {
+      await fullscreenDocument.webkitExitFullscreen();
+    } else {
+      gameFrame.classList.remove("fullscreen-fallback");
+      document.body.classList.remove("fullscreen-fallback-active");
+    }
+  } else {
+    if (document.fullscreenEnabled && gameFrame.requestFullscreen) {
+      await gameFrame.requestFullscreen();
+    } else if (fullscreenDocument.webkitFullscreenEnabled && fullscreenFrame.webkitRequestFullscreen) {
+      await fullscreenFrame.webkitRequestFullscreen();
+    } else {
+      gameFrame.classList.add("fullscreen-fallback");
+      document.body.classList.add("fullscreen-fallback-active");
+    }
+  }
+
+  updateFullscreenButton();
+  resize();
+}
+
+function update(dt: number) {
+  updatePixelOrientationGate();
+
+  if (state === "bubble-crash") {
+    updateBubbleCrash(dt);
+    updateRollButton();
+    return;
+  }
+
+  updateEffects(dt);
+  updateBridge(dt);
+  updatePixelWars(dt);
+
+  if (state !== "running") {
+    return;
+  }
+
+  rollTimer = Math.max(0, rollTimer - dt);
+
+  plane.velocity += getGravity() * dt;
+  plane.y += plane.velocity * dt;
+  plane.rotation = Math.max(-0.42, Math.min(0.72, plane.velocity / 620));
+
+  enemyPlane.bob += dt;
+  const enemyTargetY = height * 0.34 + Math.sin(enemyPlane.bob * 1.7) * Math.min(96, height * 0.16);
+  enemyPlane.y += (enemyTargetY - enemyPlane.y) * Math.min(1, dt * 3.2);
+
+  spawnTimer -= dt;
+  if (spawnTimer <= 0) {
+    spawnObstacle();
+    spawnTimer = getSpawnEvery();
+  }
+
+  bubbleTimer -= dt;
+  if (bubbleTimer <= 0) {
+    fireBubble();
+    bubbleTimer = getBubbleEvery() + Math.random() * 0.38;
+  }
+
+  obstacles.forEach((obstacle) => {
+    const width = getObstacleWidth();
+    obstacle.x -= getObstacleSpeed() * dt;
+    if (!obstacle.scored && obstacle.x + width < plane.x) {
+      obstacle.scored = true;
+      addScore(1);
+      updateRollButton();
+    }
+  });
+  obstacles = obstacles.filter((obstacle) => obstacle.x > -getObstacleWidth() - 10);
+
+  bubbles.forEach((bubble) => {
+    bubble.x -= bubble.speed * dt;
+    bubble.y += bubble.drift * dt;
+    if (!bubble.scored && bubble.x < plane.x) {
+      bubble.scored = true;
+      addScore(0.5);
+      updateRollButton();
+    }
+  });
+  bubbles = bubbles.filter((bubble) => bubble.x > -bubble.radius * 2);
+
+  const collision = collide();
+  if (collision === "ceiling") {
+    startCeilingCrash();
+  } else if (collision === "floor") {
+    startFloorCrash();
+  } else if (collision === "obstacle") {
+    startImpactCrash();
+  }
+
+  updateRollButton();
+}
+
+function render(time: number) {
+  if (state === "pixel-menu" || state === "pixel-options" || state === "pixel-running") {
+    drawPixelWars(time);
+    return;
+  }
+
+  if (state === "snake-menu" || state === "snake-options" || state === "snake-running" || state === "snake-dead") {
+    drawSnakeGame(time);
+    return;
+  }
+
+  if (state === "bridge-menu" || state === "bridge-options" || state === "bridge-running" || state === "bridge-dead") {
+    drawBridgeGame(time);
+    return;
+  }
+
+  const canvasWidth = canvas.width / dpr;
+  const canvasHeight = canvas.height / dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  drawViewportBackground(canvasWidth, canvasHeight);
+  ctx.setTransform(
+    dpr * renderScale,
+    0,
+    0,
+    dpr * renderScale,
+    dpr * renderOffsetX,
+    dpr * renderOffsetY,
+  );
+  drawBackground(time);
+  drawCeilingSpikes();
+  obstacles.forEach(drawObstacle);
+  drawBubblePops();
+  drawBubbles();
+  drawEnemyPlane(time);
+  drawSmokeTrail();
+  if (state === "bubble-crash" && !crashExploded) {
+    drawCrashFlames(time);
+  }
+  drawPlane();
+  drawPlaneDebris();
+
+  if (state === "platform" || state === "ready") {
+    ctx.fillStyle = "rgba(255, 255, 255, 0.5)";
+    ctx.fillRect(0, 0, width, height);
+  }
+}
+
+function loop(now: number) {
+  const time = now / 1000;
+  const dt = Math.min(0.032, Math.max(0, time - lastTime || 0));
+  lastTime = time;
+  update(dt);
+  render(time);
+  requestAnimationFrame(loop);
+}
+
+function canvasPointFromEvent(event: PointerEvent) {
+  const box = canvas.getBoundingClientRect();
+  return {
+    x: ((event.clientX - box.left) / box.width) * (canvas.width / dpr),
+    y: ((event.clientY - box.top) / box.height) * (canvas.height / dpr),
+  };
+}
+
+function pixelRectContains(rect: PixelRect, x: number, y: number) {
+  return x >= rect.x && x <= rect.x + rect.w && y >= rect.y && y <= rect.y + rect.h;
+}
+
+function pixelRunnerJump() {
+  pixelRunnerJumpTimer = pixelRunnerJumpDuration;
+  pixelRunnerDuckTimer = 0;
+}
+
+function pixelRunnerDuck() {
+  pixelRunnerDuckTimer = pixelRunnerDuckDuration;
+  pixelRunnerJumpTimer = 0;
+}
+
+function pixelRunnerStepLane(direction: -1 | 1) {
+  pixelRunnerTargetLane = clampNumber(pixelRunnerTargetLane + direction, 0, 2);
+}
+
+function startPixelRunnerPointer(event: PointerEvent, x: number, y: number) {
+  const layout = pixelLayout();
+  if (x < layout.panelX) {
+    return false;
+  }
+
+  const runner = pixelRunnerLayout(layout);
+  if (pixelRectContains(runner.spinButton, x, y)) {
+    pixelSpinAllReels();
+    return true;
+  }
+  if (pixelRectContains(runner.jumpButton, x, y)) {
+    pixelRunnerJump();
+    return true;
+  }
+  if (pixelRectContains(runner.duckButton, x, y)) {
+    pixelRunnerDuck();
+    return true;
+  }
+
+  pixelRunnerPointerId = event.pointerId;
+  pixelRunnerSwipeStartX = x;
+  pixelRunnerSwipeStartY = y;
+  canvas.setPointerCapture(event.pointerId);
+  return true;
+}
+
+function finishPixelRunnerPointer(event: PointerEvent) {
+  if (event.pointerId !== pixelRunnerPointerId) {
+    return false;
+  }
+
+  const point = canvasPointFromEvent(event);
+  const dx = point.x - pixelRunnerSwipeStartX;
+  const dy = point.y - pixelRunnerSwipeStartY;
+  const absX = Math.abs(dx);
+  const absY = Math.abs(dy);
+  const threshold = Math.max(18, Math.min(width, height) * 0.018);
+  pixelRunnerPointerId = null;
+  if (canvas.hasPointerCapture(event.pointerId)) {
+    canvas.releasePointerCapture(event.pointerId);
+  }
+
+  if (Math.max(absX, absY) < threshold) {
+    return true;
+  }
+
+  if (absX > absY) {
+    pixelRunnerStepLane(dx > 0 ? 1 : -1);
+  } else if (dy < 0) {
+    pixelRunnerJump();
+  } else {
+    pixelRunnerDuck();
+  }
+  return true;
+}
+
+function cancelPixelRunnerPointer(event?: PointerEvent) {
+  if (event && event.pointerId !== pixelRunnerPointerId) {
+    return false;
+  }
+  pixelRunnerPointerId = null;
+  return true;
+}
+
+function pixelPerimeterRespawnPoint(x: number, y: number, layout = pixelLayout()) {
+  const margin = Math.max(24, Math.max(layout.cellW, layout.cellH) * 2.4);
+  if (
+    x < layout.x - margin ||
+    x > layout.x + layout.boardW + margin ||
+    y < layout.y - margin ||
+    y > layout.y + layout.boardH + margin
+  ) {
+    return null;
+  }
+
+  const clampedX = clampNumber(x, layout.x, layout.x + layout.boardW);
+  const clampedY = clampNumber(y, layout.y, layout.y + layout.boardH);
+  const distances = [
+    { edge: "left", value: Math.abs(clampedX - layout.x) },
+    { edge: "right", value: Math.abs(layout.x + layout.boardW - clampedX) },
+    { edge: "top", value: Math.abs(clampedY - layout.y) },
+    { edge: "bottom", value: Math.abs(layout.y + layout.boardH - clampedY) },
+  ].sort((a, b) => a.value - b.value);
+
+  if ((distances[0]?.value ?? Number.POSITIVE_INFINITY) > margin) {
+    return null;
+  }
+
+  const edge = distances[0]?.edge;
+  if (edge === "left") {
+    return { x: layout.x, y: clampedY };
+  }
+  if (edge === "right") {
+    return { x: layout.x + layout.boardW, y: clampedY };
+  }
+  if (edge === "top") {
+    return { x: clampedX, y: layout.y };
+  }
+  return { x: clampedX, y: layout.y + layout.boardH };
+}
+
+function handlePixelRespawnPointer(x: number, y: number) {
+  const playerTurret = pixelTurrets.find((turret) => turret.isPlayer && turret.respawnPending && !turret.eliminated);
+  if (!playerTurret || !playerTurret.respawnPending || playerTurret.eliminated) {
+    return false;
+  }
+
+  const layout = pixelLayout();
+  const point = pixelPerimeterRespawnPoint(x, y, layout);
+  if (!point) {
+    pixelRunnerMessage = "Pick the board edge";
+    pixelRunnerMessageTimer = 1;
+    return false;
+  }
+  if (!pixelRespawnPlacementIsClear(playerTurret, point.x, point.y, layout)) {
+    pixelRunnerMessage = "Too close to tower";
+    pixelRunnerMessageTimer = 1.3;
+    return true;
+  }
+
+  if (pixelMode === "multi") {
+    sendPixelMessage({
+      type: "pixel-respawn",
+      xRatio: clampNumber((point.x - layout.x) / layout.boardW, 0, 1),
+      yRatio: clampNumber((point.y - layout.y) / layout.boardH, 0, 1),
+    });
+    pixelRunnerMessage = "Respawning";
+    pixelRunnerMessageTimer = 1.4;
+    return true;
+  }
+
+  queuePixelRespawn(playerTurret, point.x, point.y, layout);
+  return true;
+}
+
+function updatePixelAimFromPointer(event: PointerEvent) {
+  const point = canvasPointFromEvent(event);
+  pixelAimX = point.x;
+  pixelAimY = point.y;
+  if (pixelMode === "multi") {
+    const playerTurret = activePlayerPixelTurret();
+    if (playerTurret) {
+      const layout = pixelLayout();
+      sendPixelMessage({
+        angle: Math.atan2(pixelAimY - playerTurret.y, pixelAimX - playerTurret.x),
+        targetXRatio: clampNumber((pixelAimX - layout.x) / layout.boardW, 0, 1),
+        targetYRatio: clampNumber((pixelAimY - layout.y) / layout.boardH, 0, 1),
+        turretIndex: playerPixelTurrets().indexOf(playerTurret),
+        type: "pixel-aim",
+      });
+    }
+  }
+}
+
+function startPixelAim(event: PointerEvent) {
+  event.preventDefault();
+  unlockAudio();
+  pixelAimActive = true;
+  pixelAimPointerId = event.pointerId;
+  canvas.setPointerCapture(event.pointerId);
+  updatePixelAimFromPointer(event);
+}
+
+function stopPixelAim(event: PointerEvent) {
+  if (event.pointerId !== pixelAimPointerId) {
+    return;
+  }
+  pixelAimActive = false;
+  pixelAimPointerId = null;
+}
+
+window.addEventListener("resize", resize);
+window.addEventListener("orientationchange", () => {
+  resize();
+  updatePixelOrientationGate();
+});
+window.visualViewport?.addEventListener("resize", resize);
+window.addEventListener("keydown", (event) => {
+  if (state === "pixel-running") {
+    const playerTurret = activePlayerPixelTurret();
+    if (pixelMatchOver && (event.code === "Enter" || event.code === "Space")) {
+      event.preventDefault();
+      startPixelWars();
+      return;
+    }
+    if (
+      pixelTurrets.some((turret) => turret.isPlayer && turret.respawnPending && !turret.eliminated) &&
+      event.code === "KeyR"
+    ) {
+      event.preventDefault();
+      const point = randomPixelPerimeterPoint();
+      if (pixelMode === "multi") {
+        const layout = pixelLayout();
+        sendPixelMessage({
+          type: "pixel-respawn",
+          xRatio: clampNumber((point.x - layout.x) / layout.boardW, 0, 1),
+          yRatio: clampNumber((point.y - layout.y) / layout.boardH, 0, 1),
+        });
+      } else {
+        const pendingTurret = pixelTurrets.find((turret) => turret.isPlayer && turret.respawnPending && !turret.eliminated);
+        if (pendingTurret) {
+          queuePixelRespawn(pendingTurret, point.x, point.y);
+        }
+      }
+      return;
+    }
+    if (!pixelTurrets.some((turret) => turret.isPlayer && pixelTurretIsActive(turret))) {
+      event.preventDefault();
+      return;
+    }
+    if (event.code === "ArrowLeft") {
+      event.preventDefault();
+      pixelRunnerStepLane(-1);
+      return;
+    }
+    if (event.code === "ArrowRight") {
+      event.preventDefault();
+      pixelRunnerStepLane(1);
+      return;
+    }
+    if (event.code === "ArrowUp" || event.code === "KeyW" || event.code === "Space") {
+      event.preventDefault();
+      pixelRunnerJump();
+      return;
+    }
+    if (event.code === "ArrowDown" || event.code === "KeyS") {
+      event.preventDefault();
+      pixelRunnerDuck();
+      return;
+    }
+    if (event.code === "KeyQ") {
+      event.preventDefault();
+      pixelSpinAllReels();
+      return;
+    }
+    if (playerTurret && event.code === "KeyA") {
+      event.preventDefault();
+      pixelAimActive = false;
+      playerTurret.angle = clampPixelTurretAngle(playerTurret, playerTurret.angle - 0.12);
+      if (pixelMode === "multi") {
+        sendPixelMessage({ angle: playerTurret.angle, turretIndex: playerPixelTurrets().indexOf(playerTurret), type: "pixel-aim" });
+      }
+      return;
+    }
+    if (playerTurret && event.code === "KeyD") {
+      event.preventDefault();
+      pixelAimActive = false;
+      playerTurret.angle = clampPixelTurretAngle(playerTurret, playerTurret.angle + 0.12);
+      if (pixelMode === "multi") {
+        sendPixelMessage({ angle: playerTurret.angle, turretIndex: playerPixelTurrets().indexOf(playerTurret), type: "pixel-aim" });
+      }
+      return;
+    }
+  }
+
+  if (state === "bridge-running") {
+    if (event.code === "ArrowLeft" || event.code === "KeyA") {
+      event.preventDefault();
+      chooseBridgeSide("left");
+      return;
+    }
+    if (event.code === "ArrowRight" || event.code === "KeyD") {
+      event.preventDefault();
+      chooseBridgeSide("right");
+      return;
+    }
+    if (event.code === "Space" || event.code === "KeyS") {
+      event.preventDefault();
+      void spinBridgeWheel();
+      return;
+    }
+    if (event.code === "KeyH") {
+      event.preventDefault();
+      void spinBridgeHintWheel();
+      return;
+    }
+  }
+
+  if (state === "snake-running") {
+    const directionByKey: Partial<Record<string, SnakeDirection>> = {
+      ArrowDown: "down",
+      ArrowLeft: "left",
+      ArrowRight: "right",
+      ArrowUp: "up",
+      KeyA: "left",
+      KeyD: "right",
+      KeyS: "down",
+      KeyW: "up",
+    };
+    const direction = directionByKey[event.code];
+    if (direction) {
+      event.preventDefault();
+      setSnakeDirection(direction, true);
+      return;
+    }
+    if (event.code === "Space") {
+      event.preventDefault();
+      shootSnake();
+      return;
+    }
+  }
+
+  if (event.code === "Space") {
+    event.preventDefault();
+    flap();
+  }
+  if (event.code === "KeyR" || event.code === "ShiftLeft" || event.code === "ShiftRight") {
+    event.preventDefault();
+    roll();
+  }
+});
+canvas.addEventListener("pointerdown", (event) => {
+  if (state === "pixel-running") {
+    const point = canvasPointFromEvent(event);
+    if (pixelMatchOver) {
+      event.preventDefault();
+      unlockAudio();
+      startPixelWars();
+      return;
+    }
+    if (handlePixelRespawnPointer(point.x, point.y)) {
+      event.preventDefault();
+      unlockAudio();
+      return;
+    }
+    const tappedTurret = pixelTurretAtPoint(point.x, point.y);
+    if (tappedTurret) {
+      event.preventDefault();
+      unlockAudio();
+      togglePixelTurretRotation(tappedTurret);
+      return;
+    }
+    if (startPixelRunnerPointer(event, point.x, point.y)) {
+      event.preventDefault();
+      unlockAudio();
+      return;
+    }
+    const playerTurret = activePlayerPixelTurret();
+    if (!playerTurret) {
+      event.preventDefault();
+      return;
+    }
+    startPixelAim(event);
+    return;
+  }
+
+  if (state === "bridge-running") {
+    const point = canvasPointFromEvent(event);
+    const wheelAction = bridgeWheelActionAtPoint(point.x, point.y);
+    if (wheelAction === "hint") {
+      event.preventDefault();
+      void spinBridgeHintWheel();
+      return;
+    }
+    if (wheelAction === "point") {
+      event.preventDefault();
+      void spinBridgeWheel();
+      return;
+    }
+    const panel = bridgePanelAtPoint(point.x, point.y);
+    if (panel) {
+      chooseBridgeSide(panel.side);
+    }
+    return;
+  }
+
+  flap();
+});
+canvas.addEventListener("pointermove", (event) => {
+  if (state === "pixel-running" && event.pointerId === pixelRunnerPointerId) {
+    event.preventDefault();
+    return;
+  }
+
+  if (state !== "pixel-running" || event.pointerId !== pixelAimPointerId) {
+    return;
+  }
+
+  event.preventDefault();
+  updatePixelAimFromPointer(event);
+});
+canvas.addEventListener("pointerup", (event) => {
+  if (finishPixelRunnerPointer(event)) {
+    event.preventDefault();
+    return;
+  }
+  stopPixelAim(event);
+});
+canvas.addEventListener("pointercancel", (event) => {
+  if (cancelPixelRunnerPointer(event)) {
+    event.preventDefault();
+    return;
+  }
+  stopPixelAim(event);
+});
+canvas.addEventListener("lostpointercapture", () => {
+  cancelPixelRunnerPointer();
+  pixelAimActive = false;
+  pixelAimPointerId = null;
+});
+startButton.addEventListener("click", flap);
+planeOptionsButton.addEventListener("click", showPlaneOptions);
+planeMenuBackButton.addEventListener("click", () => reset("platform"));
+planeOptionsBackButton.addEventListener("click", showPlaneMenu);
+planeSoundToggle.addEventListener("click", () => {
+  unlockAudio();
+  setPlaneSound(!planeSoundEnabled);
+});
+planeReportIssueButton.addEventListener("click", () => showReportIssue("jumpy-plane", "plane-options"));
+restartButton.addEventListener("click", () => {
+  unlockAudio();
+  reset("running");
+});
+homeButton.addEventListener("click", () => {
+  leaveSnakeRoom();
+  leavePixelWarsNetwork();
+  cribbageGame.close();
+  reset("platform");
+});
+selectPlaneButton.addEventListener("click", () => {
+  leaveSnakeRoom();
+  leavePixelWarsNetwork();
+  reset("ready");
+});
+selectSnakeButton.addEventListener("click", () => {
+  leavePixelWarsNetwork();
+  showSnakeMenu();
+});
+selectBridgeButton.addEventListener("click", () => {
+  leavePixelWarsNetwork();
+  showBridgeMenu();
+});
+selectPixelButton.addEventListener("click", showPixelMenu);
+selectCribbageButton.addEventListener("click", () => {
+  leaveSnakeRoom();
+  leavePixelWarsNetwork();
+  cribbageGame.open();
+});
+snakeOptionsButton.addEventListener("click", showSnakeOptions);
+snakeMenuBackButton.addEventListener("click", () => reset("platform"));
+snakeOptionsBackButton.addEventListener("click", showSnakeMenu);
+snakeSoundToggle.addEventListener("click", () => {
+  unlockAudio();
+  setSnakeSound(!snakeSoundEnabled);
+});
+snakeReportIssueButton.addEventListener("click", () => showReportIssue("shooting-snakes", "snake-options"));
+bridgeOptionsButton.addEventListener("click", showBridgeOptions);
+bridgeMenuBackButton.addEventListener("click", () => reset("platform"));
+bridgeOptionsBackButton.addEventListener("click", showBridgeMenu);
+bridgeSoundToggle.addEventListener("click", () => {
+  unlockAudio();
+  setBridgeSound(!bridgeSoundEnabled);
+});
+bridgeReportIssueButton.addEventListener("click", () => showReportIssue("glass-bridge", "bridge-options"));
+pixelSinglePlayerButton.addEventListener("click", showPixelSingleConfig);
+pixelMultiplayerButton.addEventListener("click", showPixelLobby);
+pixelStartButton.addEventListener("click", startPixelWars);
+pixelOptionsButton.addEventListener("click", showPixelOptions);
+pixelMenuBackButton.addEventListener("click", handlePixelMenuBack);
+pixelOptionsBackButton.addEventListener("click", showPixelMenu);
+pixelReportIssueButton.addEventListener("click", () => showReportIssue("pixel-wars", "pixel-options"));
+window.addEventListener("breakout-report-issue", () => {
+  breakoutGame.prepareReport();
+  showReportIssue("breakout", "breakout-options");
+});
+window.addEventListener("cribbage-report-issue", () => {
+  cribbageGame.prepareReport();
+  showReportIssue("digital-cribbage", "cribbage-options");
+});
+pixelRefreshLobbiesButton.addEventListener("click", () => void loadPixelLobbies());
+pixelCreateLobbyButton.addEventListener("click", () => void createPixelLobby());
+pixelBotsInput.addEventListener("input", syncPixelConfigFromInputs);
+pixelHumansInput.addEventListener("input", syncPixelConfigFromInputs);
+issueCancelButton.addEventListener("click", returnFromReportIssue);
+issueForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const message = issueText.value.trim();
+  if (!message) {
+    issueStatus.textContent = "Add a short note first.";
+    return;
+  }
+
+  issueStatus.textContent = "Sending...";
+  void submitIssue(reportGame, message)
+    .then(() => {
+      issueText.value = "";
+      issueStatus.textContent = "Issue saved.";
+      window.setTimeout(() => {
+        returnFromReportIssue();
+      }, 900);
+    })
+    .catch(() => {
+      issueStatus.textContent = "Issue did not save.";
+    });
+});
+snakeStartButton.addEventListener("click", () => {
+  startSnakeGame();
+});
+snakeRestartButton.addEventListener("click", () => {
+  startSnakeGame(true);
+});
+bridgeStartButton.addEventListener("click", startBridgeGame);
+bridgeRestartButton.addEventListener("click", startBridgeGame);
+bridgeHintSpinButton.addEventListener("click", () => {
+  void spinBridgeHintWheel();
+});
+bridgeSpinButton.addEventListener("click", () => {
+  void spinBridgeWheel();
+});
+fullscreenButton.addEventListener("click", () => {
+  void toggleFullscreen();
+});
+snakeJoystick.addEventListener("pointerdown", (event) => {
+  if (state !== "snake-running") {
+    return;
+  }
+
+  event.preventDefault();
+  unlockAudio();
+  snakeJoystickPointerId = event.pointerId;
+  snakeJoystick.setPointerCapture(event.pointerId);
+  updateSnakeJoystickFromPointer(event);
+});
+snakeJoystick.addEventListener("pointermove", (event) => {
+  if (event.pointerId !== snakeJoystickPointerId) {
+    return;
+  }
+
+  event.preventDefault();
+  updateSnakeJoystickFromPointer(event);
+});
+snakeJoystick.addEventListener("pointerup", (event) => {
+  if (event.pointerId !== snakeJoystickPointerId) {
+    return;
+  }
+
+  snakeJoystickPointerId = null;
+  resetSnakeJoystick();
+});
+snakeJoystick.addEventListener("pointercancel", (event) => {
+  if (event.pointerId !== snakeJoystickPointerId) {
+    return;
+  }
+
+  snakeJoystickPointerId = null;
+  resetSnakeJoystick();
+});
+snakeJoystick.addEventListener("lostpointercapture", () => {
+  snakeJoystickPointerId = null;
+  resetSnakeJoystick();
+});
+snakeShootButton.addEventListener("pointerdown", (event) => {
+  if (state !== "snake-running") {
+    return;
+  }
+
+  event.preventDefault();
+  unlockAudio();
+  shootSnake();
+});
+snakeShootButton.addEventListener("click", shootSnake);
+rollButton.addEventListener("click", roll);
+rollButton.addEventListener("keydown", (event) => {
+  if (event.code === "Enter" || event.code === "Space") {
+    event.preventDefault();
+    roll();
+  }
+});
+recordForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const name = recordNameInput.value.trim() || "Player 1";
+  localStorage.setItem(playerNameKey, name);
+  setText(bridgePlayerNameEls, name);
+  recordDialog.hidden = true;
+  pendingRecordName?.(name);
+  pendingRecordName = null;
+});
+document.addEventListener("fullscreenchange", () => {
+  updateFullscreenButton();
+  resize();
+});
+document.addEventListener("visibilitychange", refreshVisibleServerScores);
+window.setInterval(refreshVisibleServerScores, 15000);
+readLocalHighest();
+readSnakeLocalLongest();
+readBridgeLocalScores();
+readPixelLocalBest();
+renderHighScores();
+renderSnakeHighScores();
+renderBridgeHighScores();
+renderPixelScores();
+void loadServerHighScores();
+void loadServerSnakeHighScores();
+void loadServerBridgeHighScores();
+void loadBridgeJackpot();
+resize();
+updateFullscreenButton();
+reset("platform");
+requestAnimationFrame(loop);

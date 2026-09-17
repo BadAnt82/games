@@ -1,0 +1,23 @@
+{
+  "name": "badant-games",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev": "vite --host 0.0.0.0 --port 3000",
+    "build": "tsc && vite build",
+    "test:cribbage": "node --experimental-strip-types scripts/cribbage-rules-check.mjs",
+    "test:cribbage-network": "node scripts/cribbage-network-check.mjs",
+    "test:smoke": "node scripts/smoke-server.mjs",
+    "preview": "vite preview --host 0.0.0.0 --port 3000",
+    "start": "node server.mjs"
+  },
+  "dependencies": {
+    "typescript": "^5.9.2",
+    "vite": "^7.3.6",
+    "ws": "^8.21.3"
+  }
+}
