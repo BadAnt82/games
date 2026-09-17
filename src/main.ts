@@ -1597,7 +1597,8 @@ function playerPixelTurrets() {
 
 function activePlayerPixelTurret() {
   const turrets = playerPixelTurrets();
-  return pixelTurretIsActive(turrets[pixelSelectedTurretIndex]) ? turrets[pixelSelectedTurretIndex] : turrets.find((turret) => pixelTurretIsActive(turret));
+  const selected = turrets[pixelSelectedTurretIndex];
+  return selected && pixelTurretIsActive(selected) ? selected : turrets.find((turret) => pixelTurretIsActive(turret));
 }
 
 function pixelTurretAtPoint(x: number, y: number) {
