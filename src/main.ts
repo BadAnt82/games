@@ -3662,6 +3662,7 @@ function explodePixelCells(index: number, owner: PixelOwner) {
 }
 
 function pixelEffectiveFireInterval(turret: PixelTurret) {
+  // Fire speed has no cap; every clock upgrade keeps reducing this interval.
   return turret.fireInterval / (1 + turret.fireSpeedBoosts * 0.25);
 }
 
@@ -3814,6 +3815,27 @@ function updatePixelWars(dt: number) {
           if (shot.bouncesRemaining > 0) {
             shot.bouncesRemaining -= 1;
             bouncePixelShot(shot, previousX, previousY, cellIndex);
+          } else {
+            hit = true;
+          }
+        }
+      }
+      if (!hit) {
+        const hitLeft = shot.x < layout.x;
+        const hitRight = shot.x > layout.x + layout.boardW;
+        const hitTop = shot.y < layout.y;
+        const hitBottom = shot.y > layout.y + layout.boardH;
+        if (hitLeft || hitRight || hitTop || hitBottom) {
+          if (shot.bouncesRemaining > 0) {
+            if (hitLeft || hitRight) {
+              shot.vx *= -1;
+              shot.x = hitLeft ? layout.x + 0.02 : layout.x + layout.boardW - 0.02;
+            }
+            if (hitTop || hitBottom) {
+              shot.vy *= -1;
+              shot.y = hitTop ? layout.y + 0.02 : layout.y + layout.boardH - 0.02;
+            }
+            shot.bouncesRemaining -= 1;
           } else {
             hit = true;
           }

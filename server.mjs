@@ -927,6 +927,8 @@ function pixelExplodeCells(match, index, owner) {
 }
 
 function pixelEffectiveFireInterval(turret) {
+  // There is deliberately no upper bound on fireSpeedBoosts. Each upgrade
+  // continues to shorten the interval toward zero.
   return pixelBaseFireInterval / (1 + turret.fireSpeedBoosts * 0.25);
 }
 
@@ -1130,6 +1132,27 @@ function updatePixelShots(match, dt) {
           if (shot.bouncesRemaining > 0) {
             shot.bouncesRemaining -= 1;
             bouncePixelShot(shot, previousX, previousY, cellIndex);
+          } else {
+            hit = true;
+          }
+        }
+      }
+      if (!hit) {
+        const hitLeft = shot.x < 0;
+        const hitRight = shot.x > pixelBoard.columns;
+        const hitTop = shot.y < 0;
+        const hitBottom = shot.y > pixelBoard.rows;
+        if (hitLeft || hitRight || hitTop || hitBottom) {
+          if (shot.bouncesRemaining > 0) {
+            if (hitLeft || hitRight) {
+              shot.vx *= -1;
+              shot.x = hitLeft ? 0.02 : pixelBoard.columns - 0.02;
+            }
+            if (hitTop || hitBottom) {
+              shot.vy *= -1;
+              shot.y = hitTop ? 0.02 : pixelBoard.rows - 0.02;
+            }
+            shot.bouncesRemaining -= 1;
           } else {
             hit = true;
           }
