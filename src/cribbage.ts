@@ -1,4 +1,4 @@
-type CribbageView = "closed" | "menu" | "options" | "network" | "board" | "round-over";
+type CribbageView = "closed" | "mode" | "menu" | "options" | "network" | "board" | "round-over";
 type CribbagePhase = "discard" | "dealer-select" | "pegging";
 type Variant = "standard" | "crazy";
 type PlayFormat = "individual" | "team";
@@ -14,6 +14,7 @@ const SUITS = ["♠", "♥", "♦", "♣"];
 const SUIT_COLORS: Record<string, string> = { "♥": "red", "♦": "red", "♠": "black", "♣": "black" };
 const PLAYER_NAME_KEY = "badant-games-player-name";
 const SAVE_KEY = "badant-cribbage-match-v2";
+const CLIENT_ID_KEY = "badant-cribbage-client-id";
 
 function element<T extends HTMLElement>(selector: string): T {
   const node = document.querySelector<T>(selector);
@@ -136,6 +137,7 @@ export function initCribbage() {
   const overlay = element<HTMLElement>("#overlay");
   const platform = element<HTMLElement>("#platform-panel");
   const homeButton = element<HTMLButtonElement>("#home");
+  const modePanel = element<HTMLElement>("#cribbage-mode-panel");
   const menu = element<HTMLElement>("#cribbage-menu-panel");
   const options = element<HTMLElement>("#cribbage-options-panel");
   const board = element<HTMLElement>("#cribbage-board-panel");
@@ -164,16 +166,23 @@ export function initCribbage() {
   const roundResults = element<HTMLElement>("#cribbage-round-results");
   const nextRoundButton = element<HTMLButtonElement>("#cribbage-next-round");
   const networkPanel = element<HTMLElement>("#cribbage-network-panel");
-  const networkList = element<HTMLElement>("#cribbage-network-list");
+  const ownedGamesList = element<HTMLElement>("#cribbage-owned-games");
+  const availableGamesList = element<HTMLElement>("#cribbage-available-games");
   const networkStatus = element<HTMLElement>("#cribbage-network-status");
   const createGameButton = element<HTMLButtonElement>("#cribbage-create-game");
+  const createFromSetupButton = element<HTMLButtonElement>("#cribbage-create-from-setup");
+  const playSingleWaitingButton = element<HTMLButtonElement>("#cribbage-play-single-waiting");
   const refreshGamesButton = element<HTMLButtonElement>("#cribbage-refresh-games");
   const networkBackButton = element<HTMLButtonElement>("#cribbage-network-back");
-  const multiplayerButton = element<HTMLButtonElement>("#cribbage-multiplayer");
   const connectionStatus = element<HTMLElement>("#cribbage-connection-status");
   const quitButton = element<HTMLButtonElement>("#cribbage-quit");
   const networkStartButton = element<HTMLButtonElement>("#cribbage-network-start");
   const cancelGameButton = element<HTMLButtonElement>("#cribbage-cancel-game");
+  const setupHeading = element<HTMLElement>("#cribbage-setup-heading");
+  const modeSingleButton = element<HTMLButtonElement>("#cribbage-mode-single");
+  const modeMultiButton = element<HTMLButtonElement>("#cribbage-mode-multi");
+  const modeOptionsButton = element<HTMLButtonElement>("#cribbage-mode-options");
+  const modeBackButton = element<HTMLButtonElement>("#cribbage-mode-back");
   const pegs = element<HTMLElement>("#cribbage-pegs");
   const pegHoles = element<HTMLElement>("#cribbage-peg-holes");
   const playedCards = element<HTMLElement>("#cribbage-played-cards");
@@ -201,9 +210,15 @@ export function initCribbage() {
     winner: "",
     teamScores: { 1: 0, 2: 0 },
     aiTimer: 0,
-    network: { socket: null as WebSocket | null, gameId: "", sessionId: "", seat: -1, host: false, remote: false, reconnect: 0 },
+    setupIntent: "single" as "single" | "multiplayer",
+    network: { socket: null as WebSocket | null, gameId: "", sessionId: "", seat: -1, host: false, remote: false, reconnect: 0, userId: "", waitingLocal: false, ready: false },
     connectionSeats: [] as NetworkSeat[],
   };
+  try {
+    let clientId = localStorage.getItem(CLIENT_ID_KEY) || "";
+    if (!clientId) { clientId = globalThis.crypto?.randomUUID?.() || `player-${Date.now()}-${Math.random().toString(36).slice(2)}`; localStorage.setItem(CLIENT_ID_KEY, clientId); }
+    state.network.userId = clientId;
+  } catch { state.network.userId = `player-${Date.now()}-${Math.random().toString(36).slice(2)}`; }
   try { const savedNetwork = JSON.parse(localStorage.getItem("badant-cribbage-network") || "null"); if (savedNetwork?.gameId && savedNetwork?.sessionId) { state.network.gameId = savedNetwork.gameId; state.network.sessionId = savedNetwork.sessionId; } } catch { /* ignore stale session */ }
 
   function readSaved() {
@@ -222,13 +237,13 @@ export function initCribbage() {
     state.view = next;
     if (next === "closed") {
       window.clearTimeout(state.aiTimer);
-      gameCanvas.hidden = false; platform.hidden = false; menu.hidden = true; options.hidden = true; board.hidden = true; roundPanel.hidden = true; networkPanel.hidden = true;
+      gameCanvas.hidden = false; platform.hidden = false; modePanel.hidden = true; menu.hidden = true; options.hidden = true; board.hidden = true; roundPanel.hidden = true; networkPanel.hidden = true;
       overlay.hidden = false; overlay.classList.add("is-platform"); overlay.classList.remove("is-cribbage"); homeButton.hidden = true; return;
     }
-    gameCanvas.hidden = true; platform.hidden = true; menu.hidden = next !== "menu"; options.hidden = next !== "options"; board.hidden = next !== "board"; roundPanel.hidden = next !== "round-over"; networkPanel.hidden = next !== "network";
+    gameCanvas.hidden = true; platform.hidden = true; modePanel.hidden = next !== "mode"; menu.hidden = next !== "menu"; options.hidden = next !== "options"; board.hidden = next !== "board"; roundPanel.hidden = next !== "round-over"; networkPanel.hidden = next !== "network";
     overlay.hidden = false; overlay.classList.remove("is-platform"); overlay.classList.add("is-cribbage"); homeButton.hidden = false;
     if (next === "menu") {
-      updateSetupUi(); const saved = readSaved(); resumeButton.disabled = !saved; resumeButton.textContent = saved ? `Resume saved match (Round ${saved.round || 1})` : "Resume saved match";
+      updateSetupUi(); const saved = readSaved(); resumeButton.disabled = !saved; resumeButton.textContent = saved ? `Resume saved match (Round ${saved.round || 1})` : "Resume saved match"; setupHeading.textContent = state.setupIntent === "multiplayer" ? "Configure the game you will host. Players can join from the lobby." : "Configure a single-player match. Human seats share this device."; createFromSetupButton.hidden = state.setupIntent !== "multiplayer"; element<HTMLButtonElement>("#cribbage-start").hidden = state.setupIntent === "multiplayer";
     }
   }
 
@@ -239,23 +254,21 @@ export function initCribbage() {
   }
   function ownedNetworkGames(): string[] { try { const value = JSON.parse(localStorage.getItem("badant-cribbage-owned-games") || "[]"); return Array.isArray(value) ? value.filter((id) => typeof id === "string") : []; } catch { return []; } }
   function rememberOwnedGame(gameId: string, sessionId = "") { const games = [...new Set([...ownedNetworkGames(), gameId])]; localStorage.setItem("badant-cribbage-owned-games", JSON.stringify(games)); if (sessionId) { try { const sessions = JSON.parse(localStorage.getItem("badant-cribbage-owned-sessions") || "{}"); sessions[gameId] = sessionId; localStorage.setItem("badant-cribbage-owned-sessions", JSON.stringify(sessions)); } catch { /* ignore storage errors */ } } }
-  function sessionForOwnedGame(gameId: string) { try { const sessions = JSON.parse(localStorage.getItem("badant-cribbage-owned-sessions") || "{}"); return typeof sessions[gameId] === "string" ? sessions[gameId] : ""; } catch { return ""; } }
   function forgetOwnedGame(gameId: string) { localStorage.setItem("badant-cribbage-owned-games", JSON.stringify(ownedNetworkGames().filter((id) => id !== gameId))); try { const sessions = JSON.parse(localStorage.getItem("badant-cribbage-owned-sessions") || "{}"); delete sessions[gameId]; localStorage.setItem("badant-cribbage-owned-sessions", JSON.stringify(sessions)); } catch { /* ignore storage errors */ } }
-  function renderNetworkList(games: Array<{ gameId: string; variant: Variant; playerCount: number; format: PlayFormat; seats: NetworkSeat[]; started: boolean; ownerSeat?: number }> = []) {
-    const owned = new Set(ownedNetworkGames());
-    const visibleGames = games.filter((game) => game.seats.some((seat) => seat.available) || owned.has(game.gameId));
-    networkList.replaceChildren(...visibleGames.map((game) => { const row = document.createElement("div"); row.className = "cribbage-network-game"; const open = game.seats.filter((seat) => seat.available).length; const mine = owned.has(game.gameId); const opponents = mine ? game.seats.filter((seat) => seat.control === "human" && seat.seat !== (game.ownerSeat ?? 0)) : []; const connected = opponents.filter((seat) => seat.connected).length; row.innerHTML = `<div><strong>${game.gameId}${mine ? " · My game" : ""}</strong><span>${game.variant === "crazy" ? "Crazy" : "Standard"} · ${game.format === "team" ? "2 vs 2" : "Individual"}${mine ? ` · Opponents: ${connected}/${opponents.length} connected` : ` · ${open} open seat${open === 1 ? "" : "s"}`}</span></div>`; const enter = document.createElement("button"); enter.type = "button"; enter.textContent = "Enter game"; enter.disabled = !mine && (game.started || open === 0); enter.addEventListener("click", () => { state.network.gameId = game.gameId; state.network.remote = true; networkSend({ type: "cribbage-join", gameId: game.gameId, sessionId: mine ? sessionForOwnedGame(game.gameId) : undefined }); networkStatus.textContent = `Entering ${game.gameId}…`; }); row.append(enter); if (mine) { const cancel = document.createElement("button"); cancel.type = "button"; cancel.className = "secondary"; cancel.textContent = "Cancel"; cancel.addEventListener("click", () => { networkSend({ type: "cribbage-cancel", gameId: game.gameId }); networkStatus.textContent = `Cancelling ${game.gameId}…`; }); row.append(cancel); } return row; }));
+  function renderNetworkList(games: Array<{ gameId: string; variant: Variant; playerCount: number; format: PlayFormat; seats: NetworkSeat[]; started: boolean; ownerSeat?: number }> = [], target: HTMLElement = availableGamesList, mine = false) {
+    target.replaceChildren(...games.map((game) => { const row = document.createElement("div"); row.className = "cribbage-network-game"; const open = game.seats.filter((seat) => seat.available).length; const opponents = game.seats.filter((seat) => seat.control === "human" && seat.seat !== (game.ownerSeat ?? 0)); const connected = opponents.filter((seat) => seat.connected).length; row.innerHTML = `<div><strong>${game.gameId}</strong><span>${game.variant === "crazy" ? "Crazy" : "Standard"} · ${game.format === "team" ? "2 vs 2" : "Individual"} · ${mine ? `${connected}/${opponents.length} opponents connected` : `${open} open seat${open === 1 ? "" : "s"}`}${open ? ` · Waiting for ${open} player${open === 1 ? "" : "s"}` : ""}</span></div>`; if (!mine) { const enter = document.createElement("button"); enter.type = "button"; enter.textContent = "Join"; enter.disabled = game.started || open === 0; enter.addEventListener("click", () => { state.network.gameId = game.gameId; state.network.remote = true; networkSend({ type: "cribbage-join", gameId: game.gameId, userId: state.network.userId }); networkStatus.textContent = `Joining ${game.gameId}…`; }); row.append(enter); } else { const cancel = document.createElement("button"); cancel.type = "button"; cancel.className = "secondary"; cancel.textContent = "Cancel game"; cancel.addEventListener("click", () => { networkSend({ type: "cribbage-cancel", gameId: game.gameId, userId: state.network.userId }); networkStatus.textContent = `Cancelling ${game.gameId}…`; }); row.append(cancel); } return row; }));
   }
+  function renderLobby(message: any = {}) { renderNetworkList(message.created || [], ownedGamesList, true); renderNetworkList(message.available || message.games || [], availableGamesList, false); if (message.activeGameId && !state.network.gameId) networkStatus.textContent = "You already have a multiplayer game. Cancel it before joining or creating another."; }
   function networkUrl() { return `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/cribbage`; }
   function connectNetwork() {
     if (state.network.socket && state.network.socket.readyState !== WebSocket.CLOSED) return;
     const socket = new WebSocket(networkUrl()); state.network.socket = socket;
-    socket.addEventListener("open", () => { networkStatus.textContent = "Connected. Choose a game or create one."; networkSend({ type: "cribbage-list" }); if (state.network.remote && state.network.gameId && state.network.sessionId) networkSend({ type: "cribbage-join", gameId: state.network.gameId, sessionId: state.network.sessionId }); });
+    socket.addEventListener("open", () => { networkStatus.textContent = "Connected. Choose a game or create one."; networkSend({ type: "cribbage-list", userId: state.network.userId }); if (state.network.gameId && state.network.sessionId) { state.network.remote = true; networkSend({ type: "cribbage-join", gameId: state.network.gameId, sessionId: state.network.sessionId, userId: state.network.userId }); } });
     socket.addEventListener("message", (event) => { let message: any; try { message = JSON.parse(event.data); } catch { return; }
-      if (message.type === "cribbage-lobby-list") { renderNetworkList(message.games || []); return; }
-      if (message.type === "cribbage-error") { networkStatus.textContent = message.message; return; }
-      if (message.type === "cribbage-created" || message.type === "cribbage-joined") { state.network.gameId = message.gameId; state.network.sessionId = message.sessionId; state.network.seat = message.seat; state.network.host = Boolean(message.host); state.network.remote = true; networkStartButton.hidden = !state.network.host; cancelGameButton.hidden = !state.network.host; if (message.type === "cribbage-created") rememberOwnedGame(message.gameId, message.sessionId); createGameButton.disabled = false; localStorage.setItem("badant-cribbage-network", JSON.stringify({ gameId: message.gameId, sessionId: message.sessionId })); networkStatus.textContent = state.network.host ? `Game ${message.gameId} created. Share this code, then wait for players.` : `Joined ${message.gameId}. Waiting for the host to deal.`; return; }
-      if (message.type === "cribbage-ready") { if (state.network.host) { networkStartButton.hidden = false; networkStatus.textContent = "All human seats are connected. Start when you are ready."; } return; }
+      if (message.type === "cribbage-lobby-list") { renderLobby(message); return; }
+      if (message.type === "cribbage-error") { createFromSetupButton.disabled = false; createGameButton.disabled = false; networkStatus.textContent = message.message; return; }
+      if (message.type === "cribbage-created" || message.type === "cribbage-joined") { state.network.gameId = message.gameId; state.network.sessionId = message.sessionId; state.network.seat = message.seat; state.network.host = Boolean(message.host); state.network.remote = true; state.network.ready = false; networkStartButton.hidden = !state.network.host; cancelGameButton.hidden = !state.network.host; playSingleWaitingButton.hidden = !state.network.host; if (message.type === "cribbage-created") rememberOwnedGame(message.gameId, message.sessionId); createGameButton.disabled = false; createFromSetupButton.disabled = false; localStorage.setItem("badant-cribbage-network", JSON.stringify({ gameId: message.gameId, sessionId: message.sessionId })); networkStatus.textContent = state.network.host ? `Game ${message.gameId} created. Waiting for players.` : `Joined ${message.gameId}. Waiting for the host to deal.`; setPanels("network"); return; }
+      if (message.type === "cribbage-ready") { state.network.ready = true; networkStartButton.hidden = !state.network.host; networkStatus.textContent = "Your game is full and ready to start."; if (state.network.waitingLocal && state.view === "board") { const joinNow = window.confirm("Your multiplayer game is ready. Join it now? Your single-player game will end."); if (joinNow) startNetworkGame(); else networkStatus.textContent = "Your multiplayer game is ready. Return to the lobby when you want to join."; } return; }
       if (message.type === "cribbage-cancelled") { forgetOwnedGame(message.gameId); if (message.gameId === state.network.gameId) { state.network.remote = false; state.network.host = false; state.network.gameId = ""; state.network.sessionId = ""; state.network.seat = -1; networkStartButton.hidden = true; cancelGameButton.hidden = true; localStorage.removeItem("badant-cribbage-network"); } createGameButton.disabled = false; networkStatus.textContent = "Game cancelled. Choose another game or create a new one."; setPanels("network"); return; }
       if (message.type === "cribbage-connection") { if (message.gameId === state.network.gameId) { state.connectionSeats = message.seats || []; renderConnections(); networkStatus.textContent = state.connectionSeats.filter((seat: NetworkSeat) => seat.connected && seat.control === "human").length >= 1 ? "Players can reconnect if their connection drops." : networkStatus.textContent; } return; }
       if (message.type === "cribbage-state") { if (!state.network.host) applyNetworkSnapshot(message.snapshot); return; }
@@ -400,6 +413,7 @@ export function initCribbage() {
   function startGame() {
     window.clearTimeout(state.aiTimer); state.variant = mode.value === "crazy" ? "crazy" : "standard"; state.format = format.value === "team" && Number(playerCount.value) === 4 ? "team" : "individual"; state.players = Array.from({ length: Number(playerCount.value) }, (_, index) => seatFromSetup(index)); const playerName = state.players[0]?.name.trim(); if (playerName && playerName !== "Player 1" && state.players[0]?.control === "human") localStorage.setItem(PLAYER_NAME_KEY, playerName); state.dealer = 0; state.round = 1; state.winner = ""; state.teamScores = { 1: 0, 2: 0 }; dealRound();
   }
+  function startNetworkGame() { if (!state.network.host || !state.network.ready) return; state.network.waitingLocal = false; state.network.remote = true; startGame(); networkSend({ type: "cribbage-state", snapshot: networkSnapshot() }); }
 
   function finishStandardDiscard() { if (state.players.length === 3) state.crib.push(state.deck.pop()!); state.players.forEach((player) => { player.scoringHand = player.hand.slice(); }); finishPegging(); }
   function finishCrazyPasses() { state.phase = "dealer-select"; state.active = state.dealer; state.selected.clear(); renderBoard(); saveGame(); publishNetworkState(); }
@@ -570,17 +584,22 @@ export function initCribbage() {
 
   function restoreSaved() { const saved = readSaved(); if (!saved) return; state.phase = saved.phase; state.variant = saved.variant; state.format = saved.format; state.players = saved.players; state.deck = saved.deck; state.crib = saved.crib; state.cut = saved.cut; state.cutBonus = saved.cutBonus || 0; state.roundResults = saved.roundResults || []; state.peggingCallouts = saved.peggingCallouts || []; state.selected = new Set(saved.selected || []); state.discardedSeats = new Set(saved.discardedSeats || []); state.dealer = saved.dealer; state.active = saved.active; state.total = saved.total; state.pegged = saved.pegged; state.pegHistory = saved.pegHistory || []; state.round = saved.round; state.winner = saved.winner || ""; state.teamScores = saved.teamScores || { 1: 0, 2: 0 }; nextRoundButton.hidden = Boolean(state.winner); setPanels("board"); renderBoard(); }
   function close() { window.clearTimeout(state.aiTimer); setPanels("closed"); }
-  function prepareReport() { window.clearTimeout(state.aiTimer); state.aiTimer = 0; state.view = "closed"; menu.hidden = true; options.hidden = true; board.hidden = true; roundPanel.hidden = true; gameCanvas.hidden = false; }
+  function prepareReport() { window.clearTimeout(state.aiTimer); state.aiTimer = 0; state.view = "closed"; modePanel.hidden = true; menu.hidden = true; options.hidden = true; board.hidden = true; roundPanel.hidden = true; networkPanel.hidden = true; gameCanvas.hidden = false; }
   function restoreReport() { setPanels("options"); }
 
-  multiplayerButton.addEventListener("click", () => { setPanels("network"); connectNetwork(); });
-  refreshGamesButton.addEventListener("click", () => { connectNetwork(); networkSend({ type: "cribbage-list" }); });
-  networkBackButton.addEventListener("click", () => setPanels("menu"));
-  createGameButton.addEventListener("click", () => { connectNetwork(); const seats = Array.from({ length: Number(playerCount.value) }, (_, index) => { const seat = seatFromSetup(index); return { name: seat.name, control: seat.control, team: seat.team }; }); networkSend({ type: "cribbage-create", config: { variant: mode.value, playerCount: Number(playerCount.value), format: format.value, seats } }); createGameButton.disabled = true; networkStatus.textContent = "Creating game…"; });
-  networkStartButton.addEventListener("click", () => { if (state.network.host) { startGame(); networkSend({ type: "cribbage-state", snapshot: networkSnapshot() }); } });
-  cancelGameButton.addEventListener("click", () => { if (!state.network.host) return; networkSend({ type: "cribbage-cancel" }); networkStatus.textContent = "Cancelling game…"; });
-  quitButton.addEventListener("click", () => { if (state.network.remote) { networkSend({ type: "cribbage-quit" }); state.network.remote = false; state.network.host = false; state.network.gameId = ""; state.network.sessionId = ""; state.network.seat = -1; localStorage.removeItem("badant-cribbage-network"); state.network.socket?.close(); state.network.socket = null; networkStartButton.hidden = true; cancelGameButton.hidden = true; createGameButton.disabled = false; setPanels("network"); connectNetwork(); } });
-  mode.addEventListener("change", updateSetupUi); playerCount.addEventListener("change", updateSetupUi); format.addEventListener("change", updateSetupUi); element<HTMLButtonElement>("#select-cribbage").addEventListener("click", () => setPanels("menu")); element<HTMLButtonElement>("#cribbage-start").addEventListener("click", startGame); resumeButton.addEventListener("click", restoreSaved); element<HTMLButtonElement>("#cribbage-options").addEventListener("click", () => setPanels("options")); element<HTMLButtonElement>("#cribbage-options-back").addEventListener("click", () => setPanels("menu")); element<HTMLButtonElement>("#cribbage-menu-back").addEventListener("click", close); cribAction.addEventListener("click", () => { if (state.network.remote && !state.network.host) networkSend({ type: "cribbage-action", action: { kind: "discard", selected: [...state.selected] } }); else applyDiscard(); }); passButton.addEventListener("click", () => { if (state.network.remote && !state.network.host) networkSend({ type: "cribbage-action", action: { kind: "pass" } }); else passPegging(); }); nextRoundButton.addEventListener("click", () => { if (state.winner) return; state.round += 1; state.dealer = (state.dealer + 1) % state.players.length; dealRound(); }); element<HTMLButtonElement>("#cribbage-round-exit").addEventListener("click", () => setPanels("menu")); element<HTMLButtonElement>("#cribbage-board-exit").addEventListener("click", () => setPanels("menu")); element<HTMLButtonElement>("#cribbage-report-issue").addEventListener("click", () => window.dispatchEvent(new CustomEvent("cribbage-report-issue"))); homeButton.addEventListener("click", (event) => { if (state.view !== "closed") { event.stopImmediatePropagation(); close(); } }); window.addEventListener("cribbage-prepare-report", prepareReport); window.addEventListener("cribbage-restore-report", restoreReport); window.addEventListener("badant-player-name-changed", (event) => { const name = (event as CustomEvent<{ name?: string }>).detail?.name?.trim(); if (name) playerOneName.value = name; }); const savedPlayerName = localStorage.getItem(PLAYER_NAME_KEY)?.trim(); if (savedPlayerName) playerOneName.value = savedPlayerName; updateSetupUi(); setPanels("closed");
+  modeSingleButton.addEventListener("click", () => { state.setupIntent = "single"; setPanels("menu"); });
+  modeMultiButton.addEventListener("click", () => { state.setupIntent = "multiplayer"; setPanels("network"); connectNetwork(); });
+  modeOptionsButton.addEventListener("click", () => setPanels("options"));
+  modeBackButton.addEventListener("click", close);
+  refreshGamesButton.addEventListener("click", () => { connectNetwork(); networkSend({ type: "cribbage-list", userId: state.network.userId }); });
+  networkBackButton.addEventListener("click", () => setPanels("mode"));
+  createGameButton.addEventListener("click", () => { state.setupIntent = "multiplayer"; setPanels("menu"); });
+  createFromSetupButton.addEventListener("click", () => { connectNetwork(); const seats = Array.from({ length: Number(playerCount.value) }, (_, index) => { const seat = seatFromSetup(index); return { name: seat.name, control: seat.control, team: seat.team }; }); networkSend({ type: "cribbage-create", userId: state.network.userId, config: { variant: mode.value, playerCount: Number(playerCount.value), format: format.value, seats } }); createFromSetupButton.disabled = true; networkStatus.textContent = "Creating game…"; });
+  playSingleWaitingButton.addEventListener("click", () => { state.network.waitingLocal = true; state.network.remote = false; state.setupIntent = "single"; startGame(); });
+  networkStartButton.addEventListener("click", () => startNetworkGame());
+  cancelGameButton.addEventListener("click", () => { if (!state.network.host) return; networkSend({ type: "cribbage-cancel", userId: state.network.userId }); networkStatus.textContent = "Cancelling game…"; });
+  quitButton.addEventListener("click", () => { if (state.network.remote) { networkSend({ type: "cribbage-quit", userId: state.network.userId }); state.network.remote = false; state.network.host = false; state.network.gameId = ""; state.network.sessionId = ""; state.network.seat = -1; state.network.waitingLocal = false; localStorage.removeItem("badant-cribbage-network"); state.network.socket?.close(); state.network.socket = null; networkStartButton.hidden = true; cancelGameButton.hidden = true; createGameButton.disabled = false; setPanels("network"); connectNetwork(); } });
+  mode.addEventListener("change", updateSetupUi); playerCount.addEventListener("change", updateSetupUi); format.addEventListener("change", updateSetupUi); element<HTMLButtonElement>("#select-cribbage").addEventListener("click", () => setPanels("mode")); element<HTMLButtonElement>("#cribbage-start").addEventListener("click", () => { state.setupIntent = "single"; state.network.remote = false; startGame(); }); resumeButton.addEventListener("click", restoreSaved); element<HTMLButtonElement>("#cribbage-options").addEventListener("click", () => setPanels("options")); element<HTMLButtonElement>("#cribbage-options-back").addEventListener("click", () => setPanels("mode")); element<HTMLButtonElement>("#cribbage-menu-back").addEventListener("click", () => setPanels("mode")); cribAction.addEventListener("click", () => { if (state.network.remote && !state.network.host) networkSend({ type: "cribbage-action", action: { kind: "discard", selected: [...state.selected] } }); else applyDiscard(); }); passButton.addEventListener("click", () => { if (state.network.remote && !state.network.host) networkSend({ type: "cribbage-action", action: { kind: "pass" } }); else passPegging(); }); nextRoundButton.addEventListener("click", () => { if (state.winner) return; state.round += 1; state.dealer = (state.dealer + 1) % state.players.length; dealRound(); }); element<HTMLButtonElement>("#cribbage-round-exit").addEventListener("click", () => setPanels("mode")); element<HTMLButtonElement>("#cribbage-board-exit").addEventListener("click", () => setPanels(state.network.waitingLocal ? "network" : "mode")); element<HTMLButtonElement>("#cribbage-report-issue").addEventListener("click", () => window.dispatchEvent(new CustomEvent("cribbage-report-issue"))); homeButton.addEventListener("click", (event) => { if (state.view !== "closed") { event.stopImmediatePropagation(); close(); } }); window.addEventListener("cribbage-prepare-report", prepareReport); window.addEventListener("cribbage-restore-report", restoreReport); window.addEventListener("badant-player-name-changed", (event) => { const name = (event as CustomEvent<{ name?: string }>).detail?.name?.trim(); if (name) playerOneName.value = name; }); const savedPlayerName = localStorage.getItem(PLAYER_NAME_KEY)?.trim(); if (savedPlayerName) playerOneName.value = savedPlayerName; updateSetupUi(); setPanels("closed");
 
-  return { open: () => setPanels("menu"), close, prepareReport, restoreReport };
+  return { open: () => setPanels("mode"), close, prepareReport, restoreReport };
 }

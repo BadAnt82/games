@@ -350,9 +350,14 @@
           <div id="breakout-options-panel" class="overlay-panel options-panel" hidden><h1>Tile Breaker Options</h1><p>Move with your mouse, touch, or arrow keys. Catch falling power-ups with the paddle.</p><button id="breakout-report-issue" type="button">Report issue</button><button id="breakout-options-back" type="button">Back</button></div>
           <div id="breakout-checkpoint-panel" class="overlay-panel breakout-checkpoint-panel" hidden><h1>Level complete</h1><p>Your next safe state is level <strong id="breakout-next-level">2</strong> with your remaining lives. Choose whether to save it.</p><div class="menu-actions"><button id="breakout-save-continue" type="button">Save progress &amp; continue</button><button id="breakout-continue" type="button">Continue without saving</button><button id="breakout-save-exit" type="button">Save progress &amp; exit</button><button id="breakout-exit-without-saving" type="button">Exit without saving</button></div></div>
           <div id="breakout-dead-panel" class="overlay-panel breakout-dead-panel" hidden><h1 id="breakout-dead-title">Game over</h1><p id="breakout-dead-message">The wall wins this round.</p><button id="breakout-restart" type="button">Try again</button><button id="breakout-dead-back" type="button">Back to games</button></div>
+          <div id="cribbage-mode-panel" class="overlay-panel cribbage-mode-panel" hidden>
+            <h1>Digital Cribbage</h1>
+            <p>Choose how you want to play before configuring the game.</p>
+            <div class="menu-actions"><button id="cribbage-mode-single" type="button">Single player</button><button id="cribbage-mode-multi" type="button">Multiplayer</button><button id="cribbage-mode-options" type="button">How to play</button><button id="cribbage-mode-back" type="button">Back to games</button></div>
+          </div>
           <div id="cribbage-menu-panel" class="overlay-panel cribbage-menu-panel" hidden>
             <h1>Digital Cribbage</h1>
-            <p>Play a hot-seat cribbage match. Pass the device after each turn.</p>
+            <p id="cribbage-setup-heading">Configure a single-player match. Human seats share this device.</p>
             <div class="cribbage-setup">
               <label>Game variant<select id="cribbage-mode"><option value="standard">Standard Cribbage</option><option value="crazy">Crazy Cribbage</option></select></label>
               <label>Players<select id="cribbage-player-count"><option value="2">2 players</option><option value="3">3 players</option><option value="4">4 players</option></select></label>
@@ -365,12 +370,14 @@
               </div>
             </div>
             <p id="cribbage-mode-note" class="cribbage-mode-note">Standard rules: choose the crib cards, peg to 31, then score each hand.</p>
-            <div class="menu-actions"><button id="cribbage-start" type="button">Deal local game</button><button id="cribbage-resume" type="button" disabled>Resume saved match</button><button id="cribbage-multiplayer" type="button">Multiplayer</button><button id="cribbage-options" type="button">How to play</button><button id="cribbage-menu-back" type="button">Back to games</button></div>
+            <div class="menu-actions"><button id="cribbage-start" type="button">Deal local game</button><button id="cribbage-create-from-setup" type="button" hidden>Create multiplayer game</button><button id="cribbage-resume" type="button" disabled>Resume saved match</button><button id="cribbage-options" type="button">How to play</button><button id="cribbage-menu-back" type="button">Back</button></div>
           </div>
           <div id="cribbage-network-panel" class="overlay-panel cribbage-network-panel" hidden>
-            <h1>Cribbage Multiplayer</h1><p>Create a game and share its code, or join an open seat from another device. No account is required.</p>
-            <div class="menu-actions"><button id="cribbage-create-game" type="button">Create game with these settings</button><button id="cribbage-network-start" type="button" hidden>Start game</button><button id="cribbage-cancel-game" type="button" hidden>Cancel my game</button><button id="cribbage-refresh-games" type="button">Refresh games</button><button id="cribbage-network-back" type="button">Back to setup</button></div>
-            <div id="cribbage-network-list" class="cribbage-network-list" aria-live="polite"></div><p id="cribbage-network-status" class="cribbage-network-status" aria-live="polite"></p>
+            <h1>Cribbage Multiplayer Lobby</h1><p>Create a game and wait for players, or join an open game. You can have one multiplayer game at a time.</p>
+            <div class="menu-actions"><button id="cribbage-create-game" type="button">Create a game</button><button id="cribbage-play-single-waiting" type="button" hidden>Play single-player while waiting</button><button id="cribbage-network-start" type="button" hidden>Join ready game</button><button id="cribbage-cancel-game" type="button" hidden>Cancel my game</button><button id="cribbage-refresh-games" type="button">Refresh games</button><button id="cribbage-network-back" type="button">Back</button></div>
+            <section class="cribbage-lobby-section"><h2>Games I created</h2><div id="cribbage-owned-games" class="cribbage-network-list" aria-live="polite"></div></section>
+            <section class="cribbage-lobby-section"><h2>Available games</h2><div id="cribbage-available-games" class="cribbage-network-list" aria-live="polite"></div></section>
+            <p id="cribbage-network-status" class="cribbage-network-status" aria-live="polite"></p>
           </div>
           <div id="cribbage-options-panel" class="overlay-panel options-panel cribbage-options-panel" hidden>
             <h1>Digital Cribbage</h1>
