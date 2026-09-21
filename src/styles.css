@@ -1541,6 +1541,17 @@ body.fullscreen-fallback-active {
     overflow-y: auto;
   }
 
+  .game-frame:has(.overlay.is-cribbage:not([hidden])) {
+    width: 100vw;
+    height: 100dvh;
+    max-height: none;
+    aspect-ratio: auto;
+  }
+
+  .game-frame:has(.overlay.is-cribbage:not([hidden])) .overlay {
+    overflow-y: auto;
+  }
+
   .game-frame:fullscreen,
   .game-frame:-webkit-full-screen,
   .game-frame.fullscreen-fallback {
@@ -1699,6 +1710,19 @@ body.fullscreen-fallback-active {
   .cribbage-setup,
   .cribbage-player-names { grid-template-columns: 1fr; }
 
+  .overlay.is-cribbage .overlay-panel > h1 {
+    max-width: calc(100% - 140px);
+    margin: 42px auto 0;
+    font-size: clamp(1.65rem, 7vw, 2.5rem);
+  }
+
+  .overlay.is-cribbage .cribbage-board-header h1 {
+    max-width: 100%;
+    margin: 0;
+  }
+
+  .overlay.is-cribbage .cribbage-board-header { padding-top: 42px; }
+
   .cribbage-player-names > div { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   .cribbage-player-names > div > label:first-child { grid-column: 1 / -1; }
 
@@ -1760,6 +1784,38 @@ body.fullscreen-fallback-active {
     width: min(100%, 340px);
     padding: 16px;
   }
+}
+
+@media (max-height: 700px) and (orientation: landscape) {
+  .game-frame:has(.overlay.is-cribbage:not([hidden])) {
+    width: 100vw;
+    height: 100dvh;
+    max-height: none;
+    aspect-ratio: auto;
+  }
+
+  .game-frame:has(.overlay.is-cribbage:not([hidden])) .overlay {
+    align-content: start;
+    overflow-y: auto;
+    padding: 8px 12px max(8px, env(safe-area-inset-bottom));
+  }
+
+  .game-frame:has(.overlay.is-cribbage:not([hidden])) .overlay-panel {
+    width: min(100%, 920px);
+  }
+
+  .overlay.is-cribbage .overlay-panel > h1 {
+    max-width: calc(100% - 180px);
+    margin: 42px auto 0;
+    font-size: clamp(2rem, 6vw, 4rem);
+  }
+
+  .overlay.is-cribbage .cribbage-board-header h1 {
+    max-width: 100%;
+    margin: 0;
+  }
+
+  .overlay.is-cribbage .cribbage-board-header { padding-top: 42px; }
 }
 
 @media (hover: none) and (pointer: coarse) {

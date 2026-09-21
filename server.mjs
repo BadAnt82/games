@@ -1725,6 +1725,7 @@ function cribbagePublicRoom(room, userId = "") {
     playerCount: room.config.playerCount,
     format: room.config.format,
     ownerSeat: room.hostSeat,
+    ownerName: room.seats[room.hostSeat]?.name || "Player 1",
     mine: Boolean(userId && room.ownerUserId === userId),
     started: room.started,
     seats: room.seats.map((seat, index) => ({ seat: index, name: seat.name, control: seat.control, team: seat.team, connected: Boolean(seat.socket), available: seat.control === "human" && !seat.sessionId })),
@@ -1919,6 +1920,8 @@ cribbageServer.on("connection", (socket) => {
     const seat = room.seats[seatIndex]; room.updatedAt = Date.now();
     if (message.type === "cribbage-state" && seatIndex === room.hostSeat && message.snapshot) { room.snapshot = message.snapshot; room.started = true; cribbageBroadcastRoom(room); return; }
     if (message.type === "cribbage-action" && seatIndex !== room.hostSeat) { cribbageSend(room.seats[room.hostSeat].socket, { type: "cribbage-remote-action", seat: seatIndex, action: message.action || {} }); return; }
+    if (message.type === "cribbage-rematch-ai-prompt" && seatIndex === room.hostSeat) { for (const [index, candidate] of room.seats.entries()) if (index === Number(message.targetSeat) && candidate.socket) cribbageSend(candidate.socket, { type: "cribbage-rematch-ai-prompt", declinedSeats: message.declinedSeats || [] }); return; }
+    if (message.type === "cribbage-rematch-ended" && seatIndex === room.hostSeat) { for (const candidate of room.seats) if (candidate.socket && candidate.socket !== socket) cribbageSend(candidate.socket, { type: "cribbage-rematch-ended", message: message.message || "Rematch ended." }); return; }
     if (message.type === "cribbage-cancel") {
       const target = cribbageRooms.get(String(message.gameId || room?.gameId || ""));
       if (!target || target.seats[target.hostSeat]?.socket !== socket) return;
