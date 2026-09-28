@@ -159,10 +159,46 @@
               <button id="select-cribbage" class="game-tile cribbage-tile" type="button" aria-label="Open Digital Cribbage">
                 <span class="tile-cribbage" aria-hidden="true"><i>5</i><i>J</i><i>Q</i></span>
                 <span class="tile-details"><strong>Digital Cribbage</strong><dl class="tile-scores" aria-label="Digital Cribbage features"><div><dt>Players</dt><dd>2–4</dd></div><div><dt>Modes</dt><dd>Classic + more</dd></div><div><dt>High scores</dt><dd>None</dd></div></dl></span>
+              </button>              <button id="select-boombox" class="game-tile boombox-tile" type="button" aria-label="Open Boom Box">
+                <span class="tile-boombox" aria-hidden="true"><i></i><i></i><i></i><b></b></span>
+                <span class="tile-details"><strong>Boom Box</strong><dl class="tile-scores" aria-label="Boom Box features"><div><dt>Players</dt><dd>2-6</dd></div><div><dt>Modes</dt><dd>Solo + online</dd></div><div><dt>Style</dt><dd>Artillery</dd></div></dl></span>
               </button>
             </div>
           </div>
-          <div id="game-menu-panel" class="overlay-panel game-menu-panel" hidden>
+          <div id="boombox-mode-panel" class="overlay-panel boombox-panel boombox-mode-panel" hidden>
+            <div class="boombox-kicker">PASS 2 PROTOTYPE</div>
+            <h1>Boom Box</h1>
+            <p>Set your shot, read the wind, and turn the landscape into the strategy.</p>
+            <div class="boombox-mode-cards">
+              <button id="boombox-mode-single" class="boombox-mode-card" type="button"><span class="boombox-mode-icon" aria-hidden="true">&#9676;</span><span><strong>Single player</strong><small>Configure a match against computer tanks.</small></span><span class="boombox-arrow" aria-hidden="true">&#8594;</span></button>
+              <button id="boombox-mode-multi" class="boombox-mode-card" type="button"><span class="boombox-mode-icon" aria-hidden="true">&#9672;</span><span><strong>Multiplayer</strong><small>Create a room or join another commander.</small></span><span class="boombox-arrow" aria-hidden="true">&#8594;</span></button>
+            </div>
+            <div class="menu-actions"><button id="boombox-mode-back" class="secondary" type="button">Back to games</button></div>
+          </div>
+          <div id="boombox-single-panel" class="overlay-panel boombox-panel boombox-single-panel" hidden>
+            <div class="boombox-kicker">SINGLE PLAYER</div>
+            <h1>Solo setup</h1>
+            <p>Single-player match setup is next. Your launch settings will live here: opponents, terrain, wind, and starting credits.</p>
+            <div class="boombox-coming-soon"><strong>Artillery systems are being calibrated.</strong><span>Pass 3 will make this screen playable.</span></div>
+            <div class="menu-actions"><button id="boombox-single-back" class="secondary" type="button">Back</button></div>
+          </div>
+          <div id="boombox-lobby-panel" class="overlay-panel boombox-panel boombox-lobby-panel" hidden>
+            <header class="boombox-panel-header"><div><div class="boombox-kicker">MULTIPLAYER COMMAND</div><h1>War room</h1><p id="boombox-lobby-status">Choose a room or create your own.</p></div><span class="boombox-prototype-badge">Local prototype</span></header>
+            <div class="boombox-lobby-actions"><button id="boombox-create" type="button">Create game</button><button id="boombox-refresh" class="secondary" type="button">Refresh rooms</button><button id="boombox-lobby-back" class="secondary" type="button">Back</button></div>
+            <section class="boombox-lobby-section" aria-labelledby="boombox-created-heading"><div class="boombox-section-heading"><h2 id="boombox-created-heading">Your rooms</h2><span id="boombox-created-count">0 rooms</span></div><div id="boombox-created-list" class="boombox-room-list" aria-live="polite"></div></section>
+            <section class="boombox-lobby-section" aria-labelledby="boombox-available-heading"><div class="boombox-section-heading"><h2 id="boombox-available-heading">Available rooms</h2><span id="boombox-available-count">0 rooms</span></div><div id="boombox-available-list" class="boombox-room-list" aria-live="polite"></div></section>
+          </div>
+          <div id="boombox-create-panel" class="overlay-panel boombox-panel boombox-create-panel" hidden>
+            <div class="boombox-kicker">CREATE MULTIPLAYER ROOM</div>
+            <h1>Set the battlefield</h1>
+            <div class="boombox-stepper" aria-label="Create game steps"><span data-boombox-step-indicator="1">1 Basics</span><span data-boombox-step-indicator="2">2 Players</span><span data-boombox-step-indicator="3">3 Review</span></div>
+            <form id="boombox-create-form" novalidate>
+              <section data-boombox-step="1" class="boombox-create-step"><h2>Basics</h2><p>Name the room and choose the battlefield preview.</p><label>Room name<input id="boombox-room-name" type="text" maxlength="28" value="Friday Night Firefight" autocomplete="off" /></label><label>Terrain profile<select id="boombox-terrain"><option value="sunset-range">Sunset Range</option><option value="ice-shelf">Ice Shelf</option><option value="lunar-crater">Lunar Crater</option></select></label><label>Seats<select id="boombox-seats"><option value="2">2 commanders</option><option value="3">3 commanders</option><option value="4" selected>4 commanders</option><option value="5">5 commanders</option><option value="6">6 commanders</option></select></label></section>
+              <section data-boombox-step="2" class="boombox-create-step" hidden><h2>Players</h2><p>Choose how many people can join and whether the room can be filled by AI.</p><label>Your commander name<input id="boombox-commander" type="text" maxlength="18" value="Commander" autocomplete="nickname" /></label><label class="boombox-check-row"><input id="boombox-ai-fill" type="checkbox" checked /> Allow AI to fill empty seats</label><label>Turn pace<select id="boombox-turn-pace"><option value="relaxed">Relaxed - 90 seconds</option><option value="standard" selected>Standard - 60 seconds</option><option value="blitz">Blitz - 30 seconds</option></select></label></section>
+              <section data-boombox-step="3" class="boombox-create-step" hidden><h2>Review room</h2><p>Confirm the room before it appears in the lobby.</p><dl id="boombox-create-summary" class="boombox-summary"></dl><div class="boombox-review-note">The artillery match itself will be enabled in Pass 3. This Pass 2 room proves the lobby flow and room states.</div></section>
+              <div class="menu-actions"><button id="boombox-create-back" class="secondary" type="button">Back</button><button id="boombox-create-next" type="button">Next</button><button id="boombox-create-submit" type="submit" hidden>Create room</button></div>
+            </form>
+          </div>          <div id="game-menu-panel" class="overlay-panel game-menu-panel" hidden>
             <h1>Jumpy Plane</h1>
             <dl class="high-scores" aria-label="Jumpy Plane high scores">
               <div>

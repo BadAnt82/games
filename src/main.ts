@@ -1,5 +1,6 @@
 import "./styles.css";
 import { initBreakout } from "./breakout";
+import { initBoomBox } from "./boom-box";
 import { initCribbage } from "./cribbage";
 
 type GameState =
@@ -426,6 +427,7 @@ const selectSnakeButton = requireElement<HTMLButtonElement>("#select-snake");
 const selectBridgeButton = requireElement<HTMLButtonElement>("#select-bridge");
 const selectPixelButton = requireElement<HTMLButtonElement>("#select-pixel");
 const selectCribbageButton = requireElement<HTMLButtonElement>("#select-cribbage");
+const selectBoomBoxButton = requireElement<HTMLButtonElement>("#select-boombox");
 const homeButton = requireElement<HTMLButtonElement>("#home");
 const fullscreenButton = requireElement<HTMLButtonElement>("#fullscreen");
 const rollButton = requireElement<HTMLElement>("#roll");
@@ -503,6 +505,7 @@ const recordNameInput = requireElement<HTMLInputElement>("#record-name");
 const bridgePlayerNameEls = Array.from(document.querySelectorAll<HTMLElement>("[data-bridge-player-name]"));
 const ctx = requireCanvasContext(canvas);
 const breakoutGame = initBreakout();
+const boomBoxGame = initBoomBox();
 const cribbageGame = initCribbage();
 
 const artUrls = [
@@ -7215,6 +7218,7 @@ restartButton.addEventListener("click", () => {
 homeButton.addEventListener("click", () => {
   leaveSnakeRoom();
   leavePixelWarsNetwork();
+  boomBoxGame.close();
   cribbageGame.close();
   reset("platform");
 });
@@ -7236,6 +7240,11 @@ selectCribbageButton.addEventListener("click", () => {
   leaveSnakeRoom();
   leavePixelWarsNetwork();
   cribbageGame.open();
+});
+selectBoomBoxButton.addEventListener("click", () => {
+  leaveSnakeRoom();
+  leavePixelWarsNetwork();
+  boomBoxGame.open();
 });
 snakeOptionsButton.addEventListener("click", showSnakeOptions);
 snakeMenuBackButton.addEventListener("click", () => reset("platform"));
@@ -7267,6 +7276,10 @@ window.addEventListener("breakout-report-issue", () => {
 window.addEventListener("cribbage-report-issue", () => {
   cribbageGame.prepareReport();
   showReportIssue("digital-cribbage", "cribbage-options");
+});
+window.addEventListener("boombox-back-games", () => {
+  boomBoxGame.close();
+  reset("platform");
 });
 pixelRefreshLobbiesButton.addEventListener("click", () => void loadPixelLobbies());
 pixelCreateLobbyButton.addEventListener("click", () => void createPixelLobby());
