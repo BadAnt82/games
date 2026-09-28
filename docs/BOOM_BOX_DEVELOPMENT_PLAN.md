@@ -5,7 +5,7 @@
 **Plan size:** 9 passes.
 
 - A first **single-player playable build** is complete after Pass 3.
-- A **playable multiplayer beta** is complete after Pass 5.
+- A **playable multiplayer beta** is complete after Pass 6.
 - The **polished release target** is complete after Pass 9.
 
 This is an ordered plan rather than a promise of fixed calendar dates. Each pass ends with a reviewable build and an explicit exit gate. A later pass can add content, but it should not quietly change the rules established in an earlier pass.
@@ -14,6 +14,7 @@ This is an ordered plan rather than a promise of fixed calendar dates. Each pass
 
 ### Included
 
+- Produce [BOOM_BOX_PASS1_FOUNDATION.md](./BOOM_BOX_PASS1_FOUNDATION.md) as the written product and technical contract.
 - Confirm Boom Box’s baseline rules against [BOOM_BOX_REFERENCE.md](./BOOM_BOX_REFERENCE.md).
 - Decide the launch player limit, firing modes, movement rules, economy model, win conditions, and first weapon set.
 - Define the authoritative match state: players, seats, settings, seed, terrain, inventory, money, turn, projectile events, damage, and result.
