@@ -1706,9 +1706,42 @@ const server = createServer(async (request, response) => {
 const snakeServer = new WebSocketServer({ noServer: true });
 const pixelServer = new WebSocketServer({ noServer: true });
 const cribbageServer = new WebSocketServer({ noServer: true });
+const boomboxServer = new WebSocketServer({ noServer: true });
 const cribbageRooms = new Map();
 const cribbageUserMemberships = new Map();
 let nextCribbageRoomId = 1;
+const boomboxRooms = new Map();
+const boomboxUserMemberships = new Map();
+let nextBoomBoxRoomId = 1027;
+
+function boomBoxRoomId() { return `BB-${String(nextBoomBoxRoomId++).padStart(4, "0")}`; }
+function boomBoxTerrain(seed, profile = "sunset-range") {
+  let value = seed >>> 0; const random = () => { value = (value * 1664525 + 1013904223) >>> 0; return value / 4294967296; };
+  const baseline = profile === "ice-shelf" ? 342 : profile === "lunar-crater" ? 378 : 365; const roughness = profile === "ice-shelf" ? 16 : profile === "lunar-crater" ? 34 : 24;
+  const terrain = Array.from({ length: 960 }, (_, x) => Math.max(245, Math.min(450, baseline + Math.sin(x / 82) * 28 + Math.sin(x / 31 + 1.4) * 12 + (random() - .5) * roughness)));
+  for (let pass = 0; pass < 3; pass += 1) for (let x = 1; x < terrain.length - 1; x += 1) terrain[x] = (terrain[x - 1] + terrain[x] + terrain[x + 1]) / 3;
+  return terrain;
+}
+function boomBoxSend(socket, payload) { if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify(payload)); }
+function boomBoxPublicRoom(room, userId = "") { return { gameId: room.gameId, name: room.name, creator: room.creator, seats: room.seats.length, connected: room.seats.filter((seat) => seat.connected).length, terrain: room.terrain, pace: room.pace, aiFill: room.aiFill, started: room.started, mine: userId === room.ownerUserId }; }
+function boomBoxLobbyPayload(userId = "") { const games = [...boomboxRooms.values()].map((room) => boomBoxPublicRoom(room, userId)); return { type: "boombox-lobby-list", games, created: games.filter((room) => room.mine), available: games.filter((room) => !room.mine && !room.started && room.connected < room.seats) }; }
+function broadcastBoomBoxLobby() { for (const room of boomboxRooms.values()) for (const seat of room.seats) if (seat.socket) boomBoxSend(seat.socket, boomBoxLobbyPayload(seat.userId)); }
+function boomBoxSnapshot(room) { return { gameId: room.gameId, phase: room.phase, seed: room.seed, terrainName: room.terrain, terrain: room.state.terrain, wind: room.state.wind, turn: room.state.turn, turnSeat: room.state.turnSeat, players: room.state.players.map(({ socket, ...player }) => player), log: room.state.log, winner: room.state.winner || null }; }
+function broadcastBoomBoxRoom(room) { const snapshot = boomBoxSnapshot(room); for (const [index, seat] of room.seats.entries()) if (seat.socket) boomBoxSend(seat.socket, { type: "boombox-state", snapshot, seat: index }); broadcastBoomBoxLobby(); }
+function createBoomBoxState(room) { const positions = room.seats.length === 2 ? [146, 814] : room.seats.map((_, index) => 146 + Math.round(index * (814 - 146) / Math.max(1, room.seats.length - 1))); const colors = ["#54e7ff", "#ff8b63", "#d98cff", "#b8f266", "#ffd166", "#f78fb3"]; return { terrain: boomBoxTerrain(room.seed, room.terrain), wind: (room.seed % 17 - 8) / 10, turn: 1, turnSeat: 0, winner: null, log: [], players: room.seats.map((seat, index) => ({ name: seat.name, x: positions[index], y: 0, health: 100, alive: true, color: colors[index % colors.length], shots: 0, hits: 0, damage: 0 })) }; }
+function startBoomBoxRoom(room) { room.started = true; room.phase = "aiming"; room.state = createBoomBoxState(room); room.state.players.forEach((player) => { player.y = room.state.terrain[player.x] - 17; }); room.updatedAt = Date.now(); broadcastBoomBoxRoom(room); }
+function resolveBoomBoxAction(room, seatIndex, action) {
+  if (!room.started || room.phase === "finished" || room.state.turnSeat !== seatIndex) return { error: "It is not your turn." };
+  const player = room.state.players[seatIndex]; const targetIndex = Math.max(0, Math.min(room.state.players.length - 1, Number(action.targetIndex) || 0)); const target = room.state.players[targetIndex]; if (!target || targetIndex === seatIndex || !target.alive) return { error: "Choose a living opponent." };
+  const angle = Math.max(8, Math.min(82, Number(action.angle) || 42)); const power = Math.max(25, Math.min(95, Number(action.power) || 58)); const weapon = String(action.weapon || "cannon"); const costs = { cannon: 0, "heavy-shell": 30, "precision-round": 20, "split-shell": 25, "terrain-tool": 15, "area-charge": 40 }; const cost = costs[weapon] ?? 0;
+  const distance = Math.abs(target.x - player.x); const accuracy = Math.abs(angle - 42) * 1.7 + Math.abs(power - Math.min(90, 42 + distance / 18)) * .7; const hit = accuracy < 58; const damage = weapon === "heavy-shell" ? 78 : weapon === "precision-round" ? 92 : weapon === "area-charge" ? 68 : weapon === "split-shell" ? 54 : weapon === "terrain-tool" ? 0 : 70;
+  const entry = { sequence: room.state.log.length + 1, kind: "fire", seat: seatIndex, target: targetIndex, weapon, angle, power, hit, damage: hit ? damage : 0 }; room.state.log.push(entry); player.shots += 1;
+  if (hit && weapon !== "terrain-tool") { target.health = Math.max(0, target.health - damage); player.hits += 1; player.damage += damage; if (target.health === 0) target.alive = false; }
+  if (!room.state.players.some((candidate, index) => index !== seatIndex && candidate.alive)) { room.phase = "finished"; room.state.winner = seatIndex; }
+  else { let next = (seatIndex + 1) % room.state.players.length; while (!room.state.players[next].alive) next = (next + 1) % room.state.players.length; room.state.turnSeat = next; room.state.turn += 1; room.state.wind = Math.max(-1.2, Math.min(1.2, room.state.wind + ((room.seed + room.state.turn * 13) % 7 - 3) / 10)); }
+  room.updatedAt = Date.now(); return null;
+}
+function pruneBoomBoxRooms() { const cutoff = Date.now() - 45 * 60 * 1000; for (const [id, room] of boomboxRooms) if (room.updatedAt < cutoff) { boomboxRooms.delete(id); for (const seat of room.seats) if (seat.userId && boomboxUserMemberships.get(seat.userId) === id) boomboxUserMemberships.delete(seat.userId); } }
 
 function cribbageRoomId() {
   return `crib-${String(nextCribbageRoomId++).padStart(4, "0")}`;
@@ -1809,6 +1842,12 @@ server.on("upgrade", (request, socket, head) => {
   if (url.pathname === "/cribbage") {
     cribbageServer.handleUpgrade(request, socket, head, (ws) => {
       cribbageServer.emit("connection", ws, request);
+    });
+    return;
+  }
+  if (url.pathname === "/boombox") {
+    boomboxServer.handleUpgrade(request, socket, head, (ws) => {
+      boomboxServer.emit("connection", ws, request);
     });
     return;
   }
@@ -1943,6 +1982,37 @@ cribbageServer.on("connection", (socket) => {
   socket.on("close", () => {
     for (const member of memberships) { for (const seat of member.seats) if (seat.socket === socket) seat.socket = null; member.updatedAt = Date.now(); cribbageBroadcastRoom(member); }
   });
+});
+
+boomboxServer.on("connection", (socket) => {
+  let room = null; let seatIndex = -1; let userId = ""; let sessionId = "";
+  boomBoxSend(socket, boomBoxLobbyPayload());
+  socket.on("message", (data) => {
+    let message; try { message = JSON.parse(data.toString()); } catch { return; }
+    pruneBoomBoxRooms();
+    userId = typeof message.userId === "string" ? message.userId.slice(0, 120) : userId;
+    if (message.type === "boombox-list") { boomBoxSend(socket, boomBoxLobbyPayload(userId)); return; }
+    if (message.type === "boombox-create") {
+      if (!userId) { boomBoxSend(socket, { type: "boombox-error", message: "A commander identity is required." }); return; }
+      if (boomboxUserMemberships.has(userId)) { boomBoxSend(socket, { type: "boombox-error", message: "You already have an active Boom Box room." }); return; }
+      const config = message.config || {}; const count = Math.max(2, Math.min(6, Number(config.seats) || 2)); const gameId = boomBoxRoomId();
+      room = { gameId, ownerUserId: userId, name: String(config.name || "Unnamed room").slice(0, 28), creator: String(config.creator || "Commander").slice(0, 18), seats: Array.from({ length: count }, (_, index) => ({ name: index === 0 ? String(config.creator || "Commander").slice(0, 18) : `Commander ${index + 1}`, userId: index === 0 ? userId : "", sessionId: index === 0 ? `${gameId}-${Math.random().toString(36).slice(2)}` : "", socket: index === 0 ? socket : null, connected: index === 0, })), terrain: String(config.terrain || "sunset-range"), pace: String(config.pace || "standard"), aiFill: Boolean(config.aiFill), started: false, phase: "lobby", state: null, seed: Math.max(1, Math.min(999999, Number(config.seed) || 314159)), updatedAt: Date.now() };
+      seatIndex = 0; sessionId = room.seats[0].sessionId; boomboxRooms.set(gameId, room); boomboxUserMemberships.set(userId, gameId); boomBoxSend(socket, { type: "boombox-created", gameId, sessionId, seat: 0, host: true }); boomBoxSend(socket, boomBoxLobbyPayload(userId)); return;
+    }
+    if (message.type === "boombox-join") {
+      const target = boomboxRooms.get(String(message.gameId || "")); if (!target) { boomBoxSend(socket, { type: "boombox-error", message: "Room not found." }); return; }
+      if (target.started) { boomBoxSend(socket, { type: "boombox-error", message: "That match has already started." }); return; }
+      if (!userId) { boomBoxSend(socket, { type: "boombox-error", message: "A commander identity is required." }); return; }
+      if (boomboxUserMemberships.has(userId) && boomboxUserMemberships.get(userId) !== target.gameId) { boomBoxSend(socket, { type: "boombox-error", message: "You already have an active Boom Box room." }); return; }
+      const index = target.seats.findIndex((seat) => !seat.connected && !seat.userId); if (index < 0) { boomBoxSend(socket, { type: "boombox-error", message: "No open commander seat is available." }); return; }
+      room = target; seatIndex = index; sessionId = `${room.gameId}-${Math.random().toString(36).slice(2)}`; room.seats[index] = { ...room.seats[index], name: String(message.name || room.seats[index].name).slice(0, 18), userId, sessionId, socket, connected: true }; boomboxUserMemberships.set(userId, room.gameId); room.updatedAt = Date.now(); boomBoxSend(socket, { type: "boombox-joined", gameId: room.gameId, sessionId, seat: index, host: false }); if (room.seats.every((seat) => seat.connected)) startBoomBoxRoom(room); else { boomBoxSend(socket, boomBoxLobbyPayload(userId)); broadcastBoomBoxLobby(); } return;
+    }
+    if (message.type === "boombox-cancel") { const target = boomboxRooms.get(String(message.gameId || room?.gameId || "")); if (!target || target.ownerUserId !== userId) return; for (const seat of target.seats) if (seat.socket && seat.socket !== socket) seat.socket.close(1000, "Room cancelled"); boomboxRooms.delete(target.gameId); for (const seat of target.seats) if (seat.userId) boomboxUserMemberships.delete(seat.userId); boomBoxSend(socket, { type: "boombox-cancelled", gameId: target.gameId }); broadcastBoomBoxLobby(); room = null; seatIndex = -1; return; }
+    if (!room || seatIndex < 0) return;
+    if (message.type === "boombox-action") { const error = resolveBoomBoxAction(room, seatIndex, message.action || {}); if (error) boomBoxSend(socket, { type: "boombox-error", message: error.error }); else broadcastBoomBoxRoom(room); return; }
+    if (message.type === "boombox-leave") { if (room.seats[seatIndex]) { room.seats[seatIndex].connected = false; room.seats[seatIndex].socket = null; } room.updatedAt = Date.now(); broadcastBoomBoxLobby(); return; }
+  });
+  socket.on("close", () => { if (!room || seatIndex < 0) return; const seat = room.seats[seatIndex]; if (seat.socket === socket) { seat.socket = null; seat.connected = false; room.updatedAt = Date.now(); broadcastBoomBoxLobby(); } });
 });
 
 pixelServer.on("connection", (socket) => {
