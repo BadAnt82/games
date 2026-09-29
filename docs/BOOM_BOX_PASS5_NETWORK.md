@@ -24,6 +24,6 @@ Pass 5 moves the Boom Box room flow from a browser-only preview to a server-auth
 - `npm run test:cribbage-network`
 - Live deployment health and HTML endpoint check.
 
-## Boundary for Pass 6
+## Follow-up
 
-Pass 5 synchronizes turn results and match state. Pass 6 can add streamed projectile flight events, reconnect tokens with state resume, AI fill for missing seats, and persistent room history.
+Pass 6 now covers flight previews, reconnect resume, AI fill, and synchronized utilities. Persistent completed-match history and spectator/invite flows remain future work.
