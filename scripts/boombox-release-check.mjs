@@ -141,6 +141,7 @@ async function verifyPass19(suffix) {
   const recoveredState = await recovered;
   if (!recoveredState.snapshot.log.some((entry) => entry.kind === "disconnect")) throw new Error("Disconnect takeover was not recorded");
   close(disconnectHost);
+
 }
 
 function close(socket) { if (socket && socket.readyState === WebSocket.OPEN) socket.close(); }

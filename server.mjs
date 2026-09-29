@@ -1983,7 +1983,7 @@ function resolveBoomBoxActionNow(room, seatIndex, action, actionId = "", options
   const advance = options.advance !== false;
   if (!room.started || room.phase === "finished" || (room.resolving && !batched) || (advance && room.rules.firingMode === "sequential" && room.state.turnSeat !== seatIndex)) return { error: "It is not your turn." };
   if (!actionId) return { error: "An action ID is required." };
-  const player = room.state.players[seatIndex]; if (!player?.alive) return { error: "Your tank is out of the fight." };
+  const player = room.state.players[seatIndex]; if (!player || (!player.alive && !batched)) return { error: "Your tank is out of the fight." };
   if (action.kind === "move") {
     if (!room.rules.movement) return { error: "Movement is disabled for this room." };
     if (room.rules.firingMode !== "sequential") return { error: "Movement is available only in sequential fire." };
@@ -2019,7 +2019,6 @@ function resolveBoomBoxAction(room, seatIndex, action, actionId = "") {
   room.pendingActions.clear(); room.phase = "resolving";
   const flights = [];
   for (const [index, pending] of prepared) {
-    if (!room.state.players[index]?.alive) continue;
     const result = resolveBoomBoxActionNow(room, index, pending.action, pending.actionId, { advance: false, batch: true });
     if (result.error) return result;
     if (result.flight) flights.push(result.flight);
