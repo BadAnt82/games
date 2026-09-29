@@ -265,4 +265,4 @@ The content-complete release is not done until all of these are true:
 
 ## What should happen next
 
-The next implementation pass should be **Pass 10, not another lobby pass**. It should reconcile the server state model and rules contract first. Content, AI upgrades, elimination order, and fast-forward depend on that state model; adding them directly to the current compact server functions would create another layer of drift.
+Passes 10 through 16 have been completed and checked against the earlier implementation. The next implementation pass is **Pass 17: Final conformance and release sign-off**. It must close the exposed firing-mode semantics gap, rerun the final matrix, and keep human testing blocked until its exit gate passes.
