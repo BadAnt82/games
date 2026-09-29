@@ -230,6 +230,22 @@ The content-complete game is understandable without developer terminology, reada
 - Performance tests for large terrain mutation, 10 seats, and multi-projectile effects
 - Final production browser tests, rollback check, and live release report
 
+### Pass 17 — Final conformance and release sign-off
+
+**Purpose:** close the last rules-completeness gaps and establish the final user-test gate.
+
+#### Build
+
+- Implement and test the prepare/release behavior for synchronous firing, and deterministic collision ordering for simultaneous firing; if either mode is intentionally removed, remove it from the wizard and rules contract instead.
+- Run the complete weapon, utility, terrain, elimination, replay, speed-control, reconnect, restart, and malformed-input matrix against the final ruleset.
+- Run production browser automation for lobby, setup, solo match, multiplayer match, spectator, results, and history flows at the supported viewport sizes.
+- Verify the deployed commit, health response, live WebSocket protocol, rollback target, and recovery-store configuration.
+- Record the final release report. Human playtesting remains blocked until this pass exits successfully.
+
+#### Exit gate
+
+Every exposed rule has matching authoritative behavior and an automated acceptance check. The live deployment is verified, rollback is documented, and the project is ready for the first user test session.
+
 ## Acceptance matrix for the finished game
 
 The content-complete release is not done until all of these are true:

@@ -2,7 +2,7 @@
 
 **Purpose:** turn the Scorched Earth baseline into a polished browser game for `games.badantproductions.com`.
 
-**Plan size:** 9 passes.
+**Plan size:** the original 9-pass product plan is complete as a historical baseline. The subsequent content-audit completion track continues through Pass 17.
 
 - A first **single-player playable build** is complete after Pass 3.
 - A **playable multiplayer beta** is complete after Pass 6.
