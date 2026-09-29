@@ -1,7 +1,7 @@
 # Boom Box Pass 10 — Rules and Authoritative State
 
 **Status:** Complete  
-**Commit:** `pending`  
+**Commit:** `d97e2de`
 **Scope:** authoritative match contract and state hardening
 
 ## What changed
