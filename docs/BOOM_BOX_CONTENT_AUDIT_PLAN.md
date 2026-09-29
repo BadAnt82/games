@@ -265,4 +265,4 @@ The content-complete release is not done until all of these are true:
 
 ## What should happen next
 
-Passes 10 through 20 have been completed and checked against the earlier implementation. Pass 20 closes projectile tunneling, deterministic environmental events, AI timing signaling, and atomic active-room snapshots. The next implementation pass is **Pass 21: production browser/live verification and targeted presentation cleanup**. Human playtesting remains deferred until that pass exits successfully.
+Passes 10 through 21 have been completed and checked against the earlier implementation. Pass 21 completed the production browser/device sweep with no release-blocking presentation regression. See [BOOM_BOX_PASS21_LIVE_ACCEPTANCE.md](./BOOM_BOX_PASS21_LIVE_ACCEPTANCE.md). The next implementation pass is **Pass 22: final read-only conformance and gap audit**. Human playtesting remains deferred until that audit exits successfully.
