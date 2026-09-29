@@ -22,7 +22,7 @@ async function stopServer() {
 
 function startServer() {
   server = spawn(process.execPath, ["server.mjs"], {
-    env: { ...process.env, PORT: String(port), BOOM_BOX_ROOM_STORE_PATH: roomStore, BOOM_BOX_HISTORY_STORE_PATH: historyStore },
+    env: { ...process.env, PORT: String(port), BOOM_BOX_ROOM_STORE_PATH: roomStore, BOOM_BOX_HISTORY_STORE_PATH: historyStore, BOOMBOX_TURN_TIMEOUT_MS: "1200" },
     stdio: ["ignore", "pipe", "pipe"],
   });
   server.stderr.on("data", (chunk) => process.stderr.write(chunk));
@@ -103,6 +103,46 @@ async function verifyPreparedMode(mode, suffix) {
   close(host); close(guest);
 }
 
+async function verifyPass19(suffix) {
+  const mover = await open();
+  const moverId = `movement-${suffix}`;
+  const moverRoom = await createRoom(mover, moverId, { name: `Movement ${suffix}`, creator: "Mover", seats: 2, firingMode: "sequential", movement: true, aiFill: true, seed: 4401 });
+  const moverStart = await startAi(mover, moverRoom.gameId, moverId);
+  if (!moverStart.snapshot.rules?.movement) throw new Error("Movement rule was not enabled");
+  const beforeX = moverStart.snapshot.players[0].x;
+  const movedPromise = next(mover, "boombox-state", (message) => message.snapshot?.log?.some((entry) => entry.kind === "move"));
+  mover.send(JSON.stringify({ type: "boombox-action", userId: moverId, actionId: `move-${suffix}`, action: { kind: "move", direction: 1, distance: 20 } }));
+  const moved = await movedPromise;
+  if (moved.snapshot.players[0].x === beforeX || moved.snapshot.players[0].fuel >= 100 || !moved.snapshot.players[0].movedThisTurn) throw new Error("Movement did not consume fuel and update authoritative position");
+  close(mover);
+
+  const deadlineHost = await open();
+  const deadlineId = `deadline-${suffix}`;
+  const deadlineRoom = await createRoom(deadlineHost, deadlineId, { name: `Deadline ${suffix}`, creator: "Deadline Host", seats: 2, firingMode: "sequential", aiFill: false, pace: "blitz", seed: 4402 });
+  const deadlineGuest = await open();
+  const joined = next(deadlineGuest, "boombox-joined");
+  const started = next(deadlineHost, "boombox-state", (message) => message.snapshot?.phase === "turn-prep");
+  deadlineGuest.send(JSON.stringify({ type: "boombox-join", gameId: deadlineRoom.gameId, userId: `deadline-guest-${suffix}`, name: "Deadline Guest" }));
+  await joined; await started;
+  const timeoutState = await next(deadlineHost, "boombox-state", (message) => message.snapshot?.log?.some((entry) => entry.kind === "timeout"), 5000);
+  if (!timeoutState.snapshot.log.some((entry) => entry.kind === "fire")) throw new Error("Turn deadline did not resolve a legal fallback shot");
+  close(deadlineHost); close(deadlineGuest);
+
+  const disconnectHost = await open();
+  const disconnectId = `disconnect-${suffix}`;
+  const disconnectRoom = await createRoom(disconnectHost, disconnectId, { name: `Disconnect ${suffix}`, creator: "Disconnect Host", seats: 2, firingMode: "synchronous", aiFill: false, seed: 4403 });
+  const disconnectGuest = await open();
+  const disconnectJoined = next(disconnectGuest, "boombox-joined");
+  const disconnectStarted = next(disconnectHost, "boombox-state", (message) => message.snapshot?.phase === "turn-prep");
+  disconnectGuest.send(JSON.stringify({ type: "boombox-join", gameId: disconnectRoom.gameId, userId: `disconnect-guest-${suffix}`, name: "Disconnect Guest" }));
+  await disconnectJoined; await disconnectStarted; disconnectGuest.close(); await new Promise((resolve) => setTimeout(resolve, 120));
+  const recovered = next(disconnectHost, "boombox-state", (message) => message.snapshot?.log?.filter((entry) => entry.kind === "fire").length >= 2, 5000);
+  disconnectHost.send(JSON.stringify({ type: "boombox-action", userId: disconnectId, actionId: `disconnect-fire-${suffix}`, action: { targetIndex: 1, weapon: "cannon", angle: 42, power: 58 } }));
+  const recoveredState = await recovered;
+  if (!recoveredState.snapshot.log.some((entry) => entry.kind === "disconnect")) throw new Error("Disconnect takeover was not recorded");
+  close(disconnectHost);
+}
+
 function close(socket) { if (socket && socket.readyState === WebSocket.OPEN) socket.close(); }
 
 mkdirSync(storeDir, { recursive: true });
@@ -155,6 +195,7 @@ try {
   close(configured);
   await verifyPreparedMode("synchronous", suffix);
   await verifyPreparedMode("simultaneous", suffix);
+  await verifyPass19(suffix);
 
   // A started room also restores authoritative state, inventory, and rules.
   const activeId = `active-${suffix}`;
@@ -176,7 +217,7 @@ try {
   if (restoredState.snapshot.rules?.version !== 2 || restoredState.snapshot.players.length !== 2 || restoredState.snapshot.gameId !== activeCreated.gameId) throw new Error("Started room state did not survive restart");
   close(restored);
 
-  console.log("Boom Box Pass 18 release matrix passed: malformed payload rejection, setup restart recovery, started-match restart recovery, 2/4/6/10-seat rules, setup rules normalization, catalogue filtering, synchronous prepare/release, simultaneous deterministic release, versioned catalogue, and session continuity.");
+  console.log("Boom Box Pass 19 release matrix passed: malformed payload rejection, setup restart recovery, started-match restart recovery, 2/4/6/10-seat rules, setup rules normalization, movement and fuel, turn deadlines, disconnect takeover, catalogue filtering, synchronous prepare/release, simultaneous deterministic release, versioned catalogue, and session continuity.");
 } finally {
   if (server && !server.killed) server.kill();
   try { rmSync(storeDir, { recursive: true, force: true }); } catch {}
