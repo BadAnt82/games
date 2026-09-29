@@ -37,6 +37,13 @@ Passed locally:
 
 The Pass 19 release matrix now covers movement/fuel, deadline fallback, and disconnect takeover in addition to the prior restart, seat, catalogue, firing-mode, and session checks.
 
+Live verification after deployment:
+
+- Coolify deployment queued for application `tmdedhfajs0iouepqit1but3`.
+- `https://games.badantproductions.com/` returned HTTP 200.
+- The live WebSocket regression passed after the deployment settled. One earlier attempt hit the existing initial-lobby-message timing race; the retry completed the full lobby, action, reconnect, AI, spectator, replay, and history matrix.
+- The live browser check confirmed the movement setup review, fuel controls, and deadline readout are present.
+
 ## Next loop decision
 
 After the live checks pass, Pass 19 is complete. Pass 20 should address the remaining content and simulation gaps: broader projectile/terrain hardening, environmental events, active-room durability guarantees, richer AI playback controls, and the original Boom Box art/effects/audio set. Human testing remains deferred until the planned passes are complete.
