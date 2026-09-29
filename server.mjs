@@ -1734,7 +1734,7 @@ function boomBoxTerrain(seed, profile = "sunset-range") {
   for (let pass = 0; pass < 3; pass += 1) for (let x = 1; x < terrain.length - 1; x += 1) terrain[x] = (terrain[x - 1] + terrain[x] + terrain[x + 1]) / 3;
   return terrain;
 }
-const BOOMBOX_RULES_VERSION = 1;
+const BOOMBOX_RULES_VERSION = 2;
 const BOOMBOX_WEAPON_CATALOG = {
   cannon: { label: "Cannon", cost: 0, inventory: 99, starter: 99, damage: 70, radius: 58, depth: 24, mode: "single" },
   "heavy-cannon": { label: "Heavy cannon", cost: 45, inventory: 2, damage: 82, radius: 72, depth: 36, mode: "single", speed: .86 },
@@ -1771,6 +1771,7 @@ function boomBoxRulesFromConfig(config = {}) {
   const firingModes = new Set(["sequential", "synchronous", "simultaneous"]);
   const boundaries = new Set(["stop", "bounce", "wrap"]);
   const pace = ["relaxed", "standard", "blitz"].includes(String(config.pace)) ? String(config.pace) : "standard";
+  const aiDifficulty = ["recruit", "veteran", "ace", "expert"].includes(String(config.aiDifficulty)) ? String(config.aiDifficulty) : "veteran";
   return {
     version: BOOMBOX_RULES_VERSION,
     seats: Math.max(2, Math.min(10, Number(config.seats) || 2)),
@@ -1782,6 +1783,7 @@ function boomBoxRulesFromConfig(config = {}) {
     boundary: boundaries.has(String(config.boundary)) ? String(config.boundary) : "stop",
     startingMoney: Math.max(0, Math.min(10000, Number(config.startingMoney) || 100)),
     turnPace: pace,
+    aiDifficulty,
     events: { meteorShower: Boolean(config.events?.meteorShower), scenery: Boolean(config.events?.scenery) },
     weaponCatalog: Object.fromEntries(Object.entries(BOOMBOX_WEAPON_CATALOG).filter(([id]) => !Array.isArray(config.disabledWeapons) || !config.disabledWeapons.includes(id))),
     utilityCatalog: Object.fromEntries(Object.entries(BOOMBOX_UTILITY_CATALOG).filter(([id]) => !Array.isArray(config.disabledUtilities) || !config.disabledUtilities.includes(id))),
@@ -1791,40 +1793,57 @@ function boomBoxSend(socket, payload) { if (socket?.readyState === WebSocket.OPE
 function boomBoxPublicRoom(room, userId = "") { return { gameId: room.gameId, name: room.name, creator: room.creator, seats: room.seats.length, connected: room.seats.filter((seat) => seat.connected).length, spectators: room.spectators?.size || 0, terrain: room.terrain, pace: room.rules?.turnPace || room.pace, firingMode: room.rules?.firingMode || "sequential", aiFill: room.aiFill, started: room.started, phase: room.phase, mine: userId === room.ownerUserId, inviteToken: userId === room.ownerUserId ? room.inviteToken : "", resumable: room.seats.some((seat) => seat.userId === userId && Boolean(seat.sessionId)) }; }
 function boomBoxLobbyPayload(userId = "") { const games = [...boomboxRooms.values()].map((room) => boomBoxPublicRoom(room, userId)); return { type: "boombox-lobby-list", games, created: games.filter((room) => room.mine), available: games.filter((room) => !room.mine && (!room.started ? room.connected < room.seats : true)) }; }
 function broadcastBoomBoxLobby() { for (const room of boomboxRooms.values()) for (const seat of room.seats) if (seat.socket) boomBoxSend(seat.socket, boomBoxLobbyPayload(seat.userId)); }
-function boomBoxSnapshot(room) { return { gameId: room.gameId, rules: room.rules, phase: room.phase, seed: room.seed, terrainName: room.terrain, terrain: room.state.terrain, terrainSolid: room.state.terrainSolid, terrainMaterial: room.state.terrainMaterial, wind: room.state.wind, turn: room.state.turn, turnSeat: room.state.turnSeat, actionSequence: room.state.actionSequence, players: room.state.players.map(({ socket, ...player }) => player), eliminationOrder: room.state.eliminationOrder, placements: room.state.placements, log: room.state.log, winner: room.state.winner ?? null }; }
+function boomBoxSnapshot(room) { return { gameId: room.gameId, rules: room.rules, phase: room.phase, seed: room.seed, terrainName: room.terrain, terrain: room.state.terrain, terrainSolid: room.state.terrainSolid, terrainMaterial: room.state.terrainMaterial, wind: room.state.wind, turn: room.state.turn, turnSeat: room.state.turnSeat, actionSequence: room.state.actionSequence, players: room.state.players.map(({ socket, ...player }) => player), eliminationOrder: room.state.eliminationOrder, placements: room.state.placements, aiIntent: room.state.aiIntent || null, log: room.state.log, winner: room.state.winner ?? null }; }
 function boomBoxLoadoutPayload(room, seatIndex) { const player = room.state?.players?.[seatIndex]; if (!player) return { type: "boombox-loadout", gameId: room.gameId, rules: room.rules, money: room.rules.startingMoney, inventory: boomBoxInitialInventory(room.rules.weaponCatalog), utilities: boomBoxInitialInventory(room.rules.utilityCatalog) }; return { type: "boombox-loadout", gameId: room.gameId, rules: room.rules, money: player.money, inventory: player.inventory, inventoryCapacity: player.inventoryCapacity, utilities: player.utilities, utilityCapacity: player.utilityCapacity }; }
 function boomBoxSendLoadout(room, seatIndex) { const seat = room.seats[seatIndex]; if (seat?.socket) boomBoxSend(seat.socket, boomBoxLoadoutPayload(room, seatIndex)); }
 function broadcastBoomBoxRoom(room) { const snapshot = boomBoxSnapshot(room); for (const [index, seat] of room.seats.entries()) if (seat.socket) boomBoxSend(seat.socket, { type: "boombox-state", snapshot, seat: index }); for (const spectator of room.spectators || []) boomBoxSend(spectator, { type: "boombox-state", snapshot, seat: -1, spectator: true }); broadcastBoomBoxLobby(); }
-function boomBoxReplaySnapshot(room) { return { sequence: room.state.log.at(-1)?.sequence || 0, turn: room.state.turn, turnSeat: room.state.turnSeat, phase: room.phase, terrain: room.state.terrain.filter((_, index) => index % 6 === 0), terrainSolid: room.state.terrainSolid.filter((_, index) => index % 6 === 0), terrainMaterial: room.state.terrainMaterial.filter((_, index) => index % 6 === 0), players: room.state.players.map(({ socket, ...player }) => ({ ...player })), eliminationOrder: room.state.eliminationOrder, placements: room.state.placements }; }
+function boomBoxReplaySnapshot(room) { return { sequence: room.state.log.at(-1)?.sequence || 0, turn: room.state.turn, turnSeat: room.state.turnSeat, phase: room.phase, terrain: room.state.terrain.filter((_, index) => index % 6 === 0), terrainSolid: room.state.terrainSolid.filter((_, index) => index % 6 === 0), terrainMaterial: room.state.terrainMaterial.filter((_, index) => index % 6 === 0), players: room.state.players.map(({ socket, ...player }) => ({ ...player })), eliminationOrder: room.state.eliminationOrder, placements: room.state.placements, aiIntent: room.state.aiIntent || null }; }
 function boomBoxRecordReplay(room) { if (!room.state) return; room.state.replay.push(boomBoxReplaySnapshot(room)); if (room.state.replay.length > 100) room.state.replay.shift(); }
 function boomBoxRecordHistory(room) { if (!room.state || room.historyRecorded) return; room.historyRecorded = true; boomBoxHistory.push({ gameId: room.gameId, name: room.name, creator: room.creator, terrain: room.terrain, seed: room.seed, rules: room.rules, finishedAt: new Date().toISOString(), winner: room.state.winner, eliminationOrder: room.state.eliminationOrder, placements: room.state.placements, players: room.state.players.map(({ socket, ...player }) => player), terrainData: room.state.terrain, terrainSolid: room.state.terrainSolid, terrainMaterial: room.state.terrainMaterial, replay: room.state.replay, log: room.state.log }); writeBoomBoxHistory(boomBoxHistory); }
 function boomBoxInitialInventory(catalog) { return Object.fromEntries(Object.entries(catalog).map(([id, item]) => [id, Math.max(0, Number(item.starter) || 0)])); }
 function boomBoxInitialCapacity(catalog) { return Object.fromEntries(Object.entries(catalog).map(([id, item]) => [id, Math.max(0, Number(item.inventory) || 0)])); }
-function createBoomBoxState(room) { const positions = room.seats.length === 2 ? [146, 814] : room.seats.map((_, index) => 146 + Math.round(index * (814 - 146) / Math.max(1, room.seats.length - 1))); const colors = ["#54e7ff", "#ff8b63", "#d98cff", "#b8f266", "#ffd166", "#f78fb3", "#8be9fd", "#ff79c6", "#50fa7b", "#f1fa8c"]; const inventory = boomBoxInitialInventory(room.rules.weaponCatalog); const utilities = boomBoxInitialInventory(room.rules.utilityCatalog); return { terrain: boomBoxTerrain(room.seed, room.terrain), terrainSolid: Array(960).fill(true), terrainMaterial: Array(960).fill("dirt"), wind: room.rules.windMode === "fixed" ? 0 : (room.seed % 17 - 8) / 10, turn: 1, turnSeat: 0, actionSequence: 0, winner: null, eliminationOrder: [], placements: [], log: [], replay: [], players: room.seats.map((seat, index) => ({ name: seat.name, x: positions[index], y: 0, turretAngle: 42, power: 58, health: 100, maxHealth: 100, alive: true, falling: false, buried: false, fallDistance: 0, burning: 0, color: colors[index % colors.length], shots: 0, hits: 0, damage: 0, shield: 0, fuel: 100, money: room.rules.startingMoney, inventory: { ...inventory }, inventoryCapacity: boomBoxInitialCapacity(room.rules.weaponCatalog), utilities: { ...utilities }, utilityCapacity: boomBoxInitialCapacity(room.rules.utilityCatalog), upgrades: {}, eliminatedAtTurn: null, eliminationOrder: null, placement: null, stats: { shots: 0, hits: 0, damage: 0, terrainChanges: 0, purchases: 0 } })) }; }
+function createBoomBoxState(room) { const positions = room.seats.length === 2 ? [146, 814] : room.seats.map((_, index) => 146 + Math.round(index * (814 - 146) / Math.max(1, room.seats.length - 1))); const colors = ["#54e7ff", "#ff8b63", "#d98cff", "#b8f266", "#ffd166", "#f78fb3", "#8be9fd", "#ff79c6", "#50fa7b", "#f1fa8c"]; const inventory = boomBoxInitialInventory(room.rules.weaponCatalog); const utilities = boomBoxInitialInventory(room.rules.utilityCatalog); return { terrain: boomBoxTerrain(room.seed, room.terrain), terrainSolid: Array(960).fill(true), terrainMaterial: Array(960).fill("dirt"), wind: room.rules.windMode === "fixed" ? 0 : (room.seed % 17 - 8) / 10, turn: 1, turnSeat: 0, actionSequence: 0, winner: null, eliminationOrder: [], placements: [], aiIntent: null, log: [], replay: [], players: room.seats.map((seat, index) => ({ name: seat.name, x: positions[index], y: 0, turretAngle: 42, power: 58, health: 100, maxHealth: 100, alive: true, falling: false, buried: false, fallDistance: 0, burning: 0, color: colors[index % colors.length], shots: 0, hits: 0, damage: 0, shield: 0, fuel: 100, money: room.rules.startingMoney, inventory: { ...inventory }, inventoryCapacity: boomBoxInitialCapacity(room.rules.weaponCatalog), utilities: { ...utilities }, utilityCapacity: boomBoxInitialCapacity(room.rules.utilityCatalog), upgrades: {}, eliminatedAtTurn: null, eliminationOrder: null, placement: null, stats: { shots: 0, hits: 0, damage: 0, terrainChanges: 0, purchases: 0 } })) }; }
 function startBoomBoxRoom(room) { room.started = true; room.phase = "turn-prep"; room.resolving = false; room.state = createBoomBoxState(room); room.state.players.forEach((player) => { player.y = room.state.terrain[player.x] - 17; }); room.updatedAt = Date.now(); broadcastBoomBoxRoom(room); scheduleBoomBoxAi(room); }
 function fillBoomBoxAi(room) { for (const seat of room.seats) if (!seat.connected) { seat.connected = true; seat.bot = true; seat.name = `AI ${seat.name}`; } startBoomBoxRoom(room); }
+function boomBoxAiDifficulty(room) { return room.rules.aiDifficulty || "veteran"; }
+function boomBoxAiDelay(room) { return room.rules.turnPace === "blitz" ? 280 : room.rules.turnPace === "relaxed" ? 900 : 520; }
+function boomBoxAiChooseTarget(room, seatIndex) { return room.state.players.map((player, index) => ({ player, index })).filter(({ player, index }) => index !== seatIndex && player.alive).sort((a, b) => a.player.health - b.player.health || Math.abs(a.player.x - room.state.players[seatIndex].x) - Math.abs(b.player.x - room.state.players[seatIndex].x) || a.index - b.index)[0]?.index ?? -1; }
+function boomBoxAiBuyBestWeapon(room, seatIndex, targetIndex) {
+  const player = room.state.players[seatIndex]; const difficulty = boomBoxAiDifficulty(room); const threshold = difficulty === "recruit" ? 100 : difficulty === "ace" ? 60 : difficulty === "expert" ? 35 : 80;
+  const options = Object.entries(room.rules.weaponCatalog).filter(([id, item]) => id !== "cannon" && (player.inventory[id] || 0) < (player.inventoryCapacity[id] || item.inventory || 0) && player.money >= (Number(item.cost) || 0) && (Number(item.damage) || 0) >= threshold).sort((a, b) => (Number(b[1].damage) || 0) - (Number(a[1].damage) || 0) || a[0].localeCompare(b[0]));
+  if (!options.length) return "cannon";
+  const preferred = difficulty === "expert" ? options.find(([id]) => ["laser-line", "mini-nuke", "mirv", "napalm"].includes(id)) : options[0];
+  const id = preferred?.[0] || options[0][0]; const purchase = boomBoxPurchase(room, seatIndex, "weapon", id, 1); return purchase?.error ? "cannon" : id;
+}
+function boomBoxAiUtility(room, seatIndex) {
+  const player = room.state.players[seatIndex]; const difficulty = boomBoxAiDifficulty(room);
+  if (player.health <= (difficulty === "recruit" ? 30 : 48) && (player.utilities["repair-kit"] || 0) > 0) return "repair-kit";
+  if (player.health <= 70 && (player.utilities["heavy-shield"] || 0) > 0 && player.shield < 35) return "heavy-shield";
+  if (player.shield === 0 && (player.utilities.shield || 0) > 0) return "shield";
+  if (player.falling && (player.utilities.parachute || 0) > 0) return "parachute";
+  return "";
+}
+function boomBoxAiCandidate(room, seatIndex, targetIndex, weapon) {
+  const shooter = room.state.players[seatIndex]; const target = room.state.players[targetIndex]; const difficulty = boomBoxAiDifficulty(room); const step = difficulty === "expert" ? 4 : difficulty === "ace" ? 6 : difficulty === "veteran" ? 9 : 14; const candidates = [];
+  for (let angle = 12; angle <= 78; angle += step) for (let power = 30; power <= 90; power += step) {
+    const trajectory = boomBoxProjectilePath(room, seatIndex, targetIndex, weapon, angle, power); const distance = Math.abs((trajectory.center || shooter.x) - target.x); let score = trajectory.impact === "tank" ? 1000 : Math.max(0, 180 - distance); score += weapon.mode === "area" ? 24 : 0; score -= Math.abs(power - 58) * (difficulty === "recruit" ? .02 : .01); candidates.push({ score, angle, power, trajectory });
+  }
+  candidates.sort((a, b) => b.score - a.score || a.angle - b.angle || a.power - b.power); const top = candidates.slice(0, difficulty === "expert" ? 3 : 1); const pick = top[(room.seed + room.state.turn + seatIndex) % top.length] || candidates[0]; return pick || { angle: 42, power: 58 };
+}
+function boomBoxAiPlan(room, seatIndex) {
+  const targetIndex = boomBoxAiChooseTarget(room, seatIndex); if (targetIndex < 0) return null; const utility = boomBoxAiUtility(room, seatIndex); if (utility) return { kind: "utility", utility, targetIndex, text: `${room.state.players[seatIndex].name} is preparing a ${room.rules.utilityCatalog[utility]?.label || utility}.` };
+  const weaponId = boomBoxAiBuyBestWeapon(room, seatIndex, targetIndex); const weapon = room.rules.weaponCatalog[weaponId] || room.rules.weaponCatalog.cannon; const shot = boomBoxAiCandidate(room, seatIndex, targetIndex, weapon); return { kind: "fire", weapon: weaponId, targetIndex, angle: shot.angle, power: shot.power, text: `${room.state.players[seatIndex].name} is lining up a ${weapon.label || weaponId}.` };
+}
 function scheduleBoomBoxAi(room) {
   if (room.aiTimer || room.resolving || !room.started || room.phase !== "turn-prep" || !room.state) return;
-  const seatIndex = room.state.turnSeat;
-  if (!room.seats[seatIndex]?.bot || !room.state.players[seatIndex]?.alive) return;
+  const seatIndex = room.state.turnSeat; if (!room.seats[seatIndex]?.bot || !room.state.players[seatIndex]?.alive) return;
+  const plan = boomBoxAiPlan(room, seatIndex); if (!plan) return; room.state.aiIntent = { seat: seatIndex, name: room.state.players[seatIndex].name, text: plan.text, kind: plan.kind, weapon: plan.weapon || null, utility: plan.utility || null, target: plan.targetIndex, turn: room.state.turn }; broadcastBoomBoxRoom(room);
   room.aiTimer = setTimeout(() => {
-    room.aiTimer = null;
-    if (!boomboxRooms.has(room.gameId) || room.resolving || !room.started || room.phase !== "turn-prep" || !room.state || room.state.turnSeat !== seatIndex) return;
-    const targetIndex = room.state.players.findIndex((player, index) => index !== seatIndex && player.alive);
-    if (targetIndex < 0) return;
-    const shooter = room.state.players[seatIndex];
-    const target = room.state.players[targetIndex];
-    const distance = Math.abs(target.x - shooter.x);
-    const angle = Math.max(18, Math.min(72, Math.round(38 + distance / 28 + ((room.seed + room.state.turn * 11 + seatIndex * 9) % 15 - 7))));
-    const power = Math.max(35, Math.min(88, Math.round(50 + distance / 18 + ((room.seed + room.state.turn * 7 + seatIndex * 5) % 18))));
-    const result = resolveBoomBoxAction(room, seatIndex, { targetIndex, angle, power, weapon: "cannon" }, `ai-${room.gameId}-${room.state.actionSequence + 1}`);
-    if (result?.error) return;
-    if (result?.flight) {
-      for (const seat of room.seats) if (seat.socket) boomBoxSend(seat.socket, { type: "boombox-flight", flight: result.flight });
-      for (const spectator of room.spectators || []) boomBoxSend(spectator, { type: "boombox-flight", flight: result.flight });
-      setTimeout(() => { if (boomboxRooms.has(room.gameId)) { room.resolving = false; if (room.phase !== "finished") room.phase = "turn-prep"; broadcastBoomBoxRoom(room); scheduleBoomBoxAi(room); } }, 450);
-    } else { broadcastBoomBoxRoom(room); scheduleBoomBoxAi(room); }
-  }, 650);
+    room.aiTimer = null; if (!boomboxRooms.has(room.gameId) || room.resolving || !room.started || room.phase !== "turn-prep" || !room.state || room.state.turnSeat !== seatIndex) return;
+    const action = plan.kind === "utility" ? { kind: "utility", utility: plan.utility } : { targetIndex: plan.targetIndex, angle: plan.angle, power: plan.power, weapon: plan.weapon };
+    const result = resolveBoomBoxAction(room, seatIndex, action, `ai-${room.gameId}-${room.state.actionSequence + 1}`); if (result?.error) { room.state.aiIntent = { ...room.state.aiIntent, text: `${room.state.players[seatIndex].name} could not complete that action.` }; broadcastBoomBoxRoom(room); return; }
+    if (result?.flight) { for (const seat of room.seats) if (seat.socket) boomBoxSend(seat.socket, { type: "boombox-flight", flight: result.flight }); for (const spectator of room.spectators || []) boomBoxSend(spectator, { type: "boombox-flight", flight: result.flight }); setTimeout(() => { if (boomboxRooms.has(room.gameId)) { room.resolving = false; if (room.phase !== "finished") room.phase = "turn-prep"; broadcastBoomBoxRoom(room); scheduleBoomBoxAi(room); } }, 450); } else { broadcastBoomBoxRoom(room); scheduleBoomBoxAi(room); }
+  }, boomBoxAiDelay(room));
 }
 function boomBoxAppendEvent(room, entry) { const event = { sequence: ++room.state.actionSequence, ...entry }; room.state.log.push(event); if (room.state.log.length > 100) room.state.log.shift(); return event; }
 function boomBoxSegmentHitsCircle(from, to, center, radius) { const dx = to.x - from.x; const dy = to.y - from.y; const lengthSquared = dx * dx + dy * dy; const t = lengthSquared ? Math.max(0, Math.min(1, ((center.x - from.x) * dx + (center.y - from.y) * dy) / lengthSquared)) : 0; const x = from.x + dx * t; const y = from.y + dy * t; return Math.hypot(center.x - x, center.y - y) <= radius; }
@@ -1862,8 +1881,7 @@ function boomBoxFinish(room, winnerIndex) { if (room.phase === "finished") retur
 function advanceBoomBoxTurn(room, seatIndex) {
   boomBoxTickStatuses(room);
   const living = room.state.players.map((player, index) => ({ player, index })).filter(({ player }) => player.alive);
-  if (!living.some(({ index }) => index !== seatIndex)) { boomBoxFinish(room, seatIndex); return; }
-  if (!living.some(({ index }) => !room.seats[index]?.bot)) { boomBoxFinish(room, living[0]?.index ?? seatIndex); return; }
+  if (living.length <= 1) { boomBoxFinish(room, living[0]?.index ?? seatIndex); return; }
   boomBoxRecordReplay(room); let next = (seatIndex + 1) % room.state.players.length; while (!room.state.players[next].alive) next = (next + 1) % room.state.players.length;
   room.state.turnSeat = next; room.state.turn += 1; const limit = room.rules.windLimit; room.state.wind = room.rules.windMode === "fixed" ? room.state.wind : Math.max(-limit, Math.min(limit, room.state.wind + ((room.seed + room.state.turn * 13) % 7 - 3) / 10));
 }
