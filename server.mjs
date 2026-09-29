@@ -1,4 +1,4 @@
-import { createReadStream, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { createReadStream, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { extname, join, normalize, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -1729,6 +1729,7 @@ let nextBoomBoxRoomId = 1027;
 
 function serializableBoomBoxRoom(room) {
   return {
+    schemaVersion: 2,
     gameId: room.gameId,
     inviteToken: room.inviteToken,
     ownerUserId: room.ownerUserId,
@@ -1750,13 +1751,16 @@ function serializableBoomBoxRoom(room) {
     seed: room.seed,
     updatedAt: room.updatedAt,
     historyRecorded: room.historyRecorded,
+    turnDeadlineAt: room.turnDeadlineAt || null,
   };
 }
 
 function writeBoomBoxRooms() {
   try {
     mkdirSync(resolve(boomBoxRoomStorePath, ".."), { recursive: true });
-    writeFileSync(boomBoxRoomStorePath, JSON.stringify([...boomboxRooms.values()].map(serializableBoomBoxRoom), null, 2));
+    const temporaryPath = `${boomBoxRoomStorePath}.tmp-${process.pid}`;
+    writeFileSync(temporaryPath, JSON.stringify([...boomboxRooms.values()].map(serializableBoomBoxRoom), null, 2));
+    renameSync(temporaryPath, boomBoxRoomStorePath);
   } catch {
     // A room remains live in memory if the optional recovery store is unavailable.
   }
@@ -1781,7 +1785,7 @@ function restoreBoomBoxRooms() {
       pendingActions: new Map(Object.entries(record.pendingActions && typeof record.pendingActions === "object" ? record.pendingActions : {}).map(([key, value]) => [Number(key), value])),
       aiTimer: null,
       turnTimer: null,
-      turnDeadlineAt: null,
+      turnDeadlineAt: Number(record.turnDeadlineAt) || null,
       resolving: false,
     };
     if (room.state) { room.state.outcome ||= room.phase === "finished" ? (room.state.winner === null ? "draw" : "win") : "in-progress"; for (const player of room.state.players || []) { player.fuel ??= 100; player.movedThisTurn ??= false; } }
@@ -1870,7 +1874,7 @@ function boomBoxRecordHistory(room) { if (!room.state || room.historyRecorded) r
 function boomBoxInitialInventory(catalog) { return Object.fromEntries(Object.entries(catalog).map(([id, item]) => [id, Math.max(0, Number(item.starter) || 0)])); }
 function boomBoxInitialCapacity(catalog) { return Object.fromEntries(Object.entries(catalog).map(([id, item]) => [id, Math.max(0, Number(item.inventory) || 0)])); }
 function createBoomBoxState(room) { const positions = room.seats.length === 2 ? [146, 814] : room.seats.map((_, index) => 146 + Math.round(index * (814 - 146) / Math.max(1, room.seats.length - 1))); const colors = ["#54e7ff", "#ff8b63", "#d98cff", "#b8f266", "#ffd166", "#f78fb3", "#8be9fd", "#ff79c6", "#50fa7b", "#f1fa8c"]; const inventory = boomBoxInitialInventory(room.rules.weaponCatalog); const utilities = boomBoxInitialInventory(room.rules.utilityCatalog); return { terrain: boomBoxTerrain(room.seed, room.terrain), terrainSolid: Array(960).fill(true), terrainMaterial: Array(960).fill("dirt"), wind: room.rules.windMode === "fixed" ? 0 : (room.seed % 17 - 8) / 10, turn: 1, turnSeat: 0, actionSequence: 0, winner: null, outcome: "in-progress", eliminationOrder: [], placements: [], aiIntent: null, log: [], replay: [], players: room.seats.map((seat, index) => ({ name: seat.name, x: positions[index], y: 0, turretAngle: 42, power: 58, health: 100, maxHealth: 100, alive: true, falling: false, buried: false, fallDistance: 0, burning: 0, color: colors[index % colors.length], shots: 0, hits: 0, damage: 0, damageTaken: 0, shield: 0, fuel: 100, movedThisTurn: false, money: room.rules.startingMoney, inventory: { ...inventory }, inventoryCapacity: boomBoxInitialCapacity(room.rules.weaponCatalog), utilities: { ...utilities }, utilityCapacity: boomBoxInitialCapacity(room.rules.utilityCatalog), upgrades: {}, eliminatedAtTurn: null, eliminationOrder: null, placement: null, stats: { shots: 0, hits: 0, damage: 0, terrainChanges: 0, purchases: 0 } })) }; }
-function startBoomBoxRoom(room) { room.started = true; room.phase = "turn-prep"; room.resolving = false; room.pendingActions = new Map(); room.state = createBoomBoxState(room); room.state.players.forEach((player) => { player.y = room.state.terrain[player.x] - 17; }); room.updatedAt = Date.now(); room.turnDeadlineAt = null; scheduleBoomBoxTurnDeadline(room); broadcastBoomBoxRoom(room); scheduleBoomBoxAi(room); }
+function startBoomBoxRoom(room) { room.started = true; room.phase = "turn-prep"; room.resolving = false; room.pendingActions = new Map(); room.state = createBoomBoxState(room); room.state.players.forEach((player) => { player.y = room.state.terrain[player.x] - 17; }); boomBoxSeedScenery(room); room.updatedAt = Date.now(); room.turnDeadlineAt = null; scheduleBoomBoxTurnDeadline(room); broadcastBoomBoxRoom(room); scheduleBoomBoxAi(room); }
 function fillBoomBoxAi(room) { for (const seat of room.seats) if (!seat.connected) { seat.connected = true; seat.bot = true; seat.name = `AI ${seat.name}`; } startBoomBoxRoom(room); }
 function boomBoxAiDifficulty(room) { return room.rules.aiDifficulty || "veteran"; }
 function boomBoxAiDelay(room) { return room.rules.turnPace === "blitz" ? 280 : room.rules.turnPace === "relaxed" ? 900 : 520; }
@@ -1930,16 +1934,54 @@ function boomBoxHandleDisconnect(room, seatIndex, reason = "disconnect") { const
 function scheduleBoomBoxAi(room) {
   if (room.aiTimer || room.resolving || !room.started || (room.phase !== "turn-prep" && room.phase !== "prepare") || !room.state) return;
   const seatIndex = boomBoxNextAiSeat(room); if (seatIndex < 0) return;
-  const plan = boomBoxAiPlan(room, seatIndex); if (!plan) return; room.state.aiIntent = { seat: seatIndex, name: room.state.players[seatIndex].name, text: plan.text, kind: plan.kind, weapon: plan.weapon || null, utility: plan.utility || null, target: plan.targetIndex, turn: room.state.turn }; broadcastBoomBoxRoom(room);
+  const delayMs = boomBoxAiDelay(room); const plan = boomBoxAiPlan(room, seatIndex); if (!plan) return; room.state.aiIntent = { seat: seatIndex, name: room.state.players[seatIndex].name, text: plan.text, kind: plan.kind, weapon: plan.weapon || null, utility: plan.utility || null, target: plan.targetIndex, turn: room.state.turn, delayMs, readyAt: Date.now() + delayMs }; broadcastBoomBoxRoom(room);
   room.aiTimer = setTimeout(() => {
     room.aiTimer = null; if (!boomboxRooms.has(room.gameId) || room.resolving || !room.started || (room.phase !== "turn-prep" && room.phase !== "prepare") || !room.state || (room.rules.firingMode === "sequential" && room.state.turnSeat !== seatIndex)) return;
     const action = plan.kind === "utility" ? { kind: "utility", utility: plan.utility } : { targetIndex: plan.targetIndex, angle: plan.angle, power: plan.power, weapon: plan.weapon };
     const result = resolveBoomBoxAction(room, seatIndex, action, `ai-${room.gameId}-${room.state.actionSequence + 1}`); if (result?.error) { room.state.aiIntent = { ...room.state.aiIntent, text: `${room.state.players[seatIndex].name} could not complete that action.` }; broadcastBoomBoxRoom(room); return; }
     boomBoxDispatchActionResult(room, result);
-  }, boomBoxAiDelay(room));
+  }, delayMs);
 }
 function boomBoxAppendEvent(room, entry) { const event = { sequence: ++room.state.actionSequence, ...entry }; room.state.log.push(event); if (room.state.log.length > 100) room.state.log.shift(); return event; }
+function boomBoxSeedScenery(room) {
+  if (!room.rules.events?.scenery || !room.state || room.state.log.some((entry) => entry.kind === "scenery")) return;
+  const markers = [];
+  for (let center = 210; center < 900; center += 230) {
+    const radius = 14 + ((room.seed + center) % 12);
+    for (let offset = -radius; offset <= radius; offset += 1) {
+      const index = Math.max(0, Math.min(959, center + offset));
+      room.state.terrainMaterial[index] = "scenery";
+    }
+    markers.push(center);
+  }
+  boomBoxAppendEvent(room, { kind: "scenery", turn: room.state.turn, markers });
+}
+function boomBoxApplyEnvironment(room) {
+  if (!room.state || room.phase === "finished") return;
+  if (room.rules.events?.meteorShower && room.state.turn > 1 && room.state.turn % 3 === 0) {
+    const center = 110 + ((room.seed * 17 + room.state.turn * 97) % 740);
+    const radius = 20 + ((room.seed + room.state.turn * 11) % 19);
+    const depth = 34 + ((room.seed + room.state.turn * 7) % 32);
+    boomBoxMutateTerrain(room, center, radius, depth, "meteor", true);
+    boomBoxAppendEvent(room, { kind: "meteor", turn: room.state.turn, center, radius, depth });
+    const living = room.state.players.filter((player) => player.alive).length;
+    if (living <= 1) boomBoxFinish(room, room.state.players.findIndex((player) => player.alive));
+  }
+}
 function boomBoxSegmentHitsCircle(from, to, center, radius) { const dx = to.x - from.x; const dy = to.y - from.y; const lengthSquared = dx * dx + dy * dy; const t = lengthSquared ? Math.max(0, Math.min(1, ((center.x - from.x) * dx + (center.y - from.y) * dy) / lengthSquared)) : 0; const x = from.x + dx * t; const y = from.y + dy * t; return Math.hypot(center.x - x, center.y - y) <= radius; }
+function boomBoxSegmentHitsTerrain(room, from, to, weapon) {
+  if (weapon.ignoreTerrain) return false;
+  const distance = Math.hypot(to.x - from.x, to.y - from.y);
+  const samples = Math.max(1, Math.ceil(distance / 4));
+  for (let sample = 1; sample <= samples; sample += 1) {
+    const ratio = sample / samples;
+    const x = from.x + (to.x - from.x) * ratio;
+    const y = from.y + (to.y - from.y) * ratio;
+    const index = Math.max(0, Math.min(959, Math.round(x)));
+    if (room.state.terrainSolid[index] && y >= room.state.terrain[index]) return true;
+  }
+  return false;
+}
 function boomBoxProjectilePath(room, shooterIndex, requestedTargetIndex, weapon, angleDegrees, power) {
   const shooter = room.state.players[shooterIndex]; const requestedTarget = room.state.players[requestedTargetIndex]; const direction = requestedTarget.x >= shooter.x ? 1 : -1; const angle = angleDegrees * Math.PI / 180; const gravity = room.rules.gravity; const speed = power * 5.4 * (Number(weapon.speed) || 1); let x = shooter.x + direction * 22; let y = shooter.y - 17; let vx = Math.cos(angle) * speed * direction; let vy = -Math.sin(angle) * speed; let bounces = 0; const maxBounces = Math.max(0, Number(weapon.bounces) || 3); const path = [{ x, y }]; let impact = "miss"; let impactX = x; let impactTarget = -1;
   if (weapon.mode === "laser") { const end = { x: requestedTarget.x, y: requestedTarget.y - 12 }; const steps = 16; for (let step = 1; step <= steps; step += 1) path.push({ x: x + (end.x - x) * step / steps, y: y + (end.y - y) * step / steps }); impact = "tank"; impactTarget = requestedTargetIndex; impactX = end.x; return { path, impact, impactTarget, center: impactX, weapon }; }
@@ -1949,7 +1991,7 @@ function boomBoxProjectilePath(room, shooterIndex, requestedTargetIndex, weapon,
     if (x < 0 || x > 959) { if (room.rules.boundary === "wrap") x = (x + 960) % 960; else if (room.rules.boundary === "bounce" && bounces < maxBounces) { x = Math.max(0, Math.min(959, x)); vx *= -0.82; bounces += 1; } else { impact = "bounds"; impactX = Math.max(0, Math.min(959, x)); path.push({ x: impactX, y }); break; } }
     if (y < 0 && room.rules.boundary === "bounce" && bounces < maxBounces) { y = 0; vy *= -0.82; bounces += 1; }
     const current = { x, y }; path.push(current); impactX = x;
-    const terrainIndex = Math.max(0, Math.min(959, Math.round(x))); const terrainY = room.state.terrain[terrainIndex]; if (!weapon.ignoreTerrain && room.state.terrainSolid[terrainIndex] && y >= terrainY) { impact = "terrain"; break; }
+    if (boomBoxSegmentHitsTerrain(room, previous, current, weapon)) { impact = "terrain"; break; }
     const hitSeat = room.state.players.findIndex((candidate, index) => index !== shooterIndex && candidate.alive && boomBoxSegmentHitsCircle(previous, current, { x: candidate.x, y: candidate.y - 12 }, 22));
     if (hitSeat >= 0) { impact = "tank"; impactTarget = hitSeat; break; }
     if (y > 590) { impact = "bounds"; break; }
@@ -1976,7 +2018,7 @@ function advanceBoomBoxTurn(room, seatIndex) {
   const living = room.state.players.map((player, index) => ({ player, index })).filter(({ player }) => player.alive);
   if (living.length <= 1) { boomBoxFinish(room, living[0]?.index ?? seatIndex); return; }
   boomBoxRecordReplay(room); let next = (seatIndex + 1) % room.state.players.length; while (!room.state.players[next].alive) next = (next + 1) % room.state.players.length;
-  room.state.players[next].movedThisTurn = false; room.state.turnSeat = next; room.state.turn += 1; room.turnDeadlineAt = null; const limit = room.rules.windLimit; room.state.wind = room.rules.windMode === "fixed" ? room.state.wind : Math.max(-limit, Math.min(limit, room.state.wind + ((room.seed + room.state.turn * 13) % 7 - 3) / 10));
+  room.state.players[next].movedThisTurn = false; room.state.turnSeat = next; room.state.turn += 1; room.turnDeadlineAt = null; const limit = room.rules.windLimit; room.state.wind = room.rules.windMode === "fixed" ? room.state.wind : Math.max(-limit, Math.min(limit, room.state.wind + ((room.seed + room.state.turn * 13) % 7 - 3) / 10)); boomBoxApplyEnvironment(room);
 }
 function resolveBoomBoxActionNow(room, seatIndex, action, actionId = "", options = {}) {
   const batched = Boolean(options.batch);

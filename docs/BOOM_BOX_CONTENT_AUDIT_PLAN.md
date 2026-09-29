@@ -22,10 +22,10 @@ The correct next step is a content and rules completion track. More lobby featur
 | Synchronous firing | Implemented | Prepare/release is server-authoritative and covered by the Pass 17 release matrix | Preserve the protocol while hardening disconnect and timeout behavior |
 | Simultaneous firing | Implemented | Coordinated launch and deterministic ordering are covered by the Pass 17 release matrix | Preserve the protocol while hardening collision and disconnect behavior |
 | Angle, power, gravity, wind | Versioned rules with setup controls | Human turn deadlines and movement remain unimplemented | Add deadlines and movement without regressing the rules contract |
-| Destructible terrain | Height array and craters | No material mask, burial, support, collapse, or fall resolution in multiplayer | Add deterministic terrain cells, swept collision, support checks, burial, collapse, and fall damage |
+| Destructible terrain | Height array, solid/material masks, support/fall handling, and swept segment collision | Full material modifiers and collapse chains remain out of scope | Add material-specific gameplay modifiers after the core collision path is user-tested |
 | Dirt add/remove tools | One simplified terrain lift | No dirt material, bury/expose rules, or tank digging behavior | Implement add/remove terrain as first-class effects |
 | Tank movement and fuel | Optional sequential movement with authoritative fuel | Synchronous/simultaneous movement remains gated; movement balance and terrain collision need broader cases | Extend the movement phase only after coordinated-turn semantics are designed |
-| Boundaries | Stop, bounce, or wrap rules are configurable and server-clamped | Edge behavior still needs broader projectile and mobile validation | Expand deterministic boundary cases in match-flow hardening |
+| Boundaries | Stop, bounce, or wrap rules are configurable and server-clamped | Edge behavior still needs broader projectile and mobile validation | Expand deterministic boundary cases in the browser matrix |
 | Economy | Solo-only local credits | Multiplayer server does not own money, prices, purchases, or limits | Make economy server-authoritative and atomic |
 | Weapons | Six simplified IDs | No real MIRV child projectiles, persistent effects, bounce, lasers, smoke, napalm, or exact weapon behaviors | Build a data-driven launch catalogue with independent simulation and tests |
 | Utilities | Repair, shield, terrain lift | Multiplayer utility inventory and limits are not authoritative | Add shields, parachute/fall protection, fuel, repair, guidance, and inventory rules |
@@ -33,11 +33,11 @@ The correct next step is a content and rules completion track. More lobby featur
 | Elimination | Elimination order, placements, winner, and explicit draw outcome are authoritative | Simultaneous tie presentation needs richer UI | Keep deterministic placement and improve result teaching |
 | Human elimination | Disconnected or eliminated commanders can be watched while the match continues | Reconnect and spectator UX need wider browser coverage | Preserve spectator continuity through later content passes |
 | AI pacing | Client has pause and 1×/2×/4× playback; server has turn deadlines and fallback actions | Network AI presentation speed is still separate from authoritative timing | Add richer playback controls without changing server outcomes |
-| Match setup | Reviewable wizard exposes seats, firing, gravity, wind, boundaries, money, catalogue, pace, AI, and terrain | Movement and environmental events remain intentionally gated until their simulation exists | Complete the remaining match rules before exposing those controls |
-| Environmental content | Three terrain profiles | No meteor events, scenery, material differences, or environmental modifiers | Add optional events after core simulation is stable |
+| Match setup | Reviewable wizard exposes seats, firing, gravity, wind, boundaries, movement, money, catalogue, pace, AI, terrain, and optional events | Full human/AI seat assignment and material modifiers remain future work | Keep the review exact and add only rules with authoritative behavior |
+| Environmental content | Three terrain profiles plus seeded scenery markers and meteor showers | No full weather/material modifier system | Expand event variety only after browser/live verification |
 | Presentation | Canvas primitives and CSS panels | No complete original art, effects, sound, or content-specific UI | Produce the original Boom Box visual and audio set |
 | Replay | Terrain timeline and match history | Inspection timeline only; no live speed controls or full event playback | Replay every authoritative event with the same speed controls |
-| Persistence | Completed history persists | Active rooms are in memory and disappear on restart/deploy | Persist active room snapshots and reconnect metadata |
+| Persistence | Completed history persists; active rooms use versioned atomic snapshots with deadlines and reconnect metadata | Deployment durability still depends on the host volume | Verify persistent-volume behavior in production and add migrations only when schema changes |
 
 ## What Ã¢â‚¬Å“near replicaÃ¢â‚¬Â means for Boom Box
 
@@ -265,4 +265,4 @@ The content-complete release is not done until all of these are true:
 
 ## What should happen next
 
-Passes 10 through 19 have been completed and checked against the earlier implementation. Pass 19 closes movement/fuel, turn deadlines, disconnect recovery, and explicit draw handling. The next implementation pass is **Pass 20: Content and simulation hardening**.
+Passes 10 through 20 have been completed and checked against the earlier implementation. Pass 20 closes projectile tunneling, deterministic environmental events, AI timing signaling, and atomic active-room snapshots. The next implementation pass is **Pass 21: production browser/live verification and targeted presentation cleanup**. Human playtesting remains deferred until that pass exits successfully.
