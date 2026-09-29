@@ -1,7 +1,7 @@
 # Boom Box Pass 17 — final conformance
 
 **Target:** `games.badantproductions.com`  
-**Status:** complete locally; awaiting final deployment verification
+**Status:** complete and deployed; live protocol verification passed
 
 ## Rules correction
 
@@ -27,6 +27,8 @@
 
 The release matrix now proves that synchronous mode does not resolve after the first submission, and that both synchronous and simultaneous modes release two prepared actions deterministically.
 
+The deployed site returned HTTP 200 and the live Boom Box WebSocket protocol check passed after the deployment proxy completed its restart. An initial live WebSocket attempt returned a transient 502 during that restart window; the retry passed.
+
 ## Loop review
 
 - Passes 10–12: authoritative validation, terrain, inventory, and economy remain server-owned.
@@ -37,5 +39,4 @@ The release matrix now proves that synchronous mode does not resolve after the f
 
 ## Exit gate
 
-The firing-mode gap identified during Pass 16 is closed locally. Human playtesting remains deferred until the final production deployment and live checks complete.
-
+The firing-mode gap identified during Pass 16 is closed. The production deployment and live protocol checks are complete. Human playtesting may begin when requested.
