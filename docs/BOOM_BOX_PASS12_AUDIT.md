@@ -4,7 +4,7 @@
 
 The Pass 10 authoritative state contract and Pass 11 physics core remain intact. Local and live protocol checks pass, including turn authority, resolution locking, replay/history, purchases, MIRV child resolution, reconnect, AI fill, spectators, and moderation.
 
-The project should **not move directly to Pass 13 yet**. A short Pass 12.1 hardening pass is required to close UI parity and a few catalogue semantics before AI work begins.
+This audit identified a short Pass 12.1 hardening pass. That cleanup is now complete; see `BOOM_BOX_PASS12_1_CLEANUP.md` for the implementation and verification record.
 
 ## Checks that passed
 
@@ -27,5 +27,8 @@ The project should **not move directly to Pass 13 yet**. A short Pass 12.1 harde
 
 ## Recommendation
 
-Complete Pass 12.1 first, rerun the same local/live matrix, and then begin Pass 13. Pass 13’s AI equipment decisions and teaching mode depend on players being able to see and use the same catalogue that the server already understands.
+Pass 12.1 is complete. The same local checks pass, and Pass 13 can begin. Pass 13's AI equipment decisions and teaching mode should build on the now-visible server catalogue. Solo preview parity remains explicitly tracked as a Pass 13 item.
 
+## Closure mapping
+
+The five cleanup findings above are closed by the Pass 12.1 changes: multiplayer catalogue controls and purchases are visible, network stock is hydrated from snapshots, terrain removal clears the solid mask, stale Pass 4 copy is gone, and solo preview status is explicit. Pass 10 metadata was corrected in the prior audit commit.
