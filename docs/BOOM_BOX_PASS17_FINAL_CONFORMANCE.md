@@ -24,10 +24,11 @@
 - `npm run test:cribbage`
 - `npm run test:cribbage-network`
 - `npm run test:smoke`
+- `npx -p playwright node .tmp_pass17_browser.mjs` (live browser smoke)
 
 The release matrix now proves that synchronous mode does not resolve after the first submission, and that both synchronous and simultaneous modes release two prepared actions deterministically.
 
-The deployed site returned HTTP 200 and the live Boom Box WebSocket protocol check passed after the deployment proxy completed its restart. An initial live WebSocket attempt returned a transient 502 during that restart window; the retry passed.
+The deployed site returned HTTP 200, the live Boom Box WebSocket protocol check passed after the deployment proxy completed its restart, and the live browser smoke passed for the home page, Boom Box entry, multiplayer lobby, and create wizard. An initial live WebSocket attempt returned a transient 502 during that restart window; the retry passed.
 
 ## Loop review
 
