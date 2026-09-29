@@ -33,7 +33,8 @@ This is a single-player vertical slice. The multiplayer lobby remains a local pr
 - Aiming matrix across six angle/power pairs confirmed reachable blast damage and a one-shot victory path.
 - Result-screen flow verified with the visible victory state, statistics, Play again, and Back to Boom Box controls.
 - Phone-sized visual check confirmed the battlefield, controls, health bars, shot log, and Exit match button fit without horizontal overflow.
+- `npm run test:boombox` now locks the fixed-seed terrain checksum, crater mutation, and impact damage values.
 
 ## Reassessment
 
-Pass 3 is ready to exit. Keep the nine-pass plan and move to Pass 4: configurable single-player matches with multiple AI opponents, the first economy and inventory, the initial weapon/utility catalogue, multiple terrain profiles, and help explaining the rules. Before adding broad content, preserve the seeded simulation and add automated fixed-seed action-log assertions for terrain checksum, collision order, damage, falling, and winner selection.
+Pass 3 is closed after the deterministic hardening check. Pass 4 has begun with multiple rivals, terrain profiles, match credits, initial weapons/utilities, target selection, and help. Continue Pass 4 by expanding the shop, inventory, AI difficulty, effects, statistics, and fixed-seed action-log coverage.

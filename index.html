@@ -158,7 +158,7 @@
               </button>
               <button id="select-cribbage" class="game-tile cribbage-tile" type="button" aria-label="Open Digital Cribbage">
                 <span class="tile-cribbage" aria-hidden="true"><i>5</i><i>J</i><i>Q</i></span>
-                <span class="tile-details"><strong>Digital Cribbage</strong><dl class="tile-scores" aria-label="Digital Cribbage features"><div><dt>Players</dt><dd>2–4</dd></div><div><dt>Modes</dt><dd>Classic + more</dd></div><div><dt>High scores</dt><dd>None</dd></div></dl></span>
+                <span class="tile-details"><strong>Digital Cribbage</strong><dl class="tile-scores" aria-label="Digital Cribbage features"><div><dt>Players</dt><dd>2ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“4</dd></div><div><dt>Modes</dt><dd>Classic + more</dd></div><div><dt>High scores</dt><dd>None</dd></div></dl></span>
               </button>              <button id="select-boombox" class="game-tile boombox-tile" type="button" aria-label="Open Boom Box">
                 <span class="tile-boombox" aria-hidden="true"><i></i><i></i><i></i><b></b></span>
                 <span class="tile-details"><strong>Boom Box</strong><dl class="tile-scores" aria-label="Boom Box features"><div><dt>Players</dt><dd>2-6</dd></div><div><dt>Modes</dt><dd>Solo + online</dd></div><div><dt>Style</dt><dd>Artillery</dd></div></dl></span>
@@ -181,22 +181,21 @@
             <p>One commander. One rival tank. Read the wind, shape the ground, and land the first decisive shot.</p>
             <form id="boombox-solo-form" class="boombox-solo-form">
               <label>Commander name<input id="boombox-solo-name" type="text" maxlength="18" autocomplete="nickname" value="Commander" /></label>
-              <label>Battlefield<select id="boombox-solo-terrain"><option value="sunset-range">Sunset Range · seeded canyon</option></select></label>
+              <label>Battlefield<select id="boombox-solo-terrain"><option value="sunset-range">Sunset Range - seeded canyon</option><option value="ice-shelf">Ice Shelf - low roughness</option><option value="lunar-crater">Lunar Crater - deep valleys</option></select></label><label>Rival tanks<select id="boombox-opponents"><option value="1">1 rival</option><option value="2" selected>2 rivals</option><option value="3">3 rivals</option></select></label><label>Starting weapon<select id="boombox-solo-weapon"><option value="cannon">Cannon - free</option><option value="heavy-shell">Heavy shell - 30 credits</option><option value="precision-round">Precision round - 20 credits</option></select></label><label>Utility<select id="boombox-solo-utility"><option value="repair-kit">Repair kit - restore 30 HP</option><option value="terrain-lift">Terrain lift - coming soon</option></select></label><div class="boombox-credit-note"><strong>Starting credits: 100</strong><span>Credits are match-local. Weapon costs are paid when you fire.</span></div>
               <label>Match seed<input id="boombox-solo-seed" type="number" min="1" max="999999" value="314159" /></label>
-              <div class="boombox-setup-note"><strong>Pass 3 rules</strong><span>Cannon fire, gravity, wind, destructible terrain, health, falling, and a complete win/lose result.</span></div>
+              <details class="boombox-help"><summary>How to play</summary><p>Adjust angle and power, then fire. Wind bends the arc. Explosions carve craters and damage tanks near the impact. Eliminate every rival to win.</p></details><div class="boombox-setup-note"><strong>Pass 4 systems now active</strong><span>Multiple rivals, terrain profiles, match credits, weapon costs, repair utility, and rules help are available in this build.</span></div>
               <div class="menu-actions"><button id="boombox-single-back" class="secondary" type="button">Back</button><button id="boombox-solo-start" type="submit">Start match</button></div>
             </form>
           </div>
           <div id="boombox-match-panel" class="overlay-panel boombox-panel boombox-match-panel" hidden>
-            <header class="boombox-match-header"><div><div class="boombox-kicker">PASS 3 · LIVE MATCH</div><h1>Boom Box</h1><p id="boombox-match-status" aria-live="polite">Your turn. Set the shot.</p></div><div class="boombox-match-meta"><span id="boombox-match-seed">Seed 314159</span><span id="boombox-match-terrain">Sunset Range</span></div></header>
+            <header class="boombox-match-header"><div><div class="boombox-kicker">PASS 4 - LIVE MATCH</div><h1>Boom Box</h1><p id="boombox-match-status" aria-live="polite">Your turn. Set the shot.</p></div><div class="boombox-match-meta"><span id="boombox-match-seed">Seed 314159</span><span id="boombox-match-terrain">Sunset Range</span></div></header>
             <div class="boombox-battle-wrap"><canvas id="boombox-canvas" width="960" height="540" aria-label="Boom Box artillery battlefield"></canvas></div>
-            <div class="boombox-match-controls">
-              <label>Angle <output id="boombox-angle-value" for="boombox-angle">42°</output><input id="boombox-angle" type="range" min="8" max="82" value="42" /></label>
+            <div class="boombox-match-controls"><label>Target<select id="boombox-target"><option value="0">Rival 1</option></select></label><label>Weapon<select id="boombox-weapon"><option value="cannon">Cannon - free</option><option value="heavy-shell">Heavy shell - 30</option><option value="precision-round">Precision round - 20</option></select></label><label>Angle <output id="boombox-angle-value" for="boombox-angle">42Ãƒâ€šÃ‚Â°</output><input id="boombox-angle" type="range" min="8" max="82" value="42" /></label>
               <label>Power <output id="boombox-power-value" for="boombox-power">58%</output><input id="boombox-power" type="range" min="25" max="95" value="58" /></label>
-              <div class="boombox-match-readout"><span>Wind <strong id="boombox-wind">+0.0</strong></span><span>Turn <strong id="boombox-turn">1</strong></span></div>
-              <button id="boombox-fire" class="boombox-fire-button" type="button">Fire cannon</button>
+              <div class="boombox-match-readout"><span>Wind <strong id="boombox-wind">+0.0</strong></span><span>Turn <strong id="boombox-turn">1</strong></span><span>Credits <strong id="boombox-credits">100</strong></span></div>
+              <button id="boombox-fire" class="boombox-fire-button" type="button">Fire cannon</button><button id="boombox-utility" class="secondary boombox-utility-button" type="button">Use repair kit</button>
             </div>
-            <div class="boombox-health-row"><div><span id="boombox-player-label">Commander</span><span class="boombox-health-track"><i id="boombox-player-health"></i></span><strong id="boombox-player-health-value">100 HP</strong></div><div><span>Rival tank</span><span class="boombox-health-track"><i id="boombox-ai-health"></i></span><strong id="boombox-ai-health-value">100 HP</strong></div></div>
+            <div class="boombox-health-row"><div><span id="boombox-player-label">Commander</span><span class="boombox-health-track"><i id="boombox-player-health"></i></span><strong id="boombox-player-health-value">100 HP</strong></div><div id="boombox-opponent-health-list" class="boombox-opponent-health-list"></div></div>
             <div class="boombox-match-footer"><span id="boombox-shot-log" aria-live="polite">Shot log: match ready.</span><button id="boombox-match-exit" class="secondary" type="button">Exit match</button></div>
           </div>
           <div id="boombox-result-panel" class="overlay-panel boombox-panel boombox-result-panel" hidden>
@@ -445,12 +444,12 @@
             <button id="cribbage-report-issue" type="button">Report issue</button><button id="cribbage-options-back" type="button">Back</button>
           </div>
           <div id="cribbage-board-panel" class="overlay-panel cribbage-board-panel" hidden>
-            <div class="cribbage-board-header"><h1>Digital Cribbage</h1><span id="cribbage-round-label">Round 1 · Classic</span></div>
+            <div class="cribbage-board-header"><h1>Digital Cribbage</h1><span id="cribbage-round-label">Round 1 Ãƒâ€šÃ‚Â· Classic</span></div>
             <div id="cribbage-scoreboard" class="cribbage-scoreboard" aria-label="Cribbage scoreboard"></div><div id="cribbage-connection-status" class="cribbage-connection-status" aria-label="Player connection status"></div>
             <p id="cribbage-status" class="cribbage-status" aria-live="polite"></p>
-            <div class="cribbage-table"><div><span>Dealer</span><strong id="cribbage-dealer">Player 1</strong></div><div><span>Cut card</span><strong id="cribbage-cut-card">—</strong></div><div><span>Crib</span><strong id="cribbage-crib-count">0 cards</strong></div><div><span>Pegging total</span><strong id="cribbage-total">0 / 31</strong></div></div>
+            <div class="cribbage-table"><div><span>Dealer</span><strong id="cribbage-dealer">Player 1</strong></div><div><span>Cut card</span><strong id="cribbage-cut-card">ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â-</strong></div><div><span>Crib</span><strong id="cribbage-crib-count">0 cards</strong></div><div><span>Pegging total</span><strong id="cribbage-total">0 / 31</strong></div></div>
             <section id="cribbage-pegging-scoring" class="cribbage-pegging-scoring" aria-live="polite"></section>
-            <section id="cribbage-peg-track" class="cribbage-peg-track" aria-label="Cribbage scoring board"><div class="cribbage-peg-heading"><strong>Cribbage board</strong><span>121 holes · first to the finish wins</span></div><div id="cribbage-peg-board" class="cribbage-peg-board"><div id="cribbage-peg-holes" class="cribbage-peg-holes" aria-hidden="true"></div><div id="cribbage-pegs" class="cribbage-pegs"></div></div><div class="cribbage-peg-scale"><span>START · 0</span><span>30</span><span>60</span><span>90</span><span>FINISH · 121</span></div></section>
+            <section id="cribbage-peg-track" class="cribbage-peg-track" aria-label="Cribbage scoring board"><div class="cribbage-peg-heading"><strong>Cribbage board</strong><span>121 holes Ãƒâ€šÃ‚Â· first to the finish wins</span></div><div id="cribbage-peg-board" class="cribbage-peg-board"><div id="cribbage-peg-holes" class="cribbage-peg-holes" aria-hidden="true"></div><div id="cribbage-pegs" class="cribbage-pegs"></div></div><div class="cribbage-peg-scale"><span>START Ãƒâ€šÃ‚Â· 0</span><span>30</span><span>60</span><span>90</span><span>FINISH Ãƒâ€šÃ‚Â· 121</span></div></section>
             <section id="cribbage-played-cards" class="cribbage-played-cards" aria-label="Cards played this round"></section>
             <h2 id="cribbage-turn-label">Player 1: choose two cards for the crib</h2>
             <div id="cribbage-hand" class="cribbage-hand" aria-label="Current player's hand"></div>
@@ -559,4 +558,4 @@
     </main>
     <script type="module" src="/src/main.ts"></script>
   </body>
-</html>
+</html>`r`n

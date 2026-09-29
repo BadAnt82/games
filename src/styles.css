@@ -937,8 +937,13 @@ body.fullscreen-fallback-active {
 }
 
 .boombox-setup-note span { color: rgba(224, 239, 255, .68); font-size: .82rem; line-height: 1.4; }
+.boombox-credit-note { display: grid; gap: 3px; padding: 11px 13px; border: 1px solid rgba(255, 174, 105, .28); border-radius: 10px; color: #ffdbad; background: rgba(66, 38, 54, .42); }
+.boombox-credit-note span { color: rgba(255, 229, 197, .68); font-size: .78rem; }
+.boombox-help { padding: 10px 13px; border: 1px solid rgba(100, 230, 255, .25); border-radius: 9px; color: #dff9ff; background: rgba(7, 32, 58, .4); }
+.boombox-help summary { cursor: pointer; font-weight: 900; }
+.boombox-help p { margin: 8px 0 0; color: rgba(224, 239, 255, .68); font-size: .82rem; line-height: 1.4; }
 
-.boombox-match-panel { width: min(100%, 1040px); gap: 12px; }
+.boombox-match-panel { width: min(100%, 1040px); min-width: 0; gap: 12px; }
 .boombox-match-header { display: flex; width: 100%; align-items: end; justify-content: space-between; gap: 16px; text-align: left; }
 .boombox-match-header h1 { margin: 2px 0 4px; font-size: clamp(1.8rem, 5vw, 3.25rem); }
 .boombox-match-header p { margin: 0; color: rgba(224, 239, 255, .78); font-size: .88rem; }
@@ -947,19 +952,28 @@ body.fullscreen-fallback-active {
 .boombox-battle-wrap { width: 100%; overflow: hidden; border: 1px solid rgba(119, 225, 255, .4); border-radius: 14px; background: #0d1731; box-shadow: 0 12px 30px rgba(2, 5, 20, .35); }
 #boombox-canvas { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; touch-action: none; }
 .boombox-match-controls { display: grid; width: 100%; grid-template-columns: minmax(150px, 1fr) minmax(150px, 1fr) auto minmax(140px, auto); align-items: end; gap: 12px; padding: 12px; border: 1px solid rgba(143, 204, 255, .2); border-radius: 12px; background: rgba(10, 22, 48, .68); text-align: left; }
-.boombox-match-controls label { display: grid; gap: 5px; color: #dcecff; font-size: .74rem; font-weight: 900; letter-spacing: .05em; text-transform: uppercase; }
+.boombox-match-controls label { display: grid; min-width: 0; gap: 5px; color: #dcecff; font-size: .74rem; font-weight: 900; letter-spacing: .05em; text-transform: uppercase; }
 .boombox-match-controls output { justify-self: end; color: #ffcb86; font-size: .84rem; letter-spacing: 0; }
 .boombox-match-controls input[type="range"] { width: 100%; accent-color: #ff9b5d; }
+.boombox-match-controls select { width: 100%; min-width: 0; }
 .boombox-match-readout { display: grid; gap: 4px; min-width: 100px; color: rgba(224, 239, 255, .62); font-size: .72rem; font-weight: 800; }
 .boombox-match-readout strong { margin-left: 6px; color: #fff; font-size: .92rem; }
 .boombox-fire-button { min-height: 44px; }
+.boombox-utility-button { min-height: 44px; }
 .boombox-health-row { display: grid; width: 100%; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .boombox-health-row > div { display: grid; grid-template-columns: auto minmax(80px, 1fr) auto; align-items: center; gap: 8px; color: #dcecff; font-size: .72rem; font-weight: 900; text-align: left; }
 .boombox-health-row strong { color: #fff; font-size: .74rem; white-space: nowrap; }
 .boombox-health-track { display: block; height: 8px; overflow: hidden; border-radius: 99px; background: rgba(4, 9, 25, .8); }
 .boombox-health-track i { display: block; width: 100%; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #59e8ff, #75ffb2); transition: width .18s ease; }
 .boombox-health-row > div:last-child .boombox-health-track i { background: linear-gradient(90deg, #ffb05d, #ff6b7d); }
-.boombox-match-footer { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 12px; color: rgba(224, 239, 255, .65); font-size: .75rem; text-align: left; }
+.boombox-opponent-health-list { display: grid; gap: 6px; }
+.boombox-opponent-health-list,
+.boombox-opponent-health,
+.boombox-health-row > div { min-width: 0; }
+.boombox-opponent-health { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px; color: #dcecff; font-size: .72rem; font-weight: 900; text-align: left; }
+.boombox-opponent-health strong { color: #fff; font-size: .74rem; white-space: nowrap; }
+.boombox-match-footer { display: flex; width: 100%; min-width: 0; align-items: center; justify-content: space-between; gap: 12px; color: rgba(224, 239, 255, .65); font-size: .75rem; text-align: left; }
+.boombox-match-footer > * { min-width: 0; overflow-wrap: anywhere; }
 .boombox-result-panel { width: min(100%, 700px); }
 .boombox-result-panel h1 { margin: 0; font-size: clamp(2rem, 6vw, 4rem); }
 .boombox-result-panel > p { max-width: 38rem; }
@@ -1941,9 +1955,16 @@ body.fullscreen-fallback-active {
   .boombox-create-step { padding: 15px; }
   .boombox-match-header { align-items: start; flex-direction: column; gap: 6px; }
   .boombox-match-meta { justify-content: start; }
+  .boombox-match-panel,
+  .boombox-match-controls,
+  .boombox-match-health,
+  .boombox-health-row,
+  .boombox-match-footer { min-width: 0; }
   .boombox-match-controls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .boombox-match-controls > * { min-width: 0; }
   .boombox-match-readout { grid-column: 1; }
   .boombox-fire-button { grid-column: 2; }
+  .boombox-utility-button { grid-column: 1 / -1; width: 100%; }
   .boombox-health-row { grid-template-columns: 1fr; gap: 8px; }
   .boombox-match-footer { align-items: stretch; flex-direction: column; }
   .boombox-match-footer button { width: 100%; }
