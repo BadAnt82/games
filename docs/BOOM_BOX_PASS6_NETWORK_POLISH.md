@@ -22,6 +22,6 @@ Pass 6 hardens the authoritative multiplayer loop for real browser sessions.
 - `npm run test:cribbage`
 - `npm run test:cribbage-network`
 
-## Boundary for Pass 7
+## Follow-up
 
-The active room history is held in the running service. Pass 7 can persist completed matches, add spectators and invite links, and add authoritative projectile collision against the full terrain model.
+Pass 7 now persists completed matches, supports spectators and invite links, and evaluates terrain collision on the server. A dedicated history screen and authenticated invite permissions remain future work.
