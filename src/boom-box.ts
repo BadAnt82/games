@@ -184,6 +184,7 @@ export function initBoomBox() {
   let targetSignature = "";
   let opponentHealthSignature = "";
   let networkSocket: WebSocket | undefined;
+  let pendingNetworkMessages: object[] = [];
   let networkSeat = -1;
   let networkGameId = "";
   let networkTurnSeat = 0;
@@ -202,12 +203,12 @@ export function initBoomBox() {
     if (networkSocket && (networkSocket.readyState === WebSocket.OPEN || networkSocket.readyState === WebSocket.CONNECTING)) return;
     networkMode = true; lobbyStatus.textContent = "Connecting to the authoritative war room...";
     try { networkSocket = new WebSocket(networkUrl()); } catch { networkMode = false; lobbyStatus.textContent = "Live room service is unavailable. Local preview remains available."; return; }
-    networkSocket.addEventListener("open", () => { networkSocket?.send(JSON.stringify({ type: "boombox-list", userId: networkUserId() })); const savedRoom = localStorage.getItem(boomBoxRoomKey) || ""; const savedSession = localStorage.getItem(boomBoxSessionKey) || ""; const targetRoom = inviteRoomId || savedRoom; if (inviteRoomId) networkSocket?.send(JSON.stringify({ type: "boombox-invite", userId: networkUserId(), gameId: inviteRoomId, inviteToken, name: networkUserId() })); else if (savedRoom && savedSession) networkSocket?.send(JSON.stringify({ type: "boombox-join", userId: networkUserId(), gameId: savedRoom, sessionId: savedSession, name: networkUserId() })); if (targetRoom) joinedRoomId = targetRoom; lobbyStatus.textContent = "Connected. Rooms are synchronized with the server."; });
+    networkSocket.addEventListener("open", () => { networkSocket?.send(JSON.stringify({ type: "boombox-list", userId: networkUserId() })); const savedRoom = localStorage.getItem(boomBoxRoomKey) || ""; const savedSession = localStorage.getItem(boomBoxSessionKey) || ""; const targetRoom = inviteRoomId || savedRoom; if (inviteRoomId) networkSocket?.send(JSON.stringify({ type: "boombox-invite", userId: networkUserId(), gameId: inviteRoomId, inviteToken, name: networkUserId() })); else if (savedRoom && savedSession) networkSocket?.send(JSON.stringify({ type: "boombox-join", userId: networkUserId(), gameId: savedRoom, sessionId: savedSession, name: networkUserId() })); if (targetRoom) joinedRoomId = targetRoom; for (const payload of pendingNetworkMessages.splice(0)) networkSocket?.send(JSON.stringify(payload)); lobbyStatus.textContent = "Connected. Rooms are synchronized with the server."; });
     networkSocket.addEventListener("message", (event) => { let message; try { message = JSON.parse(event.data); } catch { return; } handleNetworkMessage(message); });
     networkSocket.addEventListener("close", () => { networkSocket = undefined; if (matchView === "lobby") lobbyStatus.textContent = "Room service disconnected. Refresh to reconnect."; });
     networkSocket.addEventListener("error", () => { networkMode = false; lobbyStatus.textContent = "Room service unavailable. Local preview remains available."; });
   }
-  function sendNetwork(payload: unknown) { if (networkSocket?.readyState === WebSocket.OPEN) networkSocket.send(JSON.stringify({ ...payload as object, userId: networkUserId() })); }
+  function sendNetwork(payload: unknown) { const message = { ...payload as object, userId: networkUserId() }; if (networkSocket?.readyState === WebSocket.OPEN) networkSocket.send(JSON.stringify(message)); else if (networkSocket?.readyState === WebSocket.CONNECTING) pendingNetworkMessages.push(message); }
   function handleNetworkMessage(message: any) {
     if (message.type === "boombox-lobby-list") { createdRooms = Array.isArray(message.created) ? message.created.map((room: any) => ({ ...room, terrain: room.terrain === "ice-shelf" ? "Ice Shelf" : room.terrain === "lunar-crater" ? "Lunar Crater" : "Sunset Range" })) : []; availableRooms = Array.isArray(message.available) ? message.available.map((room: any) => ({ ...room, terrain: room.terrain === "ice-shelf" ? "Ice Shelf" : room.terrain === "lunar-crater" ? "Lunar Crater" : "Sunset Range" })) : []; renderRooms(); return; }
     if (message.type === "boombox-created" || message.type === "boombox-joined") { networkSpectator = false; networkGameId = message.gameId; networkSeat = message.seat; joinedRoomId = message.gameId; if (message.sessionId) localStorage.setItem(boomBoxSessionKey, message.sessionId); localStorage.setItem(boomBoxRoomKey, networkGameId); lobbyStatus.textContent = message.type === "boombox-created" ? "Room created. Waiting for commanders to join." : "Joined room. Waiting for the match to fill."; return; }
