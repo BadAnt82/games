@@ -502,6 +502,9 @@ const recordForm = requireElement<HTMLFormElement>(".record-card");
 const recordTitle = requireElement<HTMLElement>("#record-title");
 const recordMessage = requireElement<HTMLElement>("#record-message");
 const recordNameInput = requireElement<HTMLInputElement>("#record-name");
+const recordSaveButton = requireElement<HTMLButtonElement>("#record-save");
+const playerNameLabel = requireElement<HTMLElement>("#player-name-label");
+const playerNameChangeButton = requireElement<HTMLButtonElement>("#player-name-change");
 const bridgePlayerNameEls = Array.from(document.querySelectorAll<HTMLElement>("[data-bridge-player-name]"));
 const ctx = requireCanvasContext(canvas);
 const breakoutGame = initBreakout();
@@ -5615,32 +5618,30 @@ async function reconcileBridgeLocalScores() {
   }
 }
 
-function askForRecordName(finalScore: number, recordLabels: string[], unitLabel = "points") {
-  const savedName = localStorage.getItem(playerNameKey)?.trim();
-  if (savedName) {
-    return Promise.resolve(savedName);
-  }
-  recordMessage.textContent = `You set ${recordLabels.join(" and ")} with ${formatScore(finalScore)} ${unitLabel}.`;
-  recordTitle.textContent = "Congratulations!";
-  recordNameInput.value = "Player 1";
+function currentPlayerName() {
+  return localStorage.getItem(playerNameKey)?.trim() || "Player 1";
+}
+
+function updatePlayerIdentity(name = currentPlayerName()) {
+  playerNameLabel.textContent = name;
+}
+
+function openPlayerNameDialog(change = false) {
+  const savedName = localStorage.getItem(playerNameKey)?.trim() || "";
+  recordTitle.textContent = change ? "Change player name" : "Choose your player name";
+  recordMessage.textContent = "This name stays on this device and is reused across every game and multiplayer room. If you set a record, the same name appears on the public scoreboard.";
+  recordNameInput.value = savedName;
+  recordNameInput.placeholder = "Player 1";
+  recordSaveButton.textContent = change ? "Save name" : "Continue";
   recordDialog.hidden = false;
   recordNameInput.focus();
-
-  return new Promise<string>((resolve) => {
-    pendingRecordName = resolve;
-  });
 }
 
 function promptForPlayerName() {
   const savedName = localStorage.getItem(playerNameKey)?.trim() || "";
-  recordMessage.textContent = savedName
-    ? `Use “${savedName}” as your player name, or change it below.`
-    : "Enter your player name. We’ll use it for scores and multiplayer on this device.";
-  recordNameInput.value = savedName;
-  recordNameInput.placeholder = "Player 1";
-  recordTitle.textContent = "Choose your player name";
-  recordDialog.hidden = false;
-  recordNameInput.focus();
+  updatePlayerIdentity(savedName || "Player 1");
+  if (savedName) return;
+  openPlayerNameDialog();
 }
 
 async function syncFinalScore(finalScore: number) {
@@ -5650,28 +5651,12 @@ async function syncFinalScore(finalScore: number) {
   planeScoreSyncActive = true;
   try {
     rememberPendingServerScore(finalScore);
-    const savedName = localStorage.getItem(playerNameKey)?.trim() || "";
+    const savedName = currentPlayerName();
     const result = await submitServerHighScore(finalScore, savedName);
     if (!result) {
       return;
     }
 
-    const recordLabels: string[] = [];
-    if (result.todayRecord) {
-      recordLabels.push("today's top score");
-    }
-    if (result.allTimeRecord) {
-      recordLabels.push("the server top score");
-    }
-
-    if (recordLabels.length === 0) {
-      return;
-    }
-
-    if (!savedName) {
-      const name = await askForRecordName(finalScore, recordLabels);
-      await submitServerHighScore(finalScore, name);
-    }
   } finally {
     planeScoreSyncActive = false;
   }
@@ -5684,28 +5669,12 @@ async function syncFinalSnakeScore(finalScore: number) {
   snakeScoreSyncActive = true;
   try {
     rememberPendingServerSnakeScore(finalScore);
-    const savedName = localStorage.getItem(playerNameKey)?.trim() || "";
+    const savedName = currentPlayerName();
     const result = await submitServerSnakeHighScore(finalScore, savedName);
     if (!result) {
       return;
     }
 
-    const recordLabels: string[] = [];
-    if (result.todayRecord) {
-      recordLabels.push("today's longest snake");
-    }
-    if (result.allTimeRecord) {
-      recordLabels.push("the server longest snake");
-    }
-
-    if (recordLabels.length === 0) {
-      return;
-    }
-
-    if (!savedName) {
-      const name = await askForRecordName(finalScore, recordLabels, "segments");
-      await submitServerSnakeHighScore(finalScore, name);
-    }
   } finally {
     snakeScoreSyncActive = false;
   }
@@ -5718,37 +5687,12 @@ async function syncFinalBridgeScores(finalTiles: number, finalPoints: number) {
   bridgeScoreSyncActive = true;
   try {
     rememberPendingServerBridgeScores(finalTiles, finalPoints);
-    const savedName = localStorage.getItem(playerNameKey)?.trim() || "";
-    const [tileResult, pointResult] = await Promise.all([
+    const savedName = currentPlayerName();
+    await Promise.all([
       submitServerBridgeTileScore(finalTiles, savedName),
       submitServerBridgePointScore(finalPoints, savedName),
     ]);
 
-    const recordLabels: string[] = [];
-    if (tileResult?.todayRecord) {
-      recordLabels.push("today's bridge tile record");
-    }
-    if (tileResult?.allTimeRecord) {
-      recordLabels.push("the server bridge tile record");
-    }
-    if (pointResult?.todayRecord) {
-      recordLabels.push("today's bridge point record");
-    }
-    if (pointResult?.allTimeRecord) {
-      recordLabels.push("the server bridge point record");
-    }
-
-    if (recordLabels.length === 0) {
-      return;
-    }
-
-    if (!savedName) {
-      const name = await askForRecordName(Math.max(finalTiles, finalPoints), recordLabels, "best result");
-      await Promise.all([
-        submitServerBridgeTileScore(finalTiles, name),
-        submitServerBridgePointScore(finalPoints, name),
-      ]);
-    }
   } finally {
     bridgeScoreSyncActive = false;
   }
@@ -7384,12 +7328,14 @@ recordForm.addEventListener("submit", (event) => {
   event.preventDefault();
   const name = recordNameInput.value.trim() || "Player 1";
   localStorage.setItem(playerNameKey, name);
+  updatePlayerIdentity(name);
   setText(bridgePlayerNameEls, name);
   window.dispatchEvent(new CustomEvent("badant-player-name-changed", { detail: { name } }));
   recordDialog.hidden = true;
   pendingRecordName?.(name);
   pendingRecordName = null;
 });
+playerNameChangeButton.addEventListener("click", () => openPlayerNameDialog(true));
 document.addEventListener("fullscreenchange", () => {
   updateFullscreenButton();
   resize();

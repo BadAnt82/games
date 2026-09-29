@@ -1104,6 +1104,9 @@ body.fullscreen-fallback-active {
   width: min(100%, 900px);
   gap: 16px;
 }
+.player-identity { display: flex; align-items: center; justify-content: center; gap: 9px; width: min(100%, 420px); padding: 8px 11px; border: 1px solid rgba(143, 204, 255, .22); border-radius: 999px; color: rgba(224, 239, 255, .66); background: rgba(10, 22, 48, .52); font-size: .76rem; }
+.player-identity strong { color: #fff; }
+.player-identity button { min-height: 30px; padding: 4px 9px; font-size: .7rem; }
 
 .platform-panel h1 {
   color: #edf7ff;

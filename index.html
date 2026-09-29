@@ -42,6 +42,7 @@
         <div id="overlay" class="overlay">
           <div id="platform-panel" class="overlay-panel platform-panel">
             <h1>Game Select</h1>
+            <div class="player-identity" aria-live="polite"><span>Playing as</span><strong id="player-name-label">Player 1</strong><button id="player-name-change" class="secondary" type="button">Change name</button></div>
             <div class="game-grid" aria-label="Available games">
               <button id="select-plane" class="game-tile" type="button" aria-label="Open Jumpy Plane">
                 <span class="tile-plane" aria-hidden="true">
@@ -564,7 +565,7 @@
             <p id="record-message">You set a new high score.</p>
             <label for="record-name">Name</label>
             <input id="record-name" name="name" maxlength="24" autocomplete="nickname" />
-            <button id="record-save" type="submit">Save score</button>
+            <button id="record-save" type="submit">Continue</button>
           </form>
         </div>
       </section>
