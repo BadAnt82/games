@@ -34,3 +34,4 @@ The release matrix passed with restart recovery and all seat/mode cases. No user
 
 The current server accepts and persists the `sequential`, `synchronous`, and `simultaneous` rule values, but action resolution is still sequential for all three. Pass 17 must either implement the prepare/release semantics for synchronous and simultaneous firing or explicitly remove those options before final user testing. This is a rules-completeness gate, not a restart or data-loss issue.
 
+**Pass 17 follow-up:** this gate was closed by the prepare/release implementation documented in [BOOM_BOX_PASS17_FINAL_CONFORMANCE.md](./BOOM_BOX_PASS17_FINAL_CONFORMANCE.md).

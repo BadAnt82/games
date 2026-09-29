@@ -81,6 +81,28 @@ async function startAi(socket, gameId, userId) {
   return statePromise;
 }
 
+async function verifyPreparedMode(mode, suffix) {
+  const hostId = `mode-host-${mode}-${suffix}`;
+  const guestId = `mode-guest-${mode}-${suffix}`;
+  const host = await open();
+  const created = await createRoom(host, hostId, { name: `Mode ${mode} ${suffix}`, creator: "Mode Host", seats: 2, firingMode: mode, aiFill: false, seed: 8120 + mode.length });
+  const guest = await open();
+  const joinedPromise = next(guest, "boombox-joined");
+  const hostStartPromise = next(host, "boombox-state", (message) => message.snapshot?.phase === "turn-prep");
+  const guestStartPromise = next(guest, "boombox-state", (message) => message.snapshot?.phase === "turn-prep");
+  guest.send(JSON.stringify({ type: "boombox-join", gameId: created.gameId, userId: guestId, name: "Mode Guest" }));
+  await joinedPromise; await hostStartPromise; await guestStartPromise;
+  const preparedPromise = next(host, "boombox-state", (message) => message.snapshot?.phase === "prepare" && message.snapshot.preparedSeats?.includes(0));
+  host.send(JSON.stringify({ type: "boombox-action", userId: hostId, actionId: `${mode}-host-1`, action: { targetIndex: 1, weapon: "cannon", angle: 42, power: 58 } }));
+  const prepared = await preparedPromise;
+  if (prepared.snapshot.log.some((entry) => entry.kind === "fire")) throw new Error(`${mode} resolved before every commander prepared`);
+  const releasedPromise = next(host, "boombox-state", (message) => ["turn-prep", "finished"].includes(message.snapshot?.phase) && message.snapshot.log.filter((entry) => entry.kind === "fire").length >= 2, 7000);
+  guest.send(JSON.stringify({ type: "boombox-action", userId: guestId, actionId: `${mode}-guest-1`, action: { targetIndex: 0, weapon: "cannon", angle: 42, power: 58 } }));
+  const released = await releasedPromise;
+  if (released.snapshot.rules?.firingMode !== mode || released.snapshot.log.filter((entry) => entry.kind === "fire").length !== 2) throw new Error(`${mode} did not release both prepared actions deterministically`);
+  close(host); close(guest);
+}
+
 function close(socket) { if (socket && socket.readyState === WebSocket.OPEN) socket.close(); }
 
 mkdirSync(storeDir, { recursive: true });
@@ -124,6 +146,8 @@ try {
     if (initial.snapshot.players?.length !== seats || Object.keys(initial.snapshot.rules.weaponCatalog || {}).length < 18) throw new Error(`Seat/catalog matrix failed for ${seats}-seat room`);
     close(socket);
   }
+  await verifyPreparedMode("synchronous", suffix);
+  await verifyPreparedMode("simultaneous", suffix);
 
   // A started room also restores authoritative state, inventory, and rules.
   const activeId = `active-${suffix}`;
@@ -145,7 +169,7 @@ try {
   if (restoredState.snapshot.rules?.version !== 2 || restoredState.snapshot.players.length !== 2 || restoredState.snapshot.gameId !== activeCreated.gameId) throw new Error("Started room state did not survive restart");
   close(restored);
 
-  console.log("Boom Box Pass 16 release matrix passed: malformed payload rejection, setup restart recovery, started-match restart recovery, 2/4/6/10-seat rules, all firing-mode configurations, versioned catalogue, and session continuity.");
+  console.log("Boom Box Pass 17 release matrix passed: malformed payload rejection, setup restart recovery, started-match restart recovery, 2/4/6/10-seat rules, synchronous prepare/release, simultaneous deterministic release, versioned catalogue, and session continuity.");
 } finally {
   if (server && !server.killed) server.kill();
   try { rmSync(storeDir, { recursive: true, force: true }); } catch {}
