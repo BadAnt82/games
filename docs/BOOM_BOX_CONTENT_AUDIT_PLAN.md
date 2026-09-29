@@ -265,4 +265,4 @@ The content-complete release is not done until all of these are true:
 
 ## What should happen next
 
-Passes 10 through 21 have been completed and checked against the earlier implementation. Pass 21 completed the production browser/device sweep with no release-blocking presentation regression. See [BOOM_BOX_PASS21_LIVE_ACCEPTANCE.md](./BOOM_BOX_PASS21_LIVE_ACCEPTANCE.md). The next implementation pass is **Pass 22: final read-only conformance and gap audit**. Human playtesting remains deferred until that audit exits successfully.
+Passes 10 through 22 have been completed and checked against the earlier implementation. Pass 22 found four release-blocking conformance gaps: per-seat human/AI assignment, full event replay, terrain bounce behavior, and a complete two-browser multiplayer UI acceptance check. See [BOOM_BOX_PASS22_CONFORMANCE_AUDIT.md](./BOOM_BOX_PASS22_CONFORMANCE_AUDIT.md). The next implementation pass is **Pass 23: conformance corrections**. Human playtesting remains deferred until those corrections exit successfully.
