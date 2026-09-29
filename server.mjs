@@ -15,6 +15,7 @@ const bridgePointStorePath =
 const bridgeJackpotStorePath =
   process.env.BRIDGE_JACKPOT_STORE_PATH || resolve(__dirname, "data", "glass-bridge-jackpot.json");
 const boomBoxHistoryPath = process.env.BOOM_BOX_HISTORY_STORE_PATH || resolve(__dirname, "data", "boombox-match-history.json");
+const boomBoxRoomStorePath = process.env.BOOM_BOX_ROOM_STORE_PATH || resolve(__dirname, "data", "boombox-active-rooms.json");
 const issueStorePaths = {
   "glass-bridge": process.env.GLASS_BRIDGE_ISSUE_STORE_PATH || resolve(__dirname, "data", "glass-bridge-issues.json"),
   "jumpy-plane": process.env.JUMPY_PLANE_ISSUE_STORE_PATH || resolve(__dirname, "data", "jumpy-plane-issues.json"),
@@ -1718,13 +1719,73 @@ const server = createServer(async (request, response) => {
 const snakeServer = new WebSocketServer({ noServer: true });
 const pixelServer = new WebSocketServer({ noServer: true });
 const cribbageServer = new WebSocketServer({ noServer: true });
-const boomboxServer = new WebSocketServer({ noServer: true });
+const boomboxServer = new WebSocketServer({ noServer: true, maxPayload: 64 * 1024 });
 const cribbageRooms = new Map();
 const cribbageUserMemberships = new Map();
 let nextCribbageRoomId = 1;
 const boomboxRooms = new Map();
 const boomboxUserMemberships = new Map();
 let nextBoomBoxRoomId = 1027;
+
+function serializableBoomBoxRoom(room) {
+  return {
+    gameId: room.gameId,
+    inviteToken: room.inviteToken,
+    ownerUserId: room.ownerUserId,
+    name: room.name,
+    creator: room.creator,
+    seats: room.seats.map(({ socket, ...seat }) => ({ ...seat, connected: false })),
+    mutedUserIds: [...(room.mutedUserIds || [])],
+    chatLastAt: [...(room.chatLastAt || new Map()).entries()],
+    processedActionIds: [...(room.processedActionIds || [])].slice(-500),
+    terrain: room.terrain,
+    pace: room.pace,
+    rules: room.rules,
+    aiFill: room.aiFill,
+    started: room.started,
+    phase: room.phase,
+    resolving: false,
+    state: room.state,
+    seed: room.seed,
+    updatedAt: room.updatedAt,
+    historyRecorded: room.historyRecorded,
+  };
+}
+
+function writeBoomBoxRooms() {
+  try {
+    mkdirSync(resolve(boomBoxRoomStorePath, ".."), { recursive: true });
+    writeFileSync(boomBoxRoomStorePath, JSON.stringify([...boomboxRooms.values()].map(serializableBoomBoxRoom), null, 2));
+  } catch {
+    // A room remains live in memory if the optional recovery store is unavailable.
+  }
+}
+
+function restoreBoomBoxRooms() {
+  let records = [];
+  try { records = JSON.parse(readFileSync(boomBoxRoomStorePath, "utf8")); } catch { return; }
+  if (!Array.isArray(records)) return;
+  const cutoff = Date.now() - 45 * 60 * 1000;
+  for (const record of records) {
+    if (!record || typeof record !== "object" || typeof record.gameId !== "string" || Number(record.updatedAt) < cutoff) continue;
+    if (!Array.isArray(record.seats) || record.seats.length < 2 || !record.rules || (record.started && !record.state)) continue;
+    const seats = record.seats.map((seat) => ({ ...seat, socket: null, connected: false }));
+    const room = {
+      ...record,
+      seats,
+      spectators: new Set(),
+      mutedUserIds: new Set(Array.isArray(record.mutedUserIds) ? record.mutedUserIds : []),
+      chatLastAt: new Map(Array.isArray(record.chatLastAt) ? record.chatLastAt : []),
+      processedActionIds: new Set(Array.isArray(record.processedActionIds) ? record.processedActionIds : []),
+      aiTimer: null,
+      resolving: false,
+    };
+    boomboxRooms.set(room.gameId, room);
+    for (const seat of room.seats) if (seat.userId) boomboxUserMemberships.set(seat.userId, room.gameId);
+    const numericId = Number(String(room.gameId).replace(/^BB-/, ""));
+    if (Number.isFinite(numericId)) nextBoomBoxRoomId = Math.max(nextBoomBoxRoomId, numericId + 1);
+  }
+}
 
 function boomBoxRoomId() { return `BB-${String(nextBoomBoxRoomId++).padStart(4, "0")}`; }
 function boomBoxTerrain(seed, profile = "sunset-range") {
@@ -1796,7 +1857,7 @@ function broadcastBoomBoxLobby() { for (const room of boomboxRooms.values()) for
 function boomBoxSnapshot(room) { return { gameId: room.gameId, rules: room.rules, phase: room.phase, seed: room.seed, terrainName: room.terrain, terrain: room.state.terrain, terrainSolid: room.state.terrainSolid, terrainMaterial: room.state.terrainMaterial, wind: room.state.wind, turn: room.state.turn, turnSeat: room.state.turnSeat, actionSequence: room.state.actionSequence, players: room.state.players.map(({ socket, ...player }) => player), eliminationOrder: room.state.eliminationOrder, placements: room.state.placements, aiIntent: room.state.aiIntent || null, log: room.state.log, winner: room.state.winner ?? null }; }
 function boomBoxLoadoutPayload(room, seatIndex) { const player = room.state?.players?.[seatIndex]; if (!player) return { type: "boombox-loadout", gameId: room.gameId, rules: room.rules, money: room.rules.startingMoney, inventory: boomBoxInitialInventory(room.rules.weaponCatalog), utilities: boomBoxInitialInventory(room.rules.utilityCatalog) }; return { type: "boombox-loadout", gameId: room.gameId, rules: room.rules, money: player.money, inventory: player.inventory, inventoryCapacity: player.inventoryCapacity, utilities: player.utilities, utilityCapacity: player.utilityCapacity }; }
 function boomBoxSendLoadout(room, seatIndex) { const seat = room.seats[seatIndex]; if (seat?.socket) boomBoxSend(seat.socket, boomBoxLoadoutPayload(room, seatIndex)); }
-function broadcastBoomBoxRoom(room) { const snapshot = boomBoxSnapshot(room); for (const [index, seat] of room.seats.entries()) if (seat.socket) boomBoxSend(seat.socket, { type: "boombox-state", snapshot, seat: index }); for (const spectator of room.spectators || []) boomBoxSend(spectator, { type: "boombox-state", snapshot, seat: -1, spectator: true }); broadcastBoomBoxLobby(); }
+function broadcastBoomBoxRoom(room) { const snapshot = boomBoxSnapshot(room); for (const [index, seat] of room.seats.entries()) if (seat.socket) boomBoxSend(seat.socket, { type: "boombox-state", snapshot, seat: index }); for (const spectator of room.spectators || []) boomBoxSend(spectator, { type: "boombox-state", snapshot, seat: -1, spectator: true }); writeBoomBoxRooms(); broadcastBoomBoxLobby(); }
 function boomBoxReplaySnapshot(room) { return { sequence: room.state.log.at(-1)?.sequence || 0, turn: room.state.turn, turnSeat: room.state.turnSeat, phase: room.phase, terrain: room.state.terrain.filter((_, index) => index % 6 === 0), terrainSolid: room.state.terrainSolid.filter((_, index) => index % 6 === 0), terrainMaterial: room.state.terrainMaterial.filter((_, index) => index % 6 === 0), players: room.state.players.map(({ socket, ...player }) => ({ ...player })), eliminationOrder: room.state.eliminationOrder, placements: room.state.placements, aiIntent: room.state.aiIntent || null }; }
 function boomBoxRecordReplay(room) { if (!room.state) return; room.state.replay.push(boomBoxReplaySnapshot(room)); if (room.state.replay.length > 100) room.state.replay.shift(); }
 function boomBoxRecordHistory(room) { if (!room.state || room.historyRecorded) return; room.historyRecorded = true; boomBoxHistory.push({ gameId: room.gameId, name: room.name, creator: room.creator, terrain: room.terrain, seed: room.seed, rules: room.rules, finishedAt: new Date().toISOString(), winner: room.state.winner, eliminationOrder: room.state.eliminationOrder, placements: room.state.placements, players: room.state.players.map(({ socket, ...player }) => player), terrainData: room.state.terrain, terrainSolid: room.state.terrainSolid, terrainMaterial: room.state.terrainMaterial, replay: room.state.replay, log: room.state.log }); writeBoomBoxHistory(boomBoxHistory); }
@@ -1903,7 +1964,7 @@ function resolveBoomBoxAction(room, seatIndex, action, actionId = "") {
   const entry = boomBoxAppendEvent(room, { kind: "fire", seat: seatIndex, target: targetIndex, actualTarget: hitTargetIndex, weapon, mode: weaponRules.mode, children: childCount, angle, power, hit, impact: trajectory.impact, damage: hit ? damage : 0, terrainChange: { center: Math.round(terrainCenter), radius: terrainRadius, depth: terrainDepth, material }, actionId }); player.shots += 1; player.stats.shots += 1; player.stats.terrainChanges += childCount;
   advanceBoomBoxTurn(room, seatIndex); room.phase = room.phase === "finished" ? "finished" : "flight"; room.resolving = true; room.updatedAt = Date.now(); return { flight: { seat: seatIndex, target: hitTargetIndex >= 0 ? hitTargetIndex : targetIndex, weapon, hit, impact: trajectory.impact, path: trajectory.path, sequence: entry.sequence } };
 }
-function pruneBoomBoxRooms() { const cutoff = Date.now() - 45 * 60 * 1000; for (const [id, room] of boomboxRooms) if (room.updatedAt < cutoff) { if (room.aiTimer) clearTimeout(room.aiTimer); boomboxRooms.delete(id); for (const seat of room.seats) if (seat.userId && boomboxUserMemberships.get(seat.userId) === id) boomboxUserMemberships.delete(seat.userId); } }
+function pruneBoomBoxRooms() { const cutoff = Date.now() - 45 * 60 * 1000; let changed = false; for (const [id, room] of boomboxRooms) if (room.updatedAt < cutoff) { if (room.aiTimer) clearTimeout(room.aiTimer); boomboxRooms.delete(id); for (const seat of room.seats) if (seat.userId && boomboxUserMemberships.get(seat.userId) === id) boomboxUserMemberships.delete(seat.userId); changed = true; } if (changed) writeBoomBoxRooms(); }
 
 function cribbageRoomId() {
   return `crib-${String(nextCribbageRoomId++).padStart(4, "0")}`;
@@ -2151,6 +2212,7 @@ boomboxServer.on("connection", (socket) => {
   boomBoxSend(socket, boomBoxLobbyPayload());
   socket.on("message", (data) => {
     let message; try { message = JSON.parse(data.toString()); } catch { return; }
+    if (!message || typeof message !== "object" || Array.isArray(message)) { boomBoxSend(socket, { type: "boombox-error", message: "Malformed message." }); return; }
     pruneBoomBoxRooms();
     userId = typeof message.userId === "string" ? message.userId.slice(0, 120) : userId; socket.boomboxUserId = userId;
     if (message.type === "boombox-list") { boomBoxSend(socket, boomBoxLobbyPayload(userId)); return; }
@@ -2161,7 +2223,7 @@ boomboxServer.on("connection", (socket) => {
       if (boomboxUserMemberships.has(userId)) { boomBoxSend(socket, { type: "boombox-error", message: "You already have an active Boom Box room." }); return; }
       const config = message.config || {}; const rules = boomBoxRulesFromConfig(config); const count = rules.seats; const gameId = boomBoxRoomId();
       room = { gameId, inviteToken: `${gameId}-${Math.random().toString(36).slice(2)}-${Date.now().toString(36)}`, ownerUserId: userId, name: String(config.name || "Unnamed room").slice(0, 28), creator: String(config.creator || "Commander").slice(0, 18), seats: Array.from({ length: count }, (_, index) => ({ name: index === 0 ? String(config.creator || "Commander").slice(0, 18) : `Commander ${index + 1}`, userId: index === 0 ? userId : "", sessionId: index === 0 ? `${gameId}-${Math.random().toString(36).slice(2)}` : "", socket: index === 0 ? socket : null, connected: index === 0, bot: false, })), spectators: new Set(), mutedUserIds: new Set(), chatLastAt: new Map(), processedActionIds: new Set(), terrain: String(config.terrain || "sunset-range"), pace: rules.turnPace, rules, aiFill: Boolean(config.aiFill), started: false, phase: "setup", resolving: false, state: null, seed: Math.max(1, Math.min(999999, Number(config.seed) || 314159)), updatedAt: Date.now() };
-      seatIndex = 0; sessionId = room.seats[0].sessionId; boomboxRooms.set(gameId, room); boomboxUserMemberships.set(userId, gameId); boomBoxSend(socket, { type: "boombox-created", gameId, inviteToken: room.inviteToken, sessionId, seat: 0, host: true }); boomBoxSend(socket, boomBoxLoadoutPayload(room, 0)); boomBoxSend(socket, boomBoxLobbyPayload(userId)); return;
+      seatIndex = 0; sessionId = room.seats[0].sessionId; boomboxRooms.set(gameId, room); boomboxUserMemberships.set(userId, gameId); writeBoomBoxRooms(); boomBoxSend(socket, { type: "boombox-created", gameId, inviteToken: room.inviteToken, sessionId, seat: 0, host: true }); boomBoxSend(socket, boomBoxLoadoutPayload(room, 0)); boomBoxSend(socket, boomBoxLobbyPayload(userId)); return;
     }
     if (message.type === "boombox-join") {
       const target = boomboxRooms.get(String(message.gameId || "")); if (!target) { boomBoxSend(socket, { type: "boombox-error", message: "Room not found." }); return; }
@@ -2171,19 +2233,19 @@ boomboxServer.on("connection", (socket) => {
       if (target.started && index < 0) { boomBoxSend(socket, { type: "boombox-error", message: "That match has already started." }); return; }
       if (index < 0) index = target.seats.findIndex((seat) => !seat.connected && !seat.userId);
       if (index < 0) { boomBoxSend(socket, { type: "boombox-error", message: "No open commander seat is available." }); return; }
-      room = target; seatIndex = index; const previousUserId = room.seats[index].userId; if (previousUserId && previousUserId !== userId) boomboxUserMemberships.delete(previousUserId); sessionId = room.seats[index].sessionId || `${room.gameId}-${Math.random().toString(36).slice(2)}`; room.seats[index] = { ...room.seats[index], name: String(message.name || room.seats[index].name).slice(0, 18), userId, sessionId, socket, connected: true }; boomboxUserMemberships.set(userId, room.gameId); room.updatedAt = Date.now(); boomBoxSend(socket, { type: "boombox-joined", gameId: room.gameId, sessionId, seat: index, host: index === room.seats.findIndex((seat) => seat.userId === room.ownerUserId) }); if (room.started) { boomBoxSend(socket, { type: "boombox-state", snapshot: boomBoxSnapshot(room), seat: index }); } else if (room.seats.every((seat) => seat.connected)) startBoomBoxRoom(room); else { boomBoxSend(socket, boomBoxLoadoutPayload(room, index)); boomBoxSend(socket, boomBoxLobbyPayload(userId)); broadcastBoomBoxLobby(); } return;
+      room = target; seatIndex = index; const previousUserId = room.seats[index].userId; if (previousUserId && previousUserId !== userId) boomboxUserMemberships.delete(previousUserId); sessionId = room.seats[index].sessionId || `${room.gameId}-${Math.random().toString(36).slice(2)}`; room.seats[index] = { ...room.seats[index], name: String(message.name || room.seats[index].name).slice(0, 18), userId, sessionId, socket, connected: true }; boomboxUserMemberships.set(userId, room.gameId); room.updatedAt = Date.now(); writeBoomBoxRooms(); boomBoxSend(socket, { type: "boombox-joined", gameId: room.gameId, sessionId, seat: index, host: index === room.seats.findIndex((seat) => seat.userId === room.ownerUserId) }); if (room.started) { boomBoxSend(socket, { type: "boombox-state", snapshot: boomBoxSnapshot(room), seat: index }); } else if (room.seats.every((seat) => seat.connected)) startBoomBoxRoom(room); else { boomBoxSend(socket, boomBoxLoadoutPayload(room, index)); boomBoxSend(socket, boomBoxLobbyPayload(userId)); broadcastBoomBoxLobby(); } return;
     }
     if (message.type === "boombox-start-ai") { const target = boomboxRooms.get(String(message.gameId || room?.gameId || "")); if (!target || target.ownerUserId !== userId || target.started || !target.aiFill) return; room = target; seatIndex = target.seats.findIndex((seat) => seat.userId === userId); fillBoomBoxAi(target); return; }
     if (message.type === "boombox-purchase") { const target = room || boomboxRooms.get(String(message.gameId || "")); const purchaseId = typeof message.purchaseId === "string" ? message.purchaseId.slice(0, 120) : ""; if (!target || spectator || seatIndex < 0 || !purchaseId) { boomBoxSend(socket, { type: "boombox-purchase-error", message: "A valid active room and purchase ID are required." }); return; } if (target.processedActionIds.has(`purchase:${purchaseId}`)) { boomBoxSend(socket, { type: "boombox-purchase-error", message: "That purchase was already processed." }); return; } if (!target.state) { boomBoxSend(socket, { type: "boombox-purchase-error", message: "The loadout is not ready yet." }); return; } const purchase = boomBoxPurchase(target, seatIndex, message.category === "utility" ? "utility" : "weapon", String(message.item || ""), message.quantity); if (purchase?.error) boomBoxSend(socket, { type: "boombox-purchase-error", message: purchase.error }); else { target.processedActionIds.add(`purchase:${purchaseId}`); boomBoxSend(socket, { type: "boombox-purchase-result", loadout: purchase.loadout, entry: purchase.entry }); broadcastBoomBoxRoom(target); } return; }
     if (message.type === "boombox-watch-leave") { if (room?.spectators) room.spectators.delete(socket); room = null; spectator = false; broadcastBoomBoxLobby(); return; }
-    if (message.type === "boombox-cancel") { const target = boomboxRooms.get(String(message.gameId || room?.gameId || "")); if (!target || target.ownerUserId !== userId) return; if (target.aiTimer) clearTimeout(target.aiTimer); for (const seat of target.seats) if (seat.socket && seat.socket !== socket) seat.socket.close(1000, "Room cancelled"); for (const watcher of target.spectators || []) if (watcher !== socket) watcher.close(1000, "Room cancelled"); boomboxRooms.delete(target.gameId); for (const seat of target.seats) if (seat.userId) boomboxUserMemberships.delete(seat.userId); boomBoxSend(socket, { type: "boombox-cancelled", gameId: target.gameId }); broadcastBoomBoxLobby(); room = null; seatIndex = -1; return; }
+    if (message.type === "boombox-cancel") { const target = boomboxRooms.get(String(message.gameId || room?.gameId || "")); if (!target || target.ownerUserId !== userId) return; if (target.aiTimer) clearTimeout(target.aiTimer); for (const seat of target.seats) if (seat.socket && seat.socket !== socket) seat.socket.close(1000, "Room cancelled"); for (const watcher of target.spectators || []) if (watcher !== socket) watcher.close(1000, "Room cancelled"); boomboxRooms.delete(target.gameId); for (const seat of target.seats) if (seat.userId) boomboxUserMemberships.delete(seat.userId); writeBoomBoxRooms(); boomBoxSend(socket, { type: "boombox-cancelled", gameId: target.gameId }); broadcastBoomBoxLobby(); room = null; seatIndex = -1; return; }
     if (message.type === "boombox-moderate") { const target = room || boomboxRooms.get(String(message.gameId || "")); const ownerSeat = target?.seats.findIndex((seat) => seat.userId === target.ownerUserId); if (!target || spectator || seatIndex !== ownerSeat) return; const targetUserId = typeof message.targetUserId === "string" ? message.targetUserId.slice(0, 120) : ""; if (!targetUserId || targetUserId === target.ownerUserId) return; const action = message.action === "unmute" ? "unmute" : "mute"; if (action === "mute") target.mutedUserIds.add(targetUserId); else target.mutedUserIds.delete(targetUserId); const payload = { type: "boombox-chat", message: { sender: "System", text: `${targetUserId} was ${action}d by the room host.`, at: Date.now(), system: true } }; for (const seat of target.seats) if (seat.socket) boomBoxSend(seat.socket, payload); for (const watcher of target.spectators || []) boomBoxSend(watcher, payload); return; }
     if (message.type === "boombox-chat") { const target = room || boomboxRooms.get(String(message.gameId || "")); const text = typeof message.text === "string" ? message.text.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim().slice(0, 160) : ""; const senderUserId = spectator ? String(socket.boomboxUserId || userId || "") : target?.seats[seatIndex]?.userId || ""; if (!target || !text || !senderUserId || target.mutedUserIds.has(senderUserId)) return; const now = Date.now(); const previous = target.chatLastAt.get(senderUserId) || 0; if (now - previous < 650) { boomBoxSend(socket, { type: "boombox-error", message: "Please wait a moment before sending another message." }); return; } target.chatLastAt.set(senderUserId, now); const sender = spectator ? "Spectator" : target.seats[seatIndex]?.name || "Commander"; const payload = { type: "boombox-chat", message: { sender, senderUserId, text, at: now } }; for (const seat of target.seats) if (seat.socket) boomBoxSend(seat.socket, payload); for (const watcher of target.spectators || []) boomBoxSend(watcher, payload); return; }
     if (!room || spectator || seatIndex < 0) return;
     if (message.type === "boombox-action") { const actionId = typeof message.actionId === "string" ? message.actionId.slice(0, 120) : ""; if (!actionId) { boomBoxSend(socket, { type: "boombox-error", message: "An action ID is required." }); return; } if (room.processedActionIds.has(actionId)) { boomBoxSend(socket, { type: "boombox-error", message: "That action was already processed." }); return; } const result = resolveBoomBoxAction(room, seatIndex, message.action || {}, actionId); if (result?.error) boomBoxSend(socket, { type: "boombox-error", message: result.error }); else { room.processedActionIds.add(actionId); if (room.processedActionIds.size > 500) room.processedActionIds.delete(room.processedActionIds.values().next().value); if (result?.flight) { for (const seat of room.seats) if (seat.socket) boomBoxSend(seat.socket, { type: "boombox-flight", flight: result.flight }); for (const spectator of room.spectators || []) boomBoxSend(spectator, { type: "boombox-flight", flight: result.flight }); setTimeout(() => { if (boomboxRooms.has(room.gameId)) { room.resolving = false; if (room.phase !== "finished") room.phase = "turn-prep"; broadcastBoomBoxRoom(room); scheduleBoomBoxAi(room); } }, 450); } else { broadcastBoomBoxRoom(room); scheduleBoomBoxAi(room); } } return; }
-    if (message.type === "boombox-leave") { if (room.seats[seatIndex]) { room.seats[seatIndex].connected = false; room.seats[seatIndex].socket = null; } room.updatedAt = Date.now(); broadcastBoomBoxLobby(); return; }
+    if (message.type === "boombox-leave") { if (room.seats[seatIndex]) { room.seats[seatIndex].connected = false; room.seats[seatIndex].socket = null; } room.updatedAt = Date.now(); writeBoomBoxRooms(); broadcastBoomBoxLobby(); return; }
   });
-  socket.on("close", () => { if (!room) return; if (spectator) { room.spectators.delete(socket); broadcastBoomBoxLobby(); return; } if (seatIndex < 0) return; const seat = room.seats[seatIndex]; if (seat.socket === socket) { seat.socket = null; seat.connected = false; room.updatedAt = Date.now(); broadcastBoomBoxLobby(); } });
+  socket.on("close", () => { if (!room) return; if (spectator) { room.spectators.delete(socket); broadcastBoomBoxLobby(); return; } if (seatIndex < 0) return; const seat = room.seats[seatIndex]; if (seat.socket === socket) { seat.socket = null; seat.connected = false; room.updatedAt = Date.now(); writeBoomBoxRooms(); broadcastBoomBoxLobby(); } });
 });
 
 pixelServer.on("connection", (socket) => {
@@ -2298,6 +2360,8 @@ pixelServer.on("connection", (socket) => {
     }
   });
 });
+
+restoreBoomBoxRooms();
 
 server.listen(port, "0.0.0.0", () => {
   console.log(`Bad Ant Games listening on ${port}`);
