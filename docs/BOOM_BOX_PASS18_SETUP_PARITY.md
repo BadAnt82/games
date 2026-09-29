@@ -40,7 +40,12 @@ Passed locally:
 - `npm run test:cribbage-network`
 - `npm run test:smoke`
 
-The browser and live deployment checks are recorded after deployment in this report’s final section.
+Live verification after deployment:
+
+- Coolify deployment queued for application `tmdedhfajs0iouepqit1but3`.
+- `https://games.badantproductions.com/` returned HTTP 200.
+- The first WebSocket probe timed out during the restart window; a retry after the service settled passed the complete network protocol check.
+- The live Playwright setup check passed for the 10-seat, simultaneous, heavy-gravity, calm-wind, bounce-edge, 500-credit, core-catalogue configuration and found every value in the review step.
 
 ## Next loop decision
 
