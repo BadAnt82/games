@@ -901,6 +901,12 @@ body.fullscreen-fallback-active {
   gap: 12px;
   text-align: left;
 }
+.boombox-shop-readout { display:flex; justify-content:space-between; align-items:center; padding:.8rem 1rem; border:1px solid rgba(142,224,255,.22); border-radius:14px; background:rgba(13,24,52,.7); margin:1rem 0; }
+.boombox-shop-list { display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:.75rem; }
+.boombox-shop-card { display:grid; gap:.45rem; padding:.9rem; border:1px solid rgba(255,255,255,.12); border-radius:14px; background:rgba(255,255,255,.04); }
+.boombox-shop-card strong { color:#fff; }
+.boombox-shop-card small { color:#aab9d9; min-height:2.4em; }
+.boombox-shop-card button { justify-self:start; }
 
 .boombox-solo-form label {
   display: grid;
