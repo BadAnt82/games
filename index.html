@@ -178,9 +178,33 @@
           <div id="boombox-single-panel" class="overlay-panel boombox-panel boombox-single-panel" hidden>
             <div class="boombox-kicker">SINGLE PLAYER</div>
             <h1>Solo setup</h1>
-            <p>Single-player match setup is next. Your launch settings will live here: opponents, terrain, wind, and starting credits.</p>
-            <div class="boombox-coming-soon"><strong>Artillery systems are being calibrated.</strong><span>Pass 3 will make this screen playable.</span></div>
-            <div class="menu-actions"><button id="boombox-single-back" class="secondary" type="button">Back</button></div>
+            <p>One commander. One rival tank. Read the wind, shape the ground, and land the first decisive shot.</p>
+            <form id="boombox-solo-form" class="boombox-solo-form">
+              <label>Commander name<input id="boombox-solo-name" type="text" maxlength="18" autocomplete="nickname" value="Commander" /></label>
+              <label>Battlefield<select id="boombox-solo-terrain"><option value="sunset-range">Sunset Range · seeded canyon</option></select></label>
+              <label>Match seed<input id="boombox-solo-seed" type="number" min="1" max="999999" value="314159" /></label>
+              <div class="boombox-setup-note"><strong>Pass 3 rules</strong><span>Cannon fire, gravity, wind, destructible terrain, health, falling, and a complete win/lose result.</span></div>
+              <div class="menu-actions"><button id="boombox-single-back" class="secondary" type="button">Back</button><button id="boombox-solo-start" type="submit">Start match</button></div>
+            </form>
+          </div>
+          <div id="boombox-match-panel" class="overlay-panel boombox-panel boombox-match-panel" hidden>
+            <header class="boombox-match-header"><div><div class="boombox-kicker">PASS 3 · LIVE MATCH</div><h1>Boom Box</h1><p id="boombox-match-status" aria-live="polite">Your turn. Set the shot.</p></div><div class="boombox-match-meta"><span id="boombox-match-seed">Seed 314159</span><span id="boombox-match-terrain">Sunset Range</span></div></header>
+            <div class="boombox-battle-wrap"><canvas id="boombox-canvas" width="960" height="540" aria-label="Boom Box artillery battlefield"></canvas></div>
+            <div class="boombox-match-controls">
+              <label>Angle <output id="boombox-angle-value" for="boombox-angle">42°</output><input id="boombox-angle" type="range" min="8" max="82" value="42" /></label>
+              <label>Power <output id="boombox-power-value" for="boombox-power">58%</output><input id="boombox-power" type="range" min="25" max="95" value="58" /></label>
+              <div class="boombox-match-readout"><span>Wind <strong id="boombox-wind">+0.0</strong></span><span>Turn <strong id="boombox-turn">1</strong></span></div>
+              <button id="boombox-fire" class="boombox-fire-button" type="button">Fire cannon</button>
+            </div>
+            <div class="boombox-health-row"><div><span id="boombox-player-label">Commander</span><span class="boombox-health-track"><i id="boombox-player-health"></i></span><strong id="boombox-player-health-value">100 HP</strong></div><div><span>Rival tank</span><span class="boombox-health-track"><i id="boombox-ai-health"></i></span><strong id="boombox-ai-health-value">100 HP</strong></div></div>
+            <div class="boombox-match-footer"><span id="boombox-shot-log" aria-live="polite">Shot log: match ready.</span><button id="boombox-match-exit" class="secondary" type="button">Exit match</button></div>
+          </div>
+          <div id="boombox-result-panel" class="overlay-panel boombox-panel boombox-result-panel" hidden>
+            <div class="boombox-kicker">MATCH COMPLETE</div>
+            <h1 id="boombox-result-title">Congratulations, commander.</h1>
+            <p id="boombox-result-message">Your rival tank is out of the fight.</p>
+            <div id="boombox-result-stats" class="boombox-result-stats"></div>
+            <div class="menu-actions"><button id="boombox-result-restart" type="button">Play again</button><button id="boombox-result-back" class="secondary" type="button">Back to Boom Box</button></div>
           </div>
           <div id="boombox-lobby-panel" class="overlay-panel boombox-panel boombox-lobby-panel" hidden>
             <header class="boombox-panel-header"><div><div class="boombox-kicker">MULTIPLAYER COMMAND</div><h1>War room</h1><p id="boombox-lobby-status">Choose a room or create your own.</p></div><span class="boombox-prototype-badge">Local prototype</span></header>
