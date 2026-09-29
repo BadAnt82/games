@@ -1999,8 +1999,11 @@ body.fullscreen-fallback-active {
   .boombox-match-controls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .boombox-match-controls > * { min-width: 0; }
   .boombox-match-readout { grid-column: 1; }
+  .boombox-playback { grid-column: 1 / -1; justify-content: space-between; }
+  .boombox-playback button { flex: 1; }
   .boombox-fire-button { grid-column: 2; }
   .boombox-utility-button { grid-column: 1 / -1; width: 100%; }
+  .boombox-teaching-panel { font-size: .82rem; }
   .boombox-health-row { grid-template-columns: 1fr; gap: 8px; }
   .boombox-match-footer { align-items: stretch; flex-direction: column; }
   .boombox-match-footer button { width: 100%; }
