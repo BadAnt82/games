@@ -202,7 +202,7 @@
               <button id="boombox-fire" class="boombox-fire-button" type="button">Fire cannon</button><button id="boombox-utility" class="secondary boombox-utility-button" type="button">Use repair kit</button>
             </div>
             <div class="boombox-health-row"><div><span id="boombox-player-label">Commander</span><span class="boombox-health-track"><i id="boombox-player-health"></i></span><strong id="boombox-player-health-value">100 HP</strong></div><div id="boombox-opponent-health-list" class="boombox-opponent-health-list"></div></div>
-            <div class="boombox-match-footer"><span id="boombox-shot-log" aria-live="polite">Shot log: match ready.</span><button id="boombox-match-exit" class="secondary" type="button">Exit match</button></div>
+            <div class="boombox-match-footer"><span id="boombox-shot-log" aria-live="polite">Shot log: match ready.</span><div class="boombox-chat"><div id="boombox-chat-log" class="boombox-chat-log" aria-live="polite"></div><div class="boombox-chat-entry"><input id="boombox-chat-input" type="text" maxlength="160" placeholder="Message the room" aria-label="Chat message" /><button id="boombox-chat-send" class="secondary" type="button">Send</button></div></div><button id="boombox-match-exit" class="secondary" type="button">Exit match</button></div>
           </div>
           <div id="boombox-result-panel" class="overlay-panel boombox-panel boombox-result-panel" hidden>
             <div class="boombox-kicker">MATCH COMPLETE</div>
@@ -213,9 +213,15 @@
           </div>
           <div id="boombox-lobby-panel" class="overlay-panel boombox-panel boombox-lobby-panel" hidden>
             <header class="boombox-panel-header"><div><div class="boombox-kicker">MULTIPLAYER COMMAND</div><h1>War room</h1><p id="boombox-lobby-status">Choose a room or create your own.</p></div><span class="boombox-prototype-badge">Server-authoritative</span></header>
-            <div class="boombox-lobby-actions"><button id="boombox-create" type="button">Create game</button><button id="boombox-refresh" class="secondary" type="button">Refresh rooms</button><button id="boombox-lobby-back" class="secondary" type="button">Back</button></div>
+            <div class="boombox-lobby-actions"><button id="boombox-create" type="button">Create game</button><button id="boombox-refresh" class="secondary" type="button">Refresh rooms</button><button id="boombox-history-open" class="secondary" type="button">Match history</button><button id="boombox-lobby-back" class="secondary" type="button">Back</button></div>
             <section class="boombox-lobby-section" aria-labelledby="boombox-created-heading"><div class="boombox-section-heading"><h2 id="boombox-created-heading">Your rooms</h2><span id="boombox-created-count">0 rooms</span></div><div id="boombox-created-list" class="boombox-room-list" aria-live="polite"></div></section>
             <section class="boombox-lobby-section" aria-labelledby="boombox-available-heading"><div class="boombox-section-heading"><h2 id="boombox-available-heading">Available rooms</h2><span id="boombox-available-count">0 rooms</span></div><div id="boombox-available-list" class="boombox-room-list" aria-live="polite"></div></section>
+          </div>
+          <div id="boombox-history-panel" class="overlay-panel boombox-panel boombox-history-panel" hidden>
+            <header class="boombox-panel-header"><div><div class="boombox-kicker">MATCH ARCHIVE</div><h1>Boom Box history</h1><p id="boombox-history-status">Completed rooms and terrain changes.</p></div><button id="boombox-history-refresh" class="secondary" type="button">Refresh history</button></header>
+            <div id="boombox-history-list" class="boombox-history-list" aria-live="polite"></div>
+            <canvas id="boombox-history-canvas" width="480" height="180" aria-label="Selected match terrain replay" hidden></canvas>
+            <div class="menu-actions"><button id="boombox-history-back" class="secondary" type="button">Back to war room</button></div>
           </div>
           <div id="boombox-create-panel" class="overlay-panel boombox-panel boombox-create-panel" hidden>
             <div class="boombox-kicker">CREATE MULTIPLAYER ROOM</div>
