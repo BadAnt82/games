@@ -18,25 +18,25 @@ The correct next step is a content and rules completion track. More lobby featur
 | --- | --- | --- | --- |
 | Configurable player count | 2â€“10 seats | 7â€“10 seat layout is now available in the setup wizard; mobile layout still needs dedicated validation | Keep the rules clamp and validate the wide setup on mobile |
 | Human and computer seats | Human room seats plus AI fill | AI fill starts a room, but AI is cannon-only | Every AI seat uses the same legal action, inventory, utility, and damage rules as humans |
-| Sequential firing | Implemented | Projectile resolution is simplified and server pacing is not configurable | Lock the complete resolution state machine and block the next action until it finishes |
+| Sequential firing | Implemented | Full historical physics and balance remain simplified | Keep the complete resolution lock and expand physics fixtures |
 | Synchronous firing | Implemented | Prepare/release is server-authoritative and covered by the Pass 17 release matrix | Preserve the protocol while hardening disconnect and timeout behavior |
 | Simultaneous firing | Implemented | Coordinated launch and deterministic ordering are covered by the Pass 17 release matrix | Preserve the protocol while hardening collision and disconnect behavior |
-| Angle, power, gravity, wind | Versioned rules with setup controls | Human turn deadlines and movement remain unimplemented | Add deadlines and movement without regressing the rules contract |
+| Angle, power, gravity, wind | Versioned rules with setup controls, turn deadlines, and optional movement/fuel | Coordinated-mode movement remains intentionally gated | Keep the rule contract stable while evaluating a coordinated movement phase |
 | Destructible terrain | Height array, solid/material masks, support/fall handling, and swept segment collision | Full material modifiers and collapse chains remain out of scope | Add material-specific gameplay modifiers after the core collision path is user-tested |
-| Dirt add/remove tools | One simplified terrain lift | No dirt material, bury/expose rules, or tank digging behavior | Implement add/remove terrain as first-class effects |
+| Dirt add/remove tools | Terrain lift, filler, remover, smoke, reinforced, and excavated materials | Full digging/freeing behavior remains simplified | Add material-specific modifiers after user-tested core collision |
 | Tank movement and fuel | Optional sequential movement with authoritative fuel | Synchronous/simultaneous movement remains gated; movement balance and terrain collision need broader cases | Extend the movement phase only after coordinated-turn semantics are designed |
 | Boundaries | Stop, bounce, or wrap rules are configurable and server-clamped | Edge behavior still needs broader projectile and mobile validation | Expand deterministic boundary cases in the browser matrix |
-| Economy | Solo-only local credits | Multiplayer server does not own money, prices, purchases, or limits | Make economy server-authoritative and atomic |
-| Weapons | Six simplified IDs | No real MIRV child projectiles, persistent effects, bounce, lasers, smoke, napalm, or exact weapon behaviors | Build a data-driven launch catalogue with independent simulation and tests |
-| Utilities | Repair, shield, terrain lift | Multiplayer utility inventory and limits are not authoritative | Add shields, parachute/fall protection, fuel, repair, guidance, and inventory rules |
-| AI | Local difficulty profiles; network AI uses cannon | No upgrades, utility use, terrain risk analysis, or AI personalities | AI must choose legal equipment and use the same action path as humans |
+| Economy | Multiplayer server-authoritative credits, purchases, catalogue limits, and loadouts | Balance tuning and a larger shop presentation remain | Keep prices and inventory data-driven and add balance evidence |
+| Weapons | Data-driven catalogue with spread, area, bounce, piercing, napalm, smoke, filler/remover, guidance, laser, and child projectiles | Exact historical balance and broader collision fixtures remain | Expand weapon-specific deterministic fixtures |
+| Utilities | Server-authoritative repair, shields, parachute, fuel, guidance, terrain, and turret upgrades | Utility balance and coordinated-mode usage remain | Add balance tables and broader UI teaching |
+| AI | Network AI buys equipment, selects utilities, searches shots, and uses the same action path as humans | Terrain-risk personalities and deeper upgrade strategy remain | Expand decision-quality fixtures without changing authoritative rules |
 | Elimination | Elimination order, placements, winner, and explicit draw outcome are authoritative | Simultaneous tie presentation needs richer UI | Keep deterministic placement and improve result teaching |
 | Human elimination | Disconnected or eliminated commanders can be watched while the match continues | Reconnect and spectator UX need wider browser coverage | Preserve spectator continuity through later content passes |
 | AI pacing | Client has pause and 1×/2×/4× playback; server has turn deadlines and fallback actions | Network AI presentation speed is still separate from authoritative timing | Add richer playback controls without changing server outcomes |
 | Match setup | Reviewable wizard exposes seats, firing, gravity, wind, boundaries, movement, money, catalogue, pace, AI, terrain, and optional events | Full human/AI seat assignment and material modifiers remain future work | Keep the review exact and add only rules with authoritative behavior |
 | Environmental content | Three terrain profiles plus seeded scenery markers and meteor showers | No full weather/material modifier system | Expand event variety only after browser/live verification |
 | Presentation | Canvas primitives and CSS panels | No complete original art, effects, sound, or content-specific UI | Produce the original Boom Box visual and audio set |
-| Replay | Terrain timeline and match history | Inspection timeline only; no live speed controls or full event playback | Replay every authoritative event with the same speed controls |
+| Replay | Terrain timeline, match history, and live 1x/2x/4x/pause flight playback | Inspection timeline does not yet replay every event type | Expand replay coverage without changing recorded outcomes |
 | Persistence | Completed history persists; active rooms use versioned atomic snapshots with deadlines and reconnect metadata | Deployment durability still depends on the host volume | Verify persistent-volume behavior in production and add migrations only when schema changes |
 
 ## What Ã¢â‚¬Å“near replicaÃ¢â‚¬Â means for Boom Box
