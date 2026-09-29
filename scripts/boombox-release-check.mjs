@@ -146,6 +146,13 @@ try {
     if (initial.snapshot.players?.length !== seats || Object.keys(initial.snapshot.rules.weaponCatalog || {}).length < 18) throw new Error(`Seat/catalog matrix failed for ${seats}-seat room`);
     close(socket);
   }
+  // Every setup control exposed by Pass 18 must survive server normalization.
+  const configured = await open();
+  const configuredRoom = await createRoom(configured, `configured-${suffix}`, { name: `Configured ${suffix}`, creator: "Configured Host", seats: 10, firingMode: "simultaneous", gravity: 210, windMode: "fixed", windLimit: 1.7, boundary: "bounce", startingMoney: 500, disabledWeapons: ["mini-nuke"], disabledUtilities: ["fuel-canister"], aiFill: true, seed: 7654321 });
+  const configuredState = await startAi(configured, configuredRoom.gameId, `configured-${suffix}`);
+  const configuredRules = configuredState.snapshot.rules;
+  if (configuredRules?.seats !== 10 || configuredRules.firingMode !== "simultaneous" || configuredRules.gravity !== 210 || configuredRules.windMode !== "fixed" || configuredRules.windLimit !== 1.7 || configuredRules.boundary !== "bounce" || configuredRules.startingMoney !== 500 || configuredRules.weaponCatalog?.["mini-nuke"] || configuredRules.utilityCatalog?.["fuel-canister"]) throw new Error("Pass 18 setup rules were not preserved or filtered");
+  close(configured);
   await verifyPreparedMode("synchronous", suffix);
   await verifyPreparedMode("simultaneous", suffix);
 
@@ -169,7 +176,7 @@ try {
   if (restoredState.snapshot.rules?.version !== 2 || restoredState.snapshot.players.length !== 2 || restoredState.snapshot.gameId !== activeCreated.gameId) throw new Error("Started room state did not survive restart");
   close(restored);
 
-  console.log("Boom Box Pass 17 release matrix passed: malformed payload rejection, setup restart recovery, started-match restart recovery, 2/4/6/10-seat rules, synchronous prepare/release, simultaneous deterministic release, versioned catalogue, and session continuity.");
+  console.log("Boom Box Pass 18 release matrix passed: malformed payload rejection, setup restart recovery, started-match restart recovery, 2/4/6/10-seat rules, setup rules normalization, catalogue filtering, synchronous prepare/release, simultaneous deterministic release, versioned catalogue, and session continuity.");
 } finally {
   if (server && !server.killed) server.kill();
   try { rmSync(storeDir, { recursive: true, force: true }); } catch {}
