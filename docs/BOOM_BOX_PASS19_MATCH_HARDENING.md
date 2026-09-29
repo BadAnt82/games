@@ -41,7 +41,7 @@ Live verification after deployment:
 
 - Coolify deployment queued for application `tmdedhfajs0iouepqit1but3`.
 - `https://games.badantproductions.com/` returned HTTP 200.
-- The live WebSocket regression passed after the deployment settled. One earlier attempt hit the existing initial-lobby-message timing race; the retry completed the full lobby, action, reconnect, AI, spectator, replay, and history matrix.
+- The live WebSocket regression passed after the deployment settled. The regression harness now buffers the initial lobby message, so the check is deterministic across fast and slow connections; it completed the full lobby, action, reconnect, AI, spectator, replay, and history matrix.
 - The live browser check confirmed the movement setup review, fuel controls, and deadline readout are present.
 
 ## Next loop decision
