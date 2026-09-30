@@ -29,7 +29,52 @@ const bridgeJackpotSeed = 20;
 const bridgeJackpotHitOdds = 20;
 const port = Number(process.env.PORT || 3000);
 const timeZone = process.env.SCORE_TIME_ZONE || "America/Los_Angeles";
-function readBoomBoxHistory() { try { const parsed = JSON.parse(readFileSync(boomBoxHistoryPath, "utf8")); return Array.isArray(parsed) ? parsed : []; } catch { return []; } }
+function normalizeBoomBoxHistory(records) {
+  const normalized = records.map((record) => ({ ...record }));
+  const groups = new Map();
+  normalized.forEach((record, index) => {
+    if (!record || typeof record.gameId !== "string" || !record.gameId) return;
+    const entries = groups.get(record.gameId) || [];
+    entries.push({ index, record });
+    groups.set(record.gameId, entries);
+  });
+  const used = new Set(normalized.map((record) => record?.gameId).filter((id) => typeof id === "string"));
+  let changed = false;
+  for (const [gameId, entries] of groups) {
+    if (entries.length < 2) continue;
+    const ordered = entries.slice().sort((a, b) => {
+      const timeDifference = Date.parse(String(a.record.finishedAt || "")) - Date.parse(String(b.record.finishedAt || ""));
+      return (Number.isFinite(timeDifference) ? timeDifference : 0) || a.index - b.index;
+    });
+    // Preserve the newest record's public ID. Older duplicate records remain
+    // replayable under deterministic legacy IDs instead of colliding.
+    for (const [legacyIndex, entry] of ordered.slice(0, -1).entries()) {
+      let candidate = `${gameId}-legacy-${legacyIndex + 1}`;
+      let suffix = legacyIndex + 1;
+      while (used.has(candidate)) candidate = `${gameId}-legacy-${++suffix}`;
+      normalized[entry.index].gameId = candidate;
+      used.add(candidate);
+      changed = true;
+    }
+  }
+  return { records: normalized, changed };
+}
+function readBoomBoxHistory() {
+  try {
+    const parsed = JSON.parse(readFileSync(boomBoxHistoryPath, "utf8"));
+    if (!Array.isArray(parsed)) return [];
+    const normalized = normalizeBoomBoxHistory(parsed);
+    if (normalized.changed) {
+      try {
+        mkdirSync(resolve(boomBoxHistoryPath, ".."), { recursive: true });
+        writeFileSync(boomBoxHistoryPath, JSON.stringify(normalized.records.slice(-100), null, 2));
+      } catch (error) {
+        console.error(`[boombox-persistence] history ID migration failed: ${error?.message || "unknown error"}`);
+      }
+    }
+    return normalized.records;
+  } catch { return []; }
+}
 const boomBoxPersistenceStatus = {
   history: { lastWriteOk: true, lastWriteAt: null },
   activeRooms: { lastWriteOk: true, lastWriteAt: null },
@@ -1767,7 +1812,8 @@ const cribbageUserMemberships = new Map();
 let nextCribbageRoomId = 1;
 const boomboxRooms = new Map();
 const boomboxUserMemberships = new Map();
-let nextBoomBoxRoomId = 1027;
+const historyRoomIds = boomBoxHistory.map((record) => Number(String(record?.gameId || "").match(/^BB-(\d+)$/)?.[1])).filter(Number.isFinite);
+let nextBoomBoxRoomId = Math.max(1027, ...historyRoomIds.map((id) => id + 1));
 
 function serializableBoomBoxRoom(room) {
   return {
@@ -1855,7 +1901,13 @@ function restoreBoomBoxRooms() {
   }
 }
 
-function boomBoxRoomId() { return `BB-${String(nextBoomBoxRoomId++).padStart(4, "0")}`; }
+function boomBoxRoomId() {
+  let gameId = "";
+  do {
+    gameId = `BB-${String(nextBoomBoxRoomId++).padStart(4, "0")}`;
+  } while (boomboxRooms.has(gameId) || boomBoxHistory.some((record) => record?.gameId === gameId));
+  return gameId;
+}
 function boomBoxSend(socket, payload) { if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify(payload)); }
 function boomBoxPublicRoom(room, userId = "") { return { gameId: room.gameId, name: room.name, creator: room.creator, seats: room.seats.length, connected: room.seats.filter((seat) => seat.connected).length, spectators: room.spectators?.size || 0, terrain: room.terrain, pace: room.rules?.turnPace || room.pace, firingMode: room.rules?.firingMode || "sequential", aiFill: room.aiFill, aiSeats: Array.isArray(room.aiSeats) ? room.aiSeats : [], started: room.started, phase: room.phase, mine: userId === room.ownerUserId, inviteToken: userId === room.ownerUserId ? room.inviteToken : "", resumable: room.seats.some((seat) => seat.userId === userId && Boolean(seat.sessionId)) }; }
 function boomBoxLobbyPayload(userId = "") { const games = [...boomboxRooms.values()].map((room) => boomBoxPublicRoom(room, userId)); return { type: "boombox-lobby-list", games, created: games.filter((room) => room.mine), available: games.filter((room) => !room.mine && (!room.started ? room.connected < room.seats : true)) }; }
@@ -2413,6 +2465,7 @@ boomboxServer.on("connection", (socket) => {
       if (boomboxUserMemberships.has(userId) && boomboxUserMemberships.get(userId) !== target.gameId) { boomBoxSend(socket, { type: "boombox-error", message: "You already have an active Boom Box room." }); return; }
       const requestedSession = typeof message.sessionId === "string" ? message.sessionId : ""; let index = target.seats.findIndex((seat) => requestedSession && seat.sessionId === requestedSession);
       if (target.started && index < 0) { boomBoxSend(socket, { type: "boombox-error", message: "That match has already started." }); return; }
+      if (index >= 0 && target.seats[index].connected && target.seats[index].socket && target.seats[index].socket !== socket) { boomBoxSend(socket, { type: "boombox-error", message: "That commander session is already connected." }); return; }
       if (index < 0) index = target.seats.findIndex((seat, candidateIndex) => !seat.connected && !seat.userId && !target.aiSeats?.includes(candidateIndex));
       if (index < 0) { boomBoxSend(socket, { type: "boombox-error", message: "No open commander seat is available." }); return; }
       room = target; seatIndex = index; const previousUserId = room.seats[index].userId; if (previousUserId && previousUserId !== userId) boomboxUserMemberships.delete(previousUserId); sessionId = room.seats[index].sessionId || `${room.gameId}-${Math.random().toString(36).slice(2)}`; room.seats[index] = { ...room.seats[index], name: String(message.name || room.seats[index].name).slice(0, 18), userId, sessionId, socket, connected: true, bot: false }; boomboxUserMemberships.set(userId, room.gameId); room.updatedAt = Date.now(); writeBoomBoxRooms(); boomBoxSend(socket, { type: "boombox-joined", gameId: room.gameId, sessionId, seat: index, host: index === room.seats.findIndex((seat) => seat.userId === room.ownerUserId) }); if (room.started) { boomBoxSend(socket, { type: "boombox-state", snapshot: boomBoxSnapshot(room), seat: index }); scheduleBoomBoxTurnDeadline(room); scheduleBoomBoxAi(room); } else if (room.seats.every((seat) => seat.connected)) startBoomBoxRoom(room); else { boomBoxSend(socket, boomBoxLoadoutPayload(room, index)); boomBoxSend(socket, boomBoxLobbyPayload(userId)); broadcastBoomBoxLobby(); } return;
