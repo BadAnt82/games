@@ -76,3 +76,15 @@ This pass hardens the computer commander path that was still under-tested:
 - The existing network and release suites were rerun after the changes to confirm no regression in turn ownership, synchronized flight bundles, reconnect, replay, persistence, or prepared firing modes.
 
 Pass 4 does not claim final human-testing readiness. The next correction should cover browser-level spectator/reconnect/cancel flows and a long-running multi-seat match, then terrain edge/chained support behavior. Presentation work for original art, sound, effects, mute controls, and performance remains a separate final pass.
+
+## Correction pass 5 — browser multiplayer continuity
+
+**Status: complete**
+
+- Added a Playwright acceptance flow for a four-human room that completes three full turn cycles, confirming the live UI continues to synchronize over a longer match than the opening-turn matrix.
+- Added browser coverage for joining a started room as a spectator, restoring a disconnected commander through the saved room/session identity, and cancelling an owner-created room.
+- Fixed the owner lobby card so AI-fill rooms expose both **Start with AI** and **Cancel room** actions.
+- Fixed the server cancellation response so the cancelling owner receives a fresh lobby snapshot and the deleted room disappears immediately.
+- The live Pass 5 suite passed after deployment; the existing 2-human browser check and 4/6/10-seat matrix also passed.
+
+Pass 5 still does not cover terrain edge/chained support behavior or final art, effects, audio, mute controls, and performance. Those remain the next correction scopes before human-testing readiness.
