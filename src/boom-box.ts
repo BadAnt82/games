@@ -384,7 +384,28 @@ export function initBoomBox() {
     const heading = document.createElement("div"); heading.className = "boombox-room-heading"; const title = document.createElement("div"); const name = document.createElement("strong"); name.textContent = room.name; const id = document.createElement("span"); id.textContent = room.id; title.append(name, id); const badge = document.createElement("span"); badge.className = `boombox-room-badge ${room.connected === room.seats ? "is-ready" : ""}`; badge.textContent = roomStatus(room); heading.append(title, badge);
     const details = document.createElement("div"); details.className = "boombox-room-details"; const creator = document.createElement("span"); creator.textContent = `Created by ${room.creator}`; const seats = document.createElement("span"); seats.textContent = `${room.connected}/${room.seats} connected`; const terrain = document.createElement("span"); terrain.textContent = `${room.terrain} - ${room.pace}`; const firingMode = document.createElement("span"); firingMode.textContent = `${room.firingMode || "sequential"} fire`; details.append(creator, seats, terrain, firingMode);
     const actions = document.createElement("div"); actions.className = "boombox-room-actions"; const action = document.createElement("button"); action.type = "button";
-    if (mine) { action.className = "secondary"; action.textContent = networkMode && room.aiFill && room.connected < room.seats ? "Start with AI" : "Cancel room"; action.addEventListener("click", () => { if (networkMode && room.aiFill && room.connected < room.seats) { sendNetwork({ type: "boombox-start-ai", gameId: room.id }); return; } if (networkMode) { sendNetwork({ type: "boombox-cancel", gameId: room.id }); return; } createdRooms = createdRooms.filter((candidate) => candidate.id !== room.id); if (joinedRoomId === room.id) joinedRoomId = ""; lobbyStatus.textContent = `${room.name} was cancelled.`; renderRooms(); }); }
+    if (mine) {
+      action.className = "secondary";
+      if (networkMode && room.aiFill && room.connected < room.seats) {
+        action.textContent = "Start with AI";
+        action.addEventListener("click", () => sendNetwork({ type: "boombox-start-ai", gameId: room.id }));
+        const cancel = document.createElement("button");
+        cancel.type = "button";
+        cancel.className = "secondary";
+        cancel.textContent = "Cancel room";
+        cancel.addEventListener("click", () => sendNetwork({ type: "boombox-cancel", gameId: room.id }));
+        actions.append(cancel);
+      } else {
+        action.textContent = "Cancel room";
+        action.addEventListener("click", () => {
+          if (networkMode) { sendNetwork({ type: "boombox-cancel", gameId: room.id }); return; }
+          createdRooms = createdRooms.filter((candidate) => candidate.id !== room.id);
+          if (joinedRoomId === room.id) joinedRoomId = "";
+          lobbyStatus.textContent = `${room.name} was cancelled.`;
+          renderRooms();
+        });
+      }
+    }
     else if (room.id === joinedRoomId) { action.className = "secondary"; action.textContent = "Joined"; action.disabled = true; }
     else { action.textContent = room.started ? "Watch room" : room.connected === room.seats ? "Full" : "Join room"; action.disabled = !room.started && (room.connected >= room.seats); action.addEventListener("click", () => { if (networkMode) { sendNetwork({ type: room.started ? "boombox-watch" : "boombox-join", gameId: room.id, name: networkUserId() }); return; } joinedRoomId = room.id; room.connected = Math.min(room.seats, room.connected + 1); lobbyStatus.textContent = `Joined ${room.name}. Waiting for the room to launch.`; renderRooms(); }); }
     const invite = document.createElement("button"); invite.type = "button"; invite.className = "secondary"; invite.textContent = "Copy invite"; invite.disabled = !room.inviteToken; invite.title = room.inviteToken ? "Copy a secure invite link" : "Only the room creator can copy the secure invite"; invite.addEventListener("click", async () => { const link = `${location.origin}/?boomboxRoom=${encodeURIComponent(room.id)}&boomboxInvite=${encodeURIComponent(room.inviteToken || "")}`; try { await navigator.clipboard.writeText(link); lobbyStatus.textContent = "Secure invite link copied."; } catch { lobbyStatus.textContent = link; } }); actions.append(action, invite); card.append(heading, details, actions); return card;
