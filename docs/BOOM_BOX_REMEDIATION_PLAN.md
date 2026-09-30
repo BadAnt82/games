@@ -115,6 +115,8 @@
 
 **Out of scope:** adding new features after the final audit or creating another implicit package.
 
+**Status:** Complete. Evidence is recorded in [BOOM_BOX_PACKAGE_G_FINAL_CONFORMANCE.md](./BOOM_BOX_PACKAGE_G_FINAL_CONFORMANCE.md).
+
 ## Order and drift control
 
 Recommended order is **A → B → C → D → E → F → G**. A package is complete only when its exit evidence is recorded. Later packages may consume earlier contracts, but they may not silently reopen completed work or absorb issues listed under another package. This plan is the reference for the next implementation request.
