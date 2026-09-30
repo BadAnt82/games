@@ -26,10 +26,14 @@ try {
   await page.locator("#boombox-mode-multi").click();
   await page.locator("#boombox-history-open").click();
   await page.locator("#boombox-history-list article").first().waitFor({ state: "visible", timeout: 15000 });
-  await page.locator("#boombox-history-list article button", { hasText: "Replay match" }).first().click();
+  const replayButton = page.locator("#boombox-history-list article button", { hasText: "Replay match" }).first();
+  await replayButton.scrollIntoViewIfNeeded();
+  await replayButton.evaluate((button) => button.click());
+  await page.waitForTimeout(250);
+  await page.locator("#boombox-history-replay").waitFor({ state: "visible", timeout: 15000 });
   await page.locator("#boombox-replay-result").waitFor({ state: "visible", timeout: 10000 });
   const replay = await page.locator("#boombox-replay-result").innerText();
-  if (!replay || replay.includes("No replay selected")) throw new Error("Replay result summary did not render");
+  if (!replay || replay.includes("No replay selected") || replay.includes("Replay is in progress")) throw new Error(`Replay result summary did not render: ${replay}; history=${await page.locator("#boombox-history-status").innerText()}; replayStatus=${await page.locator("#boombox-history-replay-status").innerText()}; step=${await page.locator("#boombox-history-step-value").innerText()}`);
   console.log(`Boom Box Package F presentation check passed: persistent sound/effects controls, live announcement region, mobile match, replay controls, and result summary (${replay}).`);
 } finally {
   await context.close();
