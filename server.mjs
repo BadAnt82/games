@@ -1,4 +1,4 @@
-import { accessSync, constants as fsConstants, createReadStream, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { accessSync, constants as fsConstants, createReadStream, existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { extname, join, normalize, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -1505,7 +1505,19 @@ function handlePixelLobbyJoin(response, lobbyId) {
 async function handleApi(request, response) {
   const url = new URL(request.url || "/", "http://localhost");
   if (url.pathname === "/api/boombox-health" && request.method === "GET") {
-    const storage = (path, kind) => { const present = existsSync(path); let writable = false; try { accessSync(present ? path : resolve(path, ".."), fsConstants.R_OK | fsConstants.W_OK); writable = true; } catch {} return { configured: true, present, writable, ...boomBoxPersistenceStatus[kind] }; };
+    const storage = (path, kind) => {
+      const present = existsSync(path);
+      let writable = false;
+      try {
+        // A directory at the file path is not a usable store, even when the
+        // directory itself is writable. This keeps health truth aligned with
+        // the actual atomic file writes performed by Boom Box.
+        if (present && statSync(path).isDirectory()) throw new Error("store path is a directory");
+        accessSync(present ? path : resolve(path, ".."), fsConstants.R_OK | fsConstants.W_OK);
+        writable = true;
+      } catch {}
+      return { configured: true, present, writable, ...boomBoxPersistenceStatus[kind] };
+    };
     const historyStorage = storage(boomBoxHistoryPath, "history");
     const activeRoomsStorage = storage(boomBoxRoomStorePath, "activeRooms");
     const persistenceOk = historyStorage.writable && activeRoomsStorage.writable && historyStorage.lastWriteOk && activeRoomsStorage.lastWriteOk;
