@@ -35,7 +35,20 @@ The weapon matrix covered all 19 catalogue entries: cannon, heavy cannon, heavy 
 
 ## Deployment evidence
 
-Deployment and live checks will be recorded here after the Pass 27 production rollout.
+Commit `0626a1c` deployed successfully through Coolify as `jsk9345l4czofoxr04bvrzdr`.
+
+Live health, WebSocket, and browser checks are recorded below after the production rollout.
+
+Live verification passed:
+
+```text
+https://games.badantproductions.com/api/boombox-health  -> status ok, rules version 3
+https://games.badantproductions.com/api/boombox-rules   -> 19 weapons, 9 utilities
+npm run test:boombox-network   (BOOMBOX_LIVE_URL=wss://games.badantproductions.com)
+npm run test:boombox-browser   (BOOMBOX_LIVE_URL=https://games.badantproductions.com)
+```
+
+The production protocol check covered the room lobby, secure invites, turn authority, purchases, reconnect, AI fill, spectators, chat moderation, replay persistence, and match history. The production browser check completed the two-human setup, join, synchronized turns, and result panel.
 
 ## Loop recommendation
 
