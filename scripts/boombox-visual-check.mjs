@@ -1,7 +1,9 @@
 import { chromium } from "playwright";
+import { existsSync } from "node:fs";
 
 const base = process.env.BOOMBOX_BROWSER_URL || "https://games.badantproductions.com/";
-const browser = await chromium.launch({ headless: true });
+const chromePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe";
+const browser = await chromium.launch({ headless: true, ...(existsSync(chromePath) ? { executablePath: chromePath } : {}) });
 const context = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
 const page = await context.newPage();
 await page.addInitScript(() => localStorage.setItem("badant-games-player-name", "Mobile Visual"));

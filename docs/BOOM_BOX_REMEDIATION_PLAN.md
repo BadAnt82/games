@@ -95,6 +95,8 @@
 
 **Out of scope:** changing weapon rules, creating art/audio, and production volume configuration.
 
+**Status:** Complete. Evidence is recorded in [BOOM_BOX_PACKAGE_E_ACCEPTANCE.md](./BOOM_BOX_PACKAGE_E_ACCEPTANCE.md).
+
 ### Package F — replay, results, presentation, and accessibility
 
 **Scope:** render every child projectile and impact in live play; make replay reproduce trajectories, child effects, utility events, terrain materials, and result state; align solo and multiplayer standings presentation; add original Boom Box visual assets, impact effects, sound, mute/low-effects controls, and structured announcements for dynamic state.

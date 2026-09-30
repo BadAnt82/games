@@ -20,6 +20,7 @@
     "test:boombox-browser": "npx -p playwright node scripts/boombox-browser-check.mjs",
     "test:boombox-browser-matrix": "npx -p playwright node scripts/boombox-browser-matrix-check.mjs",
     "test:boombox-browser-pass5": "npx -p playwright node scripts/boombox-browser-pass5-check.mjs",
+    "test:boombox-e-acceptance": "node scripts/boombox-e-acceptance.mjs",
     "test:boombox-solo-browser": "npx -p playwright node scripts/boombox-solo-browser-check.mjs",
     "test:boombox-visual": "npx -p playwright node scripts/boombox-visual-check.mjs",
     "test:boombox-parity": "node scripts/boombox-parity-check.mjs",
