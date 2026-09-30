@@ -1828,7 +1828,7 @@ function restoreBoomBoxRooms() {
     };
     if (room.state) {
       room.state.outcome ||= room.phase === "finished" ? (room.state.winner === null ? "draw" : "win") : "in-progress";
-      for (const player of room.state.players || []) { player.fuel ??= 100; player.movedThisTurn ??= false; }
+      for (const player of room.state.players || []) { player.fuel ??= 100; player.movedThisTurn ??= false; player.damageTaken ??= 0; player.stats ||= {}; player.stats.damageTaken ??= 0; }
       // A projectile is resolved atomically before it is broadcast. If the
       // process is replaced after that commit but before the browser finishes
       // animating it, resume from the next turn instead of restoring a room
