@@ -73,6 +73,8 @@
 
 **Exit evidence:** seeded solo and multiplayer fixtures produce matching state transitions for the same rules/configuration; every advertised mode has the same legal actions and outcomes; no local-only result path remains hidden behind the full-game label.
 
+**Status:** Complete. Evidence is recorded in [BOOM_BOX_PACKAGE_C_RULES_PARITY.md](./BOOM_BOX_PACKAGE_C_RULES_PARITY.md).
+
 **Out of scope:** generated art, sound, Coolify storage, and long-run performance.
 
 ### Package D — complete equipment, terrain, economy, and AI behavior

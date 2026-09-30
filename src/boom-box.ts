@@ -87,6 +87,7 @@ export function initBoomBox() {
   const soloWeaponInput = required<HTMLSelectElement>("#boombox-solo-weapon");
   const soloUtilityInput = required<HTMLSelectElement>("#boombox-solo-utility");
   const soloDifficultyInput = required<HTMLSelectElement>("#boombox-difficulty");
+  const soloStatus = required<HTMLElement>("#boombox-solo-status");
   const createButton = required<HTMLButtonElement>("#boombox-create");
   const refreshButton = required<HTMLButtonElement>("#boombox-refresh");
   const lobbyBackButton = required<HTMLButtonElement>("#boombox-lobby-back");
@@ -182,13 +183,8 @@ export function initBoomBox() {
   let createStep = 1;
   let seatModes: Array<"human" | "ai"> = [];
   let joinedRoomId = "";
-  let roomSequence = 1027;
   let createdRooms: BoomBoxRoom[] = [];
-  let availableRooms: BoomBoxRoom[] = [
-    { id: "BB-1024", name: "Sunset Showdown", creator: "Mara", seats: 4, connected: 2, terrain: "Sunset Range", pace: "Standard", aiFill: true, started: false },
-    { id: "BB-1025", name: "Ice Shelf Siege", creator: "Rook", seats: 3, connected: 1, terrain: "Ice Shelf", pace: "Relaxed", aiFill: false, started: false },
-    { id: "BB-1026", name: "Lunar Test Range", creator: "Nova", seats: 6, connected: 5, terrain: "Lunar Crater", pace: "Blitz", aiFill: true, started: false },
-  ];
+  let availableRooms: BoomBoxRoom[] = [];
   let match: MatchState | undefined;
   let matchAnimation = 0;
   let lastFrame = 0;
@@ -250,11 +246,11 @@ export function initBoomBox() {
   function connectNetwork() {
     if (networkSocket && (networkSocket.readyState === WebSocket.OPEN || networkSocket.readyState === WebSocket.CONNECTING)) { networkMode = true; return; }
     networkMode = true; lobbyStatus.textContent = "Connecting to the authoritative war room...";
-    try { networkSocket = new WebSocket(networkUrl()); } catch { networkMode = false; lobbyStatus.textContent = "Live room service is unavailable. Local preview remains available."; return; }
+    try { networkSocket = new WebSocket(networkUrl()); } catch { networkMode = false; if (soloNetworkMode) { soloStatus.textContent = "The authoritative solo service is unavailable. Reconnect and try again."; setPanel("single"); } else lobbyStatus.textContent = "Live room service is unavailable. Refresh to reconnect."; return; }
     networkSocket.addEventListener("open", () => { networkSocket?.send(JSON.stringify({ type: "boombox-list", userId: networkUserId() })); const savedRoom = localStorage.getItem(boomBoxRoomKey) || ""; const savedSession = localStorage.getItem(boomBoxSessionKey) || ""; const targetRoom = inviteRoomId || (!soloNetworkMode ? savedRoom : ""); if (inviteRoomId) networkSocket?.send(JSON.stringify({ type: "boombox-invite", userId: networkUserId(), gameId: inviteRoomId, inviteToken, name: networkDisplayName() })); else if (savedRoom && savedSession && !soloNetworkMode) networkSocket?.send(JSON.stringify({ type: "boombox-join", userId: networkUserId(), gameId: savedRoom, sessionId: savedSession, name: networkDisplayName() })); if (targetRoom) joinedRoomId = targetRoom; for (const payload of pendingNetworkMessages.splice(0)) networkSocket?.send(JSON.stringify(payload)); lobbyStatus.textContent = "Connected. Rooms are synchronized with the server."; });
     networkSocket.addEventListener("message", (event) => { let message; try { message = JSON.parse(event.data); } catch { return; } handleNetworkMessage(message); });
     networkSocket.addEventListener("close", () => { networkSocket = undefined; if (matchView === "lobby") lobbyStatus.textContent = "Room service disconnected. Refresh to reconnect."; });
-    networkSocket.addEventListener("error", () => { const wasSolo = soloNetworkMode; networkMode = false; if (wasSolo) { resetSoloNetworkIdentity(); startSoloLocalMatch(); } else lobbyStatus.textContent = "Room service unavailable. Local preview remains available."; });
+    networkSocket.addEventListener("error", () => { const wasSolo = soloNetworkMode; networkMode = false; if (wasSolo) { resetSoloNetworkIdentity(); soloStatus.textContent = "The authoritative solo service is unavailable. Reconnect and try again."; setPanel("single"); } else lobbyStatus.textContent = "Room service unavailable. Refresh to reconnect."; });
   }
   function sendNetwork(payload: unknown) { const message = { ...payload as object, userId: networkUserId() }; if (networkSocket?.readyState === WebSocket.OPEN) networkSocket.send(JSON.stringify(message)); else if (networkSocket?.readyState === WebSocket.CONNECTING) pendingNetworkMessages.push(message); }
   function nextNetworkActionId() { networkActionSequence += 1; return `${networkUserId()}-${Date.now().toString(36)}-${networkActionSequence}`; }
@@ -409,16 +405,13 @@ export function initBoomBox() {
       } else {
         action.textContent = "Cancel room";
         action.addEventListener("click", () => {
-          if (networkMode) { sendNetwork({ type: "boombox-cancel", gameId: room.id }); return; }
-          createdRooms = createdRooms.filter((candidate) => candidate.id !== room.id);
-          if (joinedRoomId === room.id) joinedRoomId = "";
-          lobbyStatus.textContent = `${room.name} was cancelled.`;
-          renderRooms();
+          if (!networkMode) { lobbyStatus.textContent = "The authoritative room service is unavailable. Refresh to reconnect."; return; }
+          sendNetwork({ type: "boombox-cancel", gameId: room.id });
         });
       }
     }
     else if (room.id === joinedRoomId) { action.className = "secondary"; action.textContent = "Joined"; action.disabled = true; }
-    else { action.textContent = room.started ? "Watch room" : room.connected === room.seats ? "Full" : "Join room"; action.disabled = !room.started && (room.connected >= room.seats); action.addEventListener("click", () => { if (networkMode) { sendNetwork({ type: room.started ? "boombox-watch" : "boombox-join", gameId: room.id, name: networkDisplayName() }); return; } joinedRoomId = room.id; room.connected = Math.min(room.seats, room.connected + 1); lobbyStatus.textContent = `Joined ${room.name}. Waiting for the room to launch.`; renderRooms(); }); }
+    else { action.textContent = room.started ? "Watch room" : room.connected === room.seats ? "Full" : "Join room"; action.disabled = !room.started && (room.connected >= room.seats); action.addEventListener("click", () => { if (!networkMode) { lobbyStatus.textContent = "The authoritative room service is unavailable. Refresh to reconnect."; return; } sendNetwork({ type: room.started ? "boombox-watch" : "boombox-join", gameId: room.id, name: networkDisplayName() }); }); }
     const invite = document.createElement("button"); invite.type = "button"; invite.className = "secondary"; invite.textContent = "Copy invite"; invite.disabled = !room.inviteToken; invite.title = room.inviteToken ? "Copy a secure invite link" : "Only the room creator can copy the secure invite"; invite.addEventListener("click", async () => { const link = `${location.origin}/?boomboxRoom=${encodeURIComponent(room.id)}&boomboxInvite=${encodeURIComponent(room.inviteToken || "")}`; try { await navigator.clipboard.writeText(link); lobbyStatus.textContent = "Secure invite link copied."; } catch { lobbyStatus.textContent = link; } }); actions.append(action, invite); card.append(heading, details, actions); return card;
   }
 
@@ -464,7 +457,7 @@ export function initBoomBox() {
 
   function setCreateStep(next: number) { createStep = clamp(next, 1, 3); steps.forEach((step) => { step.hidden = Number(step.dataset.boomboxStep) !== createStep; }); indicators.forEach((indicator) => { const number = Number(indicator.dataset.boomboxStepIndicator); indicator.classList.toggle("is-active", number === createStep); indicator.classList.toggle("is-complete", number < createStep); }); createBackButton.textContent = createStep === 1 ? "Back to lobby" : "Back"; createNextButton.hidden = createStep === 3; createSubmitButton.hidden = createStep !== 3; if (createStep === 3) updateCreateSummary(); }
   function openCreate() { const savedName = localStorage.getItem(playerNameKey)?.trim(); if (savedName && commanderInput.value === "Commander") commanderInput.value = savedName; renderSeatPlan(); setCreateStep(1); setPanel("create"); }
-  function createRoom() { const advancedWeapons: WeaponId[] = ["heavy-cannon", "heavy-shell", "precision-round", "split-shell", "mini-nuke", "mirv", "triple-shot", "bouncing-bomb", "riot-bomb", "piercing-round", "napalm", "smoke-shell", "liquid-dirt", "terrain-tool", "terrain-remover", "tracer-round", "laser-line", "area-charge"]; const advancedUtilities: UtilityId[] = ["heavy-shield", "shield-recharge", "fuel-canister", "guidance-kit", "turret-upgrade"]; const config = { name: roomNameInput.value.trim() || "Unnamed room", creator: commanderInput.value.trim() || networkDisplayName(), seats: Number(seatsInput.value), aiSeats: seatModes.map((mode, index) => mode === "ai" && index > 0 ? index : -1).filter((index) => index >= 0), terrain: terrainInput.value, pace: paceInput.value, aiDifficulty: aiDifficultyInput.value, aiFill: aiFillInput.checked, firingMode: firingModeInput.value, movement: movementInput.checked && firingModeInput.value === "sequential", gravity: Number(gravityInput.value), windMode: windModeInput.value, windLimit: clamp(Number(windLimitInput.value) || 0, 0, 2), boundary: boundaryInput.value, events: { meteorShower: meteorEventsInput.checked, scenery: sceneryInput.checked }, startingMoney: clamp(Number(startingMoneyInput.value) || 0, 0, 10000), disabledWeapons: fullCatalogueInput.checked ? [] : advancedWeapons, disabledUtilities: fullCatalogueInput.checked ? [] : advancedUtilities, seed: 314159 }; if (networkMode) { sendNetwork({ type: "boombox-create", config }); setPanel("lobby"); return; } const room: BoomBoxRoom = { id: `BB-${roomSequence++}`, name: config.name, creator: config.creator || "Commander", seats: config.seats, connected: 1, terrain: terrainInput.selectedOptions[0]?.textContent || "Sunset Range", pace: paceInput.selectedOptions[0]?.textContent?.split(" - ")[0] || "Standard", firingMode: config.firingMode, aiFill: aiFillInput.checked, started: false }; createdRooms = [room, ...createdRooms]; joinedRoomId = room.id; lobbyStatus.textContent = `${room.name} created. Share the room code when the match is ready.`; setPanel("lobby"); }
+  function createRoom() { const advancedWeapons: WeaponId[] = ["heavy-cannon", "heavy-shell", "precision-round", "split-shell", "mini-nuke", "mirv", "triple-shot", "bouncing-bomb", "riot-bomb", "piercing-round", "napalm", "smoke-shell", "liquid-dirt", "terrain-tool", "terrain-remover", "tracer-round", "laser-line", "area-charge"]; const advancedUtilities: UtilityId[] = ["heavy-shield", "shield-recharge", "fuel-canister", "guidance-kit", "turret-upgrade"]; const config = { name: roomNameInput.value.trim() || "Unnamed room", creator: commanderInput.value.trim() || networkDisplayName(), seats: Number(seatsInput.value), aiSeats: seatModes.map((mode, index) => mode === "ai" && index > 0 ? index : -1).filter((index) => index >= 0), terrain: terrainInput.value, pace: paceInput.value, aiDifficulty: aiDifficultyInput.value, aiFill: aiFillInput.checked, firingMode: firingModeInput.value, movement: movementInput.checked && firingModeInput.value === "sequential", gravity: Number(gravityInput.value), windMode: windModeInput.value, windLimit: clamp(Number(windLimitInput.value) || 0, 0, 2), boundary: boundaryInput.value, events: { meteorShower: meteorEventsInput.checked, scenery: sceneryInput.checked }, startingMoney: clamp(Number(startingMoneyInput.value) || 0, 0, 10000), disabledWeapons: fullCatalogueInput.checked ? [] : advancedWeapons, disabledUtilities: fullCatalogueInput.checked ? [] : advancedUtilities, seed: 314159 }; if (!networkMode) { lobbyStatus.textContent = "The authoritative room service is unavailable. Refresh to reconnect."; setPanel("lobby"); return; } sendNetwork({ type: "boombox-create", config }); setPanel("lobby"); }
 
   function renderShop() {
     shopCreditsValue.textContent = String(shopCredits);
@@ -493,27 +486,11 @@ export function initBoomBox() {
   }
 
   function resizeBattlefield() { const rect = battlefield.getBoundingClientRect(); const ratio = window.devicePixelRatio || 1; battlefield.width = Math.max(1, Math.round(rect.width * ratio)); battlefield.height = Math.max(1, Math.round(rect.height * ratio)); context.setTransform(battlefield.width / CANVAS_WIDTH, 0, 0, battlefield.height / CANVAS_HEIGHT, 0, 0); }
-  function startSoloLocalMatch() {
-    const seed = clamp(Number(soloSeedInput.value) || 314159, 1, 999999);
-    const terrainName = soloTerrainInput.selectedOptions[0]?.textContent || "Sunset Range";
-    const terrain = makeTerrain(seed, soloTerrainInput.value);
-    const opponentCount = clamp(Number(opponentsInput.value) || 2, 1, 3);
-    const positions = opponentCount === 1 ? [814] : opponentCount === 2 ? [700, 842] : [620, 748, 860];
-    const colors = ["#ff8b63", "#d98cff", "#b8f266"];
-    const opponents = positions.map((x, index) => ({ x, y: terrain[x] - 17, health: 100, alive: true, falling: false, fallVelocity: 0, label: `Rival ${index + 1}`, color: colors[index], shield: 0, fuel: 100, upgrades: {} }));
-    const weaponId = soloWeaponInput.value as WeaponId;
-    const utilityId = soloUtilityInput.value as UtilityId;
-    const inventory = { ...shopInventory }; inventory.cannon = Math.max(99, inventory.cannon); if (inventory[weaponId] < 1 && weaponId !== "cannon") inventory[weaponId] = 1;
-    const utilities = Object.fromEntries((Object.keys(UTILITIES) as UtilityId[]).map((id) => [id, Number(UTILITIES[id].starter) || 0])) as Record<UtilityId, number>;
-    if ((utilities[utilityId] || 0) < 1) utilities[utilityId] = 1;
-    match = { seed, terrainName, terrain, terrainSolid: Array(CANVAS_WIDTH).fill(true), terrainMaterial: Array(CANVAS_WIDTH).fill("dirt"), wind: (seed % 17 - 8) / 10, turn: 1, player: { x: 146, y: terrain[146] - 17, health: 100, alive: true, falling: false, fallVelocity: 0, label: soloNameInput.value.trim() || "Commander", color: "#54e7ff", shield: utilityId === "shield" ? Number(UTILITIES.shield.amount) || 35 : 0, fuel: 100, upgrades: {} }, opponents, targetIndex: 0, aiIndex: 0, weaponId, utilityId, utilityUsed: utilityId === "shield", credits: shopCredits, inventory, utilities, difficulty: soloDifficultyInput.value as Difficulty, phase: "aiming", shots: 0, hits: 0, damageDealt: 0, damageTaken: 0, craters: 0, creditsSpent: 100 - shopCredits, startedAt: performance.now(), actionLog: [] };
-    recordAction("match-start", { seed, opponents: opponentCount, difficulty: match.difficulty, weaponId, utilityId });
-    targetSignature = ""; opponentHealthSignature = ""; playerLabel.textContent = match.player.label; matchSeed.textContent = `Seed ${seed}`; matchTerrain.textContent = terrainName; matchStatus.textContent = "Your turn. Set the shot."; shotLog.textContent = "Shot log: match ready."; weaponInput.value = weaponId; targetInput.value = "0"; setPanel("match"); updateControls();
-  }
   function startSoloMatch() {
-    if (typeof WebSocket === "undefined") return startSoloLocalMatch();
+    if (typeof WebSocket === "undefined") { soloStatus.textContent = "The authoritative solo service requires a browser with WebSocket support."; return; }
     const name = soloNameInput.value.trim() || localStorage.getItem(playerNameKey)?.trim() || "Commander";
     localStorage.setItem(playerNameKey, name);
+    soloStatus.textContent = "Connecting to the authoritative solo rules service...";
     soloNetworkMode = true; soloNetworkUserId = `${name}-solo-${Date.now().toString(36)}`; soloLoadoutSynced = false; soloLoadoutPending = 0;
     soloDesiredWeaponId = soloWeaponInput.value as WeaponId; soloDesiredUtilityId = soloUtilityInput.value as UtilityId;
     networkMode = true;

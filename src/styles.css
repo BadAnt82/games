@@ -970,6 +970,7 @@ body.fullscreen-fallback-active {
 }
 
 .boombox-setup-note span { color: rgba(224, 239, 255, .68); font-size: .82rem; line-height: 1.4; }
+.boombox-inline-status { min-height: 1.2em; margin: 0; color: #ffcf9a; font-size: .8rem; line-height: 1.35; }
 .boombox-credit-note { display: grid; gap: 3px; padding: 11px 13px; border: 1px solid rgba(255, 174, 105, .28); border-radius: 10px; color: #ffdbad; background: rgba(66, 38, 54, .42); }
 .boombox-credit-note span { color: rgba(255, 229, 197, .68); font-size: .78rem; }
 .boombox-help { padding: 10px 13px; border: 1px solid rgba(100, 230, 255, .25); border-radius: 9px; color: #dff9ff; background: rgba(7, 32, 58, .4); }
