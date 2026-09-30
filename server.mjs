@@ -29,7 +29,23 @@ const bridgeJackpotHitOdds = 20;
 const port = Number(process.env.PORT || 3000);
 const timeZone = process.env.SCORE_TIME_ZONE || "America/Los_Angeles";
 function readBoomBoxHistory() { try { const parsed = JSON.parse(readFileSync(boomBoxHistoryPath, "utf8")); return Array.isArray(parsed) ? parsed : []; } catch { return []; } }
-function writeBoomBoxHistory(history) { mkdirSync(resolve(boomBoxHistoryPath, ".."), { recursive: true }); writeFileSync(boomBoxHistoryPath, JSON.stringify(history.slice(-100), null, 2)); }
+const boomBoxPersistenceStatus = {
+  history: { lastWriteOk: true, lastWriteAt: null },
+  activeRooms: { lastWriteOk: true, lastWriteAt: null },
+};
+function markBoomBoxPersistence(kind, ok) {
+  boomBoxPersistenceStatus[kind] = { lastWriteOk: ok, lastWriteAt: new Date().toISOString() };
+}
+function writeBoomBoxHistory(history) {
+  try {
+    mkdirSync(resolve(boomBoxHistoryPath, ".."), { recursive: true });
+    writeFileSync(boomBoxHistoryPath, JSON.stringify(history.slice(-100), null, 2));
+    markBoomBoxPersistence("history", true);
+  } catch (error) {
+    markBoomBoxPersistence("history", false);
+    console.error(`[boombox-persistence] history write failed: ${error?.message || "unknown error"}`);
+  }
+}
 const boomBoxHistory = readBoomBoxHistory();
 const snakeBoard = {
   cellSize: 24,
@@ -1488,8 +1504,11 @@ function handlePixelLobbyJoin(response, lobbyId) {
 async function handleApi(request, response) {
   const url = new URL(request.url || "/", "http://localhost");
   if (url.pathname === "/api/boombox-health" && request.method === "GET") {
-    const storage = (path) => { const present = existsSync(path); try { accessSync(present ? path : resolve(path, ".."), fsConstants.R_OK | fsConstants.W_OK); return { configured: true, present, writable: true }; } catch { return { configured: true, present, writable: false }; } };
-    sendJson(response, 200, { status: "ok", rulesVersion: BOOMBOX_RULES_VERSION, activeRooms: boomboxRooms.size, completedMatches: boomBoxHistory.length, persistence: { history: storage(boomBoxHistoryPath), activeRooms: storage(boomBoxRoomStorePath) } });
+    const storage = (path, kind) => { const present = existsSync(path); let writable = false; try { accessSync(present ? path : resolve(path, ".."), fsConstants.R_OK | fsConstants.W_OK); writable = true; } catch {} return { configured: true, present, writable, ...boomBoxPersistenceStatus[kind] }; };
+    const historyStorage = storage(boomBoxHistoryPath, "history");
+    const activeRoomsStorage = storage(boomBoxRoomStorePath, "activeRooms");
+    const persistenceOk = historyStorage.writable && activeRoomsStorage.writable && historyStorage.lastWriteOk && activeRoomsStorage.lastWriteOk;
+    sendJson(response, 200, { status: persistenceOk ? "ok" : "degraded", rulesVersion: BOOMBOX_RULES_VERSION, activeRooms: boomboxRooms.size, completedMatches: boomBoxHistory.length, persistence: { history: historyStorage, activeRooms: activeRoomsStorage } });
     return true;
   }
   if (url.pathname === "/api/boombox-rules" && request.method === "GET") {
@@ -1771,8 +1790,10 @@ function writeBoomBoxRooms() {
     const temporaryPath = `${boomBoxRoomStorePath}.tmp-${process.pid}`;
     writeFileSync(temporaryPath, JSON.stringify([...boomboxRooms.values()].map(serializableBoomBoxRoom), null, 2));
     renameSync(temporaryPath, boomBoxRoomStorePath);
-  } catch {
-    // A room remains live in memory if the optional recovery store is unavailable.
+    markBoomBoxPersistence("activeRooms", true);
+  } catch (error) {
+    markBoomBoxPersistence("activeRooms", false);
+    console.error(`[boombox-persistence] active-room write failed: ${error?.message || "unknown error"}`);
   }
 }
 
