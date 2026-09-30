@@ -60,6 +60,7 @@ try {
   }
   const roomName = `E-simultaneous-${suffix}`.slice(0, 28);
   await openMode(guest, "multi");
+  await guest.locator("#boombox-refresh").click();
   const available = guest.locator("#boombox-available-list article", { hasText: roomName }).first();
   await available.waitFor({ state: "visible", timeout: 12000 });
   if (!(await available.innerText()).includes(`Created by E Host`)) throw new Error("Available room omitted the creator name");
@@ -69,7 +70,16 @@ try {
     const status = await page.locator("#boombox-match-status").innerText();
     if (!status || status.includes("unavailable")) throw new Error(`2-seat ${page === host ? "host" : "guest"} match did not become usable`);
   }
-  await rooms.at(-1).getByRole("button", { name: "Cancel room" }).count().catch(() => {});
+  // Leave and cancel the fixture so repeated live acceptance runs do not accumulate rooms.
+  await host.locator("#boombox-match-exit").click();
+  await guest.locator("#boombox-match-exit").click();
+  await host.locator("#boombox-mode-panel").waitFor({ state: "visible", timeout: 5000 });
+  await host.locator("#boombox-mode-multi").click();
+  await host.locator("#boombox-lobby-panel").waitFor({ state: "visible", timeout: 8000 });
+  const cleanupCard = host.locator("#boombox-created-list article", { hasText: roomName }).first();
+  await cleanupCard.waitFor({ state: "visible", timeout: 8000 });
+  await cleanupCard.getByRole("button", { name: "Cancel room" }).click();
+  await cleanupCard.waitFor({ state: "detached", timeout: 8000 });
 
   // Portrait and landscape must retain a usable, scrollable setup surface without horizontal clipping.
   for (const [label, viewport] of [["portrait", { width: 390, height: 844 }], ["landscape", { width: 844, height: 390 }]]) {
