@@ -43,3 +43,5 @@ Pass 22 is **not** a human-testing green light. The automated and live checks ar
 ## Next loop step
 
 Proceed to **Pass 23: conformance corrections**. It should add per-seat human/AI assignment and review, complete event-level replay controls, define terrain bounce behavior, remove obsolete prototype copy, and run a two-browser multiplayer start-to-finish acceptance check. Reassess the art/audio scope and persistent-volume evidence after those corrections.
+
+**Superseded:** Pass 23 completed these four release-blocking corrections. See [BOOM_BOX_PASS23_CONFORMANCE_CORRECTIONS.md](./BOOM_BOX_PASS23_CONFORMANCE_CORRECTIONS.md) for the deployed evidence and next-loop recommendation.
