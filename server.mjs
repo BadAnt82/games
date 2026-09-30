@@ -1943,16 +1943,15 @@ function boomBoxAiUtility(room, seatIndex) {
   if (player.falling && (player.utilities.parachute || 0) > 0) return "parachute";
   if (room.rules.movement && player.fuel < 45 && (player.utilities["fuel-canister"] || 0) > 0) return "fuel-canister";
   if (!player.upgrades.guidance && (player.utilities["guidance-kit"] || 0) > 0) return "guidance-kit";
-  if (!player.upgrades.turret && (player.utilities["turret-upgrade"] || 0) > 0) return "turret-upgrade";
   if (player.health < 82 && (player.utilities["terrain-lift"] || 0) > 0) return "terrain-lift";
   return "";
 }
 function boomBoxAiBuyUtility(room, seatIndex) {
   const player = room.state.players[seatIndex]; player.utilities ||= {}; player.utilityCapacity ||= {};
-  const preferred = player.health < 65 ? ["repair-kit", "heavy-shield", "shield-recharge"] : ["guidance-kit", "turret-upgrade", "fuel-canister", "terrain-lift", "parachute", "shield-recharge"];
+  const preferred = player.health < 65 ? ["repair-kit", "heavy-shield", "shield-recharge"] : ["guidance-kit", "fuel-canister", "terrain-lift", "parachute", "shield-recharge"];
   for (const id of preferred) {
     const item = room.rules.utilityCatalog[id];
-    if ((id === "guidance-kit" && player.upgrades.guidance) || (id === "turret-upgrade" && player.upgrades.turret)) continue;
+    if (id === "guidance-kit" && player.upgrades.guidance) continue;
     if (!item || (player.utilities[id] || 0) >= (player.utilityCapacity[id] || item.inventory || 0) || player.money < (Number(item.cost) || 0)) continue;
     const purchase = boomBoxPurchase(room, seatIndex, "utility", id, 1);
     if (!purchase?.error) return id;
@@ -2179,7 +2178,7 @@ function resolveBoomBoxActionNow(room, seatIndex, action, actionId = "", options
   }
   if (action.kind === "utility") {
     const utility = String(action.utility || "repair-kit"); const utilityRules = room.rules.utilityCatalog[utility]; if (!utilityRules) return { error: "That utility is not available in this ruleset." }; if ((player.utilities[utility] || 0) < 1) return { error: "That utility is out of stock." }; const amount = Number(utilityRules.amount) || 0;
-    if (utilityRules.effect === "repair") player.health = Math.min(player.maxHealth, player.health + amount); else if (utilityRules.effect === "shield") player.shield = Math.max(player.shield || 0, amount); else if (utilityRules.effect === "shield-recharge") player.shield = Math.min(100, (player.shield || 0) + amount); else if (utilityRules.effect === "terrain-lift") boomBoxMutateTerrain(room, player.x, 70, -26, "reinforced"); else if (utilityRules.effect === "parachute") player.upgrades.parachute = (player.upgrades.parachute || 0) + 1; else if (utilityRules.effect === "fuel") player.fuel = Math.min(100, player.fuel + amount); else if (utilityRules.effect === "guidance") player.upgrades.guidance = (player.upgrades.guidance || 0) + 1; else if (utilityRules.effect === "turret-upgrade") player.upgrades.turret = (player.upgrades.turret || 0) + 1;
+    if (utilityRules.effect === "repair") player.health = Math.min(player.maxHealth, player.health + amount); else if (utilityRules.effect === "shield") player.shield = Math.max(player.shield || 0, amount); else if (utilityRules.effect === "shield-recharge") player.shield = Math.min(100, (player.shield || 0) + amount); else if (utilityRules.effect === "terrain-lift") boomBoxMutateTerrain(room, player.x, 70, -26, "reinforced"); else if (utilityRules.effect === "parachute") player.upgrades.parachute = (player.upgrades.parachute || 0) + 1; else if (utilityRules.effect === "fuel") player.fuel = Math.min(100, player.fuel + amount); else if (utilityRules.effect === "guidance") player.upgrades.guidance = (player.upgrades.guidance || 0) + 1;
     player.utilities[utility] -= 1; boomBoxAppendEvent(room, { kind: "utility", seat: seatIndex, utility, effect: utilityRules.effect, actionId }); if (advance) advanceBoomBoxTurn(room, seatIndex); room.updatedAt = Date.now(); return { flight: null };
   }
   const targetIndex = Math.max(0, Math.min(room.state.players.length - 1, Number(action.targetIndex) || 0)); const target = room.state.players[targetIndex]; if (!target || targetIndex === seatIndex || !target.alive) return { error: "Choose a living opponent." };

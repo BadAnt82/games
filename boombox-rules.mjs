@@ -35,7 +35,6 @@ export const BOOM_BOX_UTILITY_CATALOG = {
   parachute: { label: "Parachute", cost: 15, inventory: 2, starter: 1, effect: "parachute", description: "Protect the next terrain fall." },
   "fuel-canister": { label: "Fuel canister", cost: 15, inventory: 2, effect: "fuel", amount: 50, economy: "Keeps movement available in long matches.", description: "Restore 50 movement fuel." },
   "guidance-kit": { label: "Guidance kit", cost: 30, inventory: 1, effect: "guidance", description: "Adds steering to later shots." },
-  "turret-upgrade": { label: "Turret upgrade", cost: 50, inventory: 1, effect: "turret-upgrade", description: "Permanent turret upgrade slot." },
 };
 
 export function boomBoxTerrain(seed, profile = "sunset-range") {

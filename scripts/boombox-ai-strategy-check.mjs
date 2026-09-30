@@ -22,8 +22,8 @@ try {
     try {
       const { room, state } = await created(socket, userId, difficulty, false); console.log(`${difficulty}: started turn=${state.snapshot.turnSeat}`);
       let lastSequence = 0; const utilities = []; let latestPlayer = null;
-      for (let step = 1; step <= 6 && !(utilities.includes("guidance-kit") && utilities.includes("turret-upgrade")); step += 1) { const result = await nextAiUtility(socket, userId, room.gameId, `${difficulty}-${step}`, lastSequence); utilities.push(result.event.utility); lastSequence = result.event.sequence; latestPlayer = result.player; }
-      if (utilities[0] !== "shield" || !utilities.includes("guidance-kit") || !utilities.includes("turret-upgrade")) throw new Error(`${difficulty}: expected shield, guidance-kit, and turret-upgrade; saw ${utilities.join(", ")}`);
+      for (let step = 1; step <= 6 && !utilities.includes("guidance-kit"); step += 1) { const result = await nextAiUtility(socket, userId, room.gameId, `${difficulty}-${step}`, lastSequence); utilities.push(result.event.utility); lastSequence = result.event.sequence; latestPlayer = result.player; }
+      if (utilities[0] !== "shield" || !utilities.includes("guidance-kit")) throw new Error(`${difficulty}: expected shield and guidance-kit; saw ${utilities.join(", ")}`);
       console.log(`Boom Box AI ${difficulty} strategy passed: ${utilities.join(" -> ")} (upgrades ${JSON.stringify(latestPlayer?.upgrades)}).`);
     } finally { socket.close(); }
   }

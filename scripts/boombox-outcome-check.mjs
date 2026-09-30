@@ -28,7 +28,6 @@ try {
       if (utilityId === "terrain-lift" && !used.snapshot.terrainMaterial.includes("reinforced")) throw new Error("terrain-lift effect did not persist material");
       if (utilityId === "parachute" && player.upgrades.parachute < 1) throw new Error("parachute effect did not arm");
       if (utilityId === "guidance-kit" && player.upgrades.guidance < 1) throw new Error("guidance effect did not arm");
-      if (utilityId === "turret-upgrade" && player.upgrades.turret < 1) throw new Error("turret-upgrade effect did not apply");
       if (utilityId === "fuel-canister" && player.fuel <= before.fuel - 20) throw new Error("fuel-canister effect did not restore fuel");
       if (utilityId === "repair-kit" && player.health < before.health) throw new Error("repair-kit reduced health");
       utilityResults.push(utilityId);
