@@ -982,6 +982,7 @@ body.fullscreen-fallback-active {
 .boombox-match-meta { display: flex; flex-wrap: wrap; justify-content: end; gap: 6px; color: #aeeeff; font-size: .72rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
 .boombox-match-meta span { padding: 6px 8px; border: 1px solid rgba(100, 230, 255, .25); border-radius: 999px; background: rgba(6, 25, 53, .6); }
 .boombox-battle-wrap { width: 100%; overflow: hidden; border: 1px solid rgba(119, 225, 255, .4); border-radius: 14px; background: #0d1731; box-shadow: 0 12px 30px rgba(2, 5, 20, .35); }
+.boombox-match-help { width: 100%; margin: 0; color: rgba(224, 239, 255, .68); font-size: .78rem; line-height: 1.4; text-align: left; }
 #boombox-canvas { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; touch-action: none; }
 .boombox-match-controls { display: grid; width: 100%; grid-template-columns: minmax(150px, 1fr) minmax(150px, 1fr) auto minmax(140px, auto); align-items: end; gap: 12px; padding: 12px; border: 1px solid rgba(143, 204, 255, .2); border-radius: 12px; background: rgba(10, 22, 48, .68); text-align: left; }
 .boombox-match-controls label { display: grid; min-width: 0; gap: 5px; color: #dcecff; font-size: .74rem; font-weight: 900; letter-spacing: .05em; text-transform: uppercase; }
@@ -2212,5 +2213,16 @@ body.fullscreen-fallback-active {
     position: absolute;
     bottom: max(12px, env(safe-area-inset-bottom));
     left: max(12px, env(safe-area-inset-left));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .overlay.is-boombox *,
+  .overlay.is-boombox *::before,
+  .overlay.is-boombox *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: .01ms !important;
   }
 }

@@ -1,4 +1,4 @@
-import { createReadStream, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { accessSync, constants as fsConstants, createReadStream, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { extname, join, normalize, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -1487,6 +1487,15 @@ function handlePixelLobbyJoin(response, lobbyId) {
 
 async function handleApi(request, response) {
   const url = new URL(request.url || "/", "http://localhost");
+  if (url.pathname === "/api/boombox-health" && request.method === "GET") {
+    const storage = (path) => { const present = existsSync(path); try { accessSync(present ? path : resolve(path, ".."), fsConstants.R_OK | fsConstants.W_OK); return { configured: true, present, writable: true }; } catch { return { configured: true, present, writable: false }; } };
+    sendJson(response, 200, { status: "ok", rulesVersion: BOOMBOX_RULES_VERSION, activeRooms: boomboxRooms.size, completedMatches: boomBoxHistory.length, persistence: { history: storage(boomBoxHistoryPath), activeRooms: storage(boomBoxRoomStorePath) } });
+    return true;
+  }
+  if (url.pathname === "/api/boombox-rules" && request.method === "GET") {
+    sendJson(response, 200, { version: BOOMBOX_RULES_VERSION, weapons: BOOMBOX_WEAPON_CATALOG, utilities: BOOMBOX_UTILITY_CATALOG });
+    return true;
+  }
   if (url.pathname === "/api/boombox-history" && request.method === "GET") {
     const requestedLimit = Number(url.searchParams.get("limit") || 50);
     const limit = Math.max(1, Math.min(50, Number.isFinite(requestedLimit) ? Math.floor(requestedLimit) : 50));

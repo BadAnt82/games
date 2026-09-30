@@ -17,7 +17,7 @@ const WEAPONS: Record<WeaponId, { label: string; cost: number; radius: number; d
   "mini-nuke": { label: "Mini nuke", cost: 70, radius: 150, depth: 68, directDamage: 100, splashDamage: 82, speed: .72, description: "Huge crater and area damage.", mode: "area" },
   mirv: { label: "MIRV", cost: 65, radius: 54, depth: 28, directDamage: 54, splashDamage: 34, speed: .94, description: "Three separated warheads.", mode: "spread", count: 3, spread: 32 },
   "triple-shot": { label: "Triple shot", cost: 50, radius: 38, depth: 18, directDamage: 44, splashDamage: 26, speed: 1, description: "Three spread shells.", mode: "spread", count: 3, spread: 26 },
-  "bouncing-bomb": { label: "Bouncing bomb", cost: 40, radius: 52, depth: 30, directDamage: 64, splashDamage: 42, speed: .94, description: "Bounces at the boundaries.", mode: "bounce", bounces: 5 },
+  "bouncing-bomb": { label: "Bouncing bomb", cost: 40, radius: 52, depth: 30, directDamage: 64, splashDamage: 42, speed: .94, description: "Bounces off walls and terrain.", mode: "bounce", bounces: 5 },
   "riot-bomb": { label: "Riot bomb", cost: 35, radius: 68, depth: 34, directDamage: 58, splashDamage: 58, speed: 1, description: "Strong close-range impact." },
   "piercing-round": { label: "Piercing round", cost: 40, radius: 36, depth: 20, directDamage: 78, splashDamage: 24, speed: .92, description: "Cuts through terrain.", mode: "piercing", ignoreTerrain: true },
   napalm: { label: "Napalm", cost: 55, radius: 62, depth: 16, directDamage: 40, splashDamage: 32, speed: .9, description: "Leaves a burning target effect.", mode: "napalm", burningTurns: 2 },
