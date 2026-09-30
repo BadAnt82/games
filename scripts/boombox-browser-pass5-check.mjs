@@ -99,6 +99,10 @@ try {
   console.log(`Boom Box Pass 5 browser acceptance passed: four-human long run, spectator view, reconnect resume, and owner cancellation (${roomName}).`);
 } catch (error) {
   console.error("Boom Box Pass 5 browser acceptance failed", error);
+  for (const [index, context] of contexts.entries()) {
+    const page = context.pages()[0];
+    if (page) console.error(`page${index + 1}`, await page.locator("#boombox-lobby-status").textContent().catch(() => "unavailable"), await page.locator("#boombox-match-status").textContent().catch(() => "unavailable"), await page.locator("#boombox-canvas").isVisible().catch(() => false));
+  }
   throw error;
 } finally {
   for (const context of contexts) await context.close().catch(() => {});
