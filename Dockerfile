@@ -17,7 +17,7 @@ ENV PORT=3000
 
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
-COPY server.mjs package.json ./
+COPY server.mjs boombox-rules.mjs package.json ./
 RUN mkdir -p /app/data
 
 EXPOSE 3000
