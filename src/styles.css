@@ -894,6 +894,13 @@ body.fullscreen-fallback-active {
 .boombox-history-replay label { display: flex; justify-content: space-between; color: #dcecff; font-size: .74rem; font-weight: 800; }
 .boombox-history-replay input { width: 100%; accent-color: #ff9b5d; }
 .boombox-history-replay p { margin: 0; color: rgba(224, 239, 255, .64); font-size: .74rem; }
+.boombox-replay-controls { display: flex; flex-wrap: wrap; gap: 6px; }
+.boombox-history-events { display: grid; gap: 4px; max-height: 132px; overflow: auto; padding: 7px 9px; border: 1px solid rgba(137, 227, 255, .16); border-radius: 8px; background: rgba(7, 13, 32, .42); color: rgba(224, 239, 255, .72); font-size: .72rem; }
+.boombox-history-events span { display: block; }
+.boombox-field-heading { display: block; margin-top: 3px; color: #fff; font-size: .82rem; }
+.boombox-seat-plan { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 8px; margin-top: 8px; }
+.boombox-seat-plan label { display: grid; gap: 5px; color: rgba(224, 239, 255, .8); font-size: .76rem; }
+.boombox-seat-plan select { width: 100%; }
 
 .boombox-create-panel { width: min(100%, 700px); }
 .boombox-stepper { display: flex; width: 100%; justify-content: center; gap: 8px; }

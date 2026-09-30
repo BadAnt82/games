@@ -14,6 +14,7 @@
     "test:boombox": "node --experimental-strip-types scripts/boombox-determinism-check.mjs",
     "test:boombox-network": "node scripts/boombox-network-check.mjs",
     "test:boombox-release": "node scripts/boombox-release-check.mjs",
+    "test:boombox-browser": "npx -p playwright node scripts/boombox-browser-check.mjs",
     "test:smoke": "node scripts/smoke-server.mjs",
     "preview": "vite preview --host 0.0.0.0 --port 3000",
     "start": "node server.mjs"
