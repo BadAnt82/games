@@ -996,6 +996,11 @@ body.fullscreen-fallback-active {
 .boombox-playback { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; color: rgba(224, 239, 255, .7); font-size: .72rem; font-weight: 900; }
 .boombox-playback button { padding: 7px 9px; }
 .boombox-playback button.is-selected { border-color: #ffb36e; color: #fff; background: rgba(255, 155, 93, .2); }
+.boombox-presentation-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
+.boombox-presentation-controls button { padding: 7px 9px; }
+.boombox-presentation-controls button[aria-pressed="false"] { color: rgba(224, 239, 255, .72); }
+.boombox-announcement { width: 100%; min-height: 1.2em; margin: 0; color: #ffe0a8; font-size: .78rem; font-weight: 800; text-align: left; }
+.boombox-replay-result { width: min(100%, 480px); margin: 0; padding: 8px 10px; border: 1px solid rgba(255, 179, 110, .24); border-radius: 8px; color: #ffe0a8; background: rgba(20, 25, 54, .5); font-size: .76rem; }
 .boombox-fire-button { min-height: 44px; }
 .boombox-utility-button { min-height: 44px; }
 .boombox-health-row { display: grid; width: 100%; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }

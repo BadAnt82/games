@@ -70,6 +70,25 @@ export function initBoomBox() {
   const createPanel = required<HTMLElement>("#boombox-create-panel");
   const matchPanel = required<HTMLElement>("#boombox-match-panel");
   const resultPanel = required<HTMLElement>("#boombox-result-panel");
+  const presentationControls = document.createElement("div");
+  presentationControls.className = "boombox-presentation-controls";
+  presentationControls.setAttribute("aria-label", "Presentation controls");
+  const soundToggle = document.createElement("button");
+  soundToggle.id = "boombox-sound-toggle";
+  soundToggle.className = "secondary";
+  soundToggle.type = "button";
+  const effectsToggle = document.createElement("button");
+  effectsToggle.id = "boombox-effects-toggle";
+  effectsToggle.className = "secondary";
+  effectsToggle.type = "button";
+  presentationControls.append(soundToggle, effectsToggle);
+  matchPanel.querySelector(".boombox-playback")?.after(presentationControls);
+  const announcement = document.createElement("p");
+  announcement.id = "boombox-announcement";
+  announcement.className = "boombox-announcement";
+  announcement.setAttribute("role", "status");
+  announcement.setAttribute("aria-live", "assertive");
+  matchPanel.querySelector(".boombox-teaching-panel")?.after(announcement);
   const modeSingleButton = required<HTMLButtonElement>("#boombox-mode-single");
   const modeMultiButton = required<HTMLButtonElement>("#boombox-mode-multi");
   const modeBackButton = required<HTMLButtonElement>("#boombox-mode-back");
@@ -172,6 +191,12 @@ export function initBoomBox() {
   const historyReplayPlay = required<HTMLButtonElement>("#boombox-replay-play");
   const historyReplaySpeedButtons = [required<HTMLButtonElement>("#boombox-replay-1"), required<HTMLButtonElement>("#boombox-replay-2"), required<HTMLButtonElement>("#boombox-replay-4")];
   const historyEvents = required<HTMLElement>("#boombox-history-events");
+  const replayResult = document.createElement("p");
+  replayResult.id = "boombox-replay-result";
+  replayResult.className = "boombox-replay-result";
+  replayResult.setAttribute("role", "status");
+  replayResult.setAttribute("aria-live", "polite");
+  historyReplay.after(replayResult);
   const chatLog = required<HTMLElement>("#boombox-chat-log");
   const chatInput = required<HTMLInputElement>("#boombox-chat-input");
   const chatSendButton = required<HTMLButtonElement>("#boombox-chat-send");
@@ -229,6 +254,36 @@ export function initBoomBox() {
   let replayTimer = 0;
   let replaySpeed = 1;
   let replayPlaying = false;
+  const presentationKey = "badant-boombox-presentation";
+  let soundEnabled = true;
+  let effectsEnabled = true;
+  let audioContext: AudioContext | undefined;
+  let networkImpactBursts: Array<{ center: number; damage: number; startedAt: number; color: string }> = [];
+
+  try {
+    const saved = JSON.parse(localStorage.getItem(presentationKey) || "{}");
+    soundEnabled = saved.sound !== false;
+    effectsEnabled = saved.effects !== false;
+  } catch {}
+
+  function savePresentation() { localStorage.setItem(presentationKey, JSON.stringify({ sound: soundEnabled, effects: effectsEnabled })); }
+  function updatePresentationLabels() { soundToggle.textContent = soundEnabled ? "Sound on" : "Sound off"; effectsToggle.textContent = effectsEnabled ? "Full effects" : "Low effects"; soundToggle.setAttribute("aria-pressed", String(soundEnabled)); effectsToggle.setAttribute("aria-pressed", String(effectsEnabled)); }
+  function announce(text: string) { announcement.textContent = text; }
+  function tone(frequency: number, duration = .08, gain = .035) {
+    if (!soundEnabled || typeof AudioContext === "undefined") return;
+    try {
+      audioContext ||= new AudioContext();
+      if (audioContext.state === "suspended") void audioContext.resume();
+      const oscillator = audioContext.createOscillator();
+      const volume = audioContext.createGain();
+      oscillator.frequency.value = frequency;
+      oscillator.type = "sine";
+      volume.gain.setValueAtTime(gain, audioContext.currentTime);
+      volume.gain.exponentialRampToValueAtTime(.0001, audioContext.currentTime + duration);
+      oscillator.connect(volume).connect(audioContext.destination);
+      oscillator.start(); oscillator.stop(audioContext.currentTime + duration);
+    } catch {}
+  }
 
   function networkUrl() { return `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/boombox`; }
   function boomBoxClientId() {
@@ -270,6 +325,8 @@ export function initBoomBox() {
       networkFlight = networkFlights.reduce((longest, child) => child.path.length > longest.length ? child.path : longest, [] as Array<{ x: number; y: number }>);
       networkFlightImpacts = flights.flatMap((flight: any) => Array.isArray(flight.impacts) ? flight.impacts : []);
       networkFlightIndex = 0;
+      announce(`${flights.length} projectile${flights.length === 1 ? "" : "s"} in flight. Watch the trajectory and impacts.`);
+      tone(520, .12);
       return;
     }
     if (message.type === "boombox-loadout") { lobbyStatus.textContent = `Loadout ready: ${message.money ?? 0} credits.`; return; }
@@ -291,6 +348,10 @@ export function initBoomBox() {
     const selectedUtility = (soloNetworkMode && Object.prototype.hasOwnProperty.call(utilities, soloDesiredUtilityId) ? soloDesiredUtilityId : (Object.prototype.hasOwnProperty.call(utilities, match?.utilityId || "") ? match?.utilityId : Object.keys(utilities)[0] || "repair-kit")) as UtilityId;
     match = { seed: snapshot.seed, terrainName: snapshot.terrainName, terrain: snapshot.terrain, terrainSolid: snapshot.terrainSolid, terrainMaterial: snapshot.terrainMaterial, wind: snapshot.wind, turn: snapshot.turn, player: { x: local.x, y: local.y, health: local.health, alive: local.alive, falling: Boolean(local.falling), fallVelocity: local.falling ? 180 : 0, label: networkSpectator ? "Spectator view" : local.name, color: local.color, shield: local.shield || 0, fuel: local.fuel ?? 100, movedThisTurn: Boolean(local.movedThisTurn) }, opponents, targetIndex: 0, aiIndex: 0, weaponId: selectedWeapon as WeaponId, utilityId: selectedUtility, utilityUsed: false, credits: local.money || 0, inventory, utilities, difficulty: "veteran", phase: snapshot.phase === "finished" ? "finished" : "aiming", shots: local.shots || 0, hits: local.hits || 0, damageDealt: local.damage || 0, damageTaken: 0, craters: snapshot.log?.length || 0, creditsSpent: 0, startedAt: performance.now(), actionLog: (snapshot.log || []).map((entry: any) => ({ sequence: entry.sequence, kind: entry.kind, payload: JSON.stringify(entry) })) };
     targetSignature = ""; opponentHealthSignature = ""; networkFlight = []; networkFlightIndex = 0; networkFlightBundleId = ""; networkFlightAckSent = false; playerLabel.textContent = networkSpectator ? "Spectator view" : local.name; matchSeed.textContent = `Seed ${snapshot.seed}`; matchTerrain.textContent = snapshot.terrainName; const canSubmit = networkCanSubmit(); matchStatus.textContent = networkSpectator ? (snapshot.phase === "finished" ? "Spectator view — match complete." : `Spectating ${players[networkTurnSeat]?.name || "the next commander"}.`) : snapshot.phase === "finished" ? (snapshot.outcome === "draw" ? "The room ended in a draw." : snapshot.winner === seat ? "You won the room." : "You were eliminated.") : networkFiringMode === "sequential" ? networkTurnSeat === seat ? "Your turn. Set the shot." : `Waiting for ${players[networkTurnSeat]?.name || "the next commander"}.` : canSubmit ? `Prepare your shot. ${networkPreparedSeats.length} commander${networkPreparedSeats.length === 1 ? "" : "s"} ready.` : "Shot prepared. Waiting for the other commanders."; shotLog.textContent = snapshot.log?.length ? `Server log: ${snapshot.log.at(-1).hit ? "Impact confirmed" : snapshot.log.at(-1).impact === "terrain" ? "Terrain stopped the shot" : snapshot.log.at(-1).kind === "utility" ? "Utility resolved" : "Shot missed"}.` : "Server log: match ready."; weaponInput.value = match.weaponId; utilityInput.value = match.utilityId; setPanel("match"); updateControls(); if (snapshot.phase === "finished") showNetworkResult(!networkSpectator && snapshot.winner === seat, snapshot);
+    const latest = snapshot.log?.at?.(-1);
+    if (snapshot.phase === "finished") announce(snapshot.outcome === "draw" ? "Match complete. The room ended in a draw." : snapshot.winner === seat ? "Match complete. You won." : networkSpectator ? "Match complete. Review the final standings." : "You were eliminated. Review the final standings.");
+    else if (latest?.kind === "utility") { announce(`Utility resolved: ${latest.utility || "equipment"}.`); tone(720, .08); }
+    else if (latest?.kind === "placement") announce(`${latest.name || "Commander"} placed ${latest.place}.`);
     renderTeachingState(snapshot);
   }
   function populateNetworkCatalog(rules: any, inventory: Record<WeaponId, number>, utilities: Record<UtilityId, number>) {
@@ -331,13 +392,25 @@ export function initBoomBox() {
     if (placements.length) entries.push(...placements.map((entry: any) => `${entry.place}. ${entry.name}`));
     eliminationList.replaceChildren(...entries.map((label: string) => { const item = document.createElement("span"); item.textContent = label; return item; }));
   }
-  function showNetworkResult(won: boolean, snapshot: any) { const draw = snapshot.outcome === "draw"; resultTitle.textContent = draw ? "Draw." : won ? "Congratulations, commander." : "Your tank is out of the fight."; resultMessage.textContent = draw ? "No tank remained after the final exchange. The room is recorded as a draw." : won ? "The authoritative room confirmed your victory." : "You are eliminated. Watch the remaining battle or review the final standings."; resultStats.replaceChildren(); const rows: Array<[string, string]> = [["Result", draw ? "Draw" : won ? "Victory" : "Defeat"], ["Server actions", String(snapshot.log?.length || 0)], ["Match turns", String(snapshot.turn)], ["Eliminations", String(snapshot.eliminationOrder?.length || 0)]]; const players = Array.isArray(snapshot.players) ? snapshot.players : []; players.forEach((player: any) => rows.push([`${player.name || "Commander"} · damage dealt`, String(player.stats?.damage ?? player.damage ?? 0)], [`${player.name || "Commander"} · damage taken`, String(player.stats?.damageTaken ?? player.damageTaken ?? 0)])); (snapshot.placements || []).forEach((entry: any) => rows.push([`${entry.place}. ${entry.name}`, entry.reason || "final standing"])); rows.forEach(([label, value]) => { const row = document.createElement("div"); const name = document.createElement("span"); name.textContent = label; const amount = document.createElement("strong"); amount.textContent = value; row.append(name, amount); resultStats.append(row); }); setPanel("result"); }
+  function showNetworkResult(won: boolean, snapshot: any) {
+    const draw = snapshot.outcome === "draw";
+    resultTitle.textContent = draw ? "Draw." : won ? "Congratulations, commander." : "Your tank is out of the fight.";
+    resultMessage.textContent = draw ? "No tank remained after the final exchange. The room is recorded as a draw." : won ? "The authoritative room confirmed your victory." : "You are eliminated. Watch the remaining battle or review the final standings.";
+    resultStats.replaceChildren();
+    const placements = Array.isArray(snapshot.placements) ? snapshot.placements : [];
+    const players = Array.isArray(snapshot.players) ? snapshot.players : [];
+    const rows: Array<[string, string]> = [["Result", draw ? "Draw" : won ? "Victory" : "Defeat"], ["Server actions", String(snapshot.log?.length || 0)], ["Match turns", String(snapshot.turn)], ["Eliminations", String(snapshot.eliminationOrder?.length || 0)]];
+    placements.forEach((entry: any) => rows.push([`${entry.place}. ${entry.name || "Commander"}`, entry.reason || "final standing"]));
+    players.forEach((player: any) => rows.push([`${player.name || "Commander"} · damage dealt`, String(player.stats?.damage ?? player.damage ?? 0)], [`${player.name || "Commander"} · damage taken`, String(player.stats?.damageTaken ?? player.damageTaken ?? 0)]));
+    rows.forEach(([label, value]) => { const row = document.createElement("div"); const name = document.createElement("span"); name.textContent = label; const amount = document.createElement("strong"); amount.textContent = value; row.append(name, amount); resultStats.append(row); });
+    tone(won ? 880 : 220, .2, .05); announce(draw ? "Match complete. Draw." : won ? "Match complete. Victory." : "Match complete. Defeat."); setPanel("result");
+  }
 
   function replayTerrain(terrain: unknown, changes: number, frames: any[] = []) {
     replayPlaying = false; if (replayTimer) window.clearInterval(replayTimer); replayTimer = 0; historyReplayPlay.textContent = "Play";
     const fallback = Array.isArray(terrain) && terrain.length ? [{ terrain }] : []; replayFrames = frames.length ? frames : fallback;
-    if (!replayFrames.length) { historyStatus.textContent = "This older record has no replay snapshot."; historyCanvas.hidden = true; historyReplay.hidden = true; return; }
-    historyCanvas.hidden = false; historyStep.disabled = true; historyStep.max = String(Math.max(0, replayFrames.length - 1)); historyStep.value = String(replayFrames.length - 1); drawReplayFrame(Number(historyStep.value)); historyReplay.hidden = false; historyStep.disabled = replayFrames.length < 2; historyStatus.textContent = `Replay loaded. ${changes} recorded terrain change${changes === 1 ? "" : "s"}.`;
+    if (!replayFrames.length) { historyStatus.textContent = "This older record has no replay snapshot."; replayResult.textContent = "Replay unavailable for this older record."; historyCanvas.hidden = true; historyReplay.hidden = true; return; }
+    historyCanvas.hidden = false; historyStep.disabled = true; historyStep.max = String(Math.max(0, replayFrames.length - 1)); historyStep.value = String(replayFrames.length - 1); drawReplayFrame(Number(historyStep.value)); historyReplay.hidden = false; historyStep.disabled = replayFrames.length < 2; historyStatus.textContent = `Replay loaded. ${changes} recorded terrain change${changes === 1 ? "" : "s"}.`; announce(`Replay loaded with ${replayFrames.length} steps.`);
   }
   function drawReplayPaths(replayContext: CanvasRenderingContext2D, fireEvents: any[]) {
     for (const event of fireEvents) {
@@ -354,15 +427,18 @@ export function initBoomBox() {
     const frame = replayFrames[Math.max(0, Math.min(replayFrames.length - 1, index))]; const terrain = frame?.terrain; if (!Array.isArray(terrain) || !terrain.length) return;
     const context = historyCanvas.getContext("2d"); if (!context) return; const width = historyCanvas.width; const height = historyCanvas.height;
     context.clearRect(0, 0, width, height); context.fillStyle = "#101b41"; context.fillRect(0, 0, width, height); context.beginPath(); terrain.forEach((value: number, pointIndex: number) => { const x = pointIndex * width / (terrain.length - 1); const y = (Number(value) - 210) * (height - 28) / 312 + 12; pointIndex ? context.lineTo(x, y) : context.moveTo(x, y); }); context.lineTo(width, height); context.lineTo(0, height); context.closePath(); context.fillStyle = "#d7734a"; context.fill(); context.strokeStyle = "#ffb36e"; context.lineWidth = 2; context.beginPath(); terrain.forEach((value: number, pointIndex: number) => { const x = pointIndex * width / (terrain.length - 1); const y = (Number(value) - 210) * (height - 28) / 312 + 12; pointIndex ? context.lineTo(x, y) : context.moveTo(x, y); }); context.stroke();
+    const materials = Array.isArray(frame.terrainMaterial) ? frame.terrainMaterial : [];
+    for (let pointIndex = 0; pointIndex < materials.length; pointIndex += 1) { const material = materials[pointIndex]; if (!material || material === "dirt") continue; const x = pointIndex * width / Math.max(1, materials.length - 1); const terrainY = (Number(terrain[Math.min(pointIndex, terrain.length - 1)]) - 210) * (height - 28) / 312 + 12; context.fillStyle = terrainMaterialColor(material); context.globalAlpha = .55; context.fillRect(x, terrainY, Math.max(2, width / materials.length), height - terrainY); }
+    context.globalAlpha = 1;
     (frame.players || []).forEach((player: any) => { const x = Number(player.x) * width / 960; const y = (Number(player.y) - 210) * (height - 28) / 312 + 12; context.globalAlpha = player.alive === false ? .35 : 1; context.fillStyle = player.color || "#fff"; context.beginPath(); context.arc(x, Math.max(8, y - 5), 5, 0, Math.PI * 2); context.fill(); });
     const fireEvents = (frame.events || []).filter((event: any) => event.kind === "fire"); drawReplayPaths(context, fireEvents); context.globalAlpha = 1;
-    fireEvents.slice(-4).forEach((event: any, eventIndex: number) => { const impacts = Array.isArray(event.childImpacts) && event.childImpacts.length ? event.childImpacts : [event.terrainChange || { center: 0 }]; impacts.forEach((impact: any, impactIndex: number) => { const center = Number(impact.center ?? event.terrainChange?.center ?? 0); const x = center * width / 960; const y = ((Number(terrain[Math.max(0, Math.min(terrain.length - 1, Math.round(center / 6)))]) || 365) - 210) * (height - 28) / 312 + 12; context.fillStyle = impact.damage > 0 ? "#fff4b0" : "#9dffea"; context.strokeStyle = "#10182c"; context.lineWidth = 2; context.beginPath(); context.arc(x, Math.max(8, y - 5 - eventIndex * 2), impactIndex === 0 ? 5 : 4, 0, Math.PI * 2); context.fill(); context.stroke(); }); });
+    fireEvents.forEach((event: any, eventIndex: number) => { const impacts = Array.isArray(event.childImpacts) && event.childImpacts.length ? event.childImpacts : [event.terrainChange || { center: 0 }]; impacts.forEach((impact: any, impactIndex: number) => { const center = Number(impact.center ?? event.terrainChange?.center ?? 0); const x = center * width / 960; const y = ((Number(terrain[Math.max(0, Math.min(terrain.length - 1, Math.round(center / 6)))]) || 365) - 210) * (height - 28) / 312 + 12; context.fillStyle = impact.damage > 0 ? "#fff4b0" : "#9dffea"; context.strokeStyle = "#10182c"; context.lineWidth = 2; context.beginPath(); context.arc(x, Math.max(8, y - 5 - eventIndex * 2), effectsEnabled ? (impactIndex === 0 ? 6 : 5) : 4, 0, Math.PI * 2); context.fill(); context.stroke(); }); });
     context.globalAlpha = 1; const safeIndex = Math.max(0, Math.min(replayFrames.length - 1, index)); historyStepValue.textContent = `${safeIndex + 1} / ${replayFrames.length}`; historyReplayStatus.textContent = `Turn ${frame.turn || "-"} · ${frame.phase === "finished" ? "Match complete" : "Action resolved"}`;
     const events = Array.isArray(frame.events) ? frame.events.slice(-8) : []; const labels = (events.length ? events : [{ kind: "snapshot", sequence: frame.sequence }]).map((event: any) => { const kind = String(event.kind || "event").replaceAll("-", " "); const seat = Number.isInteger(event.seat) ? ` · Seat ${event.seat + 1}` : ""; const count = event.kind === "fire" ? (event.childImpacts?.length || event.children || 1) : 0; const childCount = count ? ` · ${count} impact${count === 1 ? "" : "s"}` : ""; return `${kind}${seat}${event.weapon ? ` · ${event.weapon}` : ""}${childCount}${event.reason ? ` · ${event.reason}` : ""}`; }); historyEvents.replaceChildren(...labels.map((label: string) => { const item = document.createElement("span"); item.textContent = label; return item; }));
-    const currentImpacts = fireEvents.flatMap((event: any) => Array.isArray(event.childImpacts) ? event.childImpacts : []).slice(-12); replayA11y.textContent = `Replay step ${safeIndex + 1} of ${replayFrames.length}. ${currentImpacts.length ? `${currentImpacts.length} confirmed impact${currentImpacts.length === 1 ? "" : "s"} visible.` : "No projectile impacts on this step."} ${labels.slice(-3).join(". ")}`;
+    const currentImpacts = fireEvents.flatMap((event: any) => Array.isArray(event.childImpacts) ? event.childImpacts : []); const placements = Array.isArray(frame.placements) ? frame.placements : []; replayResult.textContent = frame.phase === "finished" && placements.length ? `Final standings: ${placements.map((entry: any) => `${entry.place}. ${entry.name}`).join(" · ")}.` : "Replay is in progress."; replayA11y.textContent = `Replay step ${safeIndex + 1} of ${replayFrames.length}. ${currentImpacts.length ? `${currentImpacts.length} confirmed impact${currentImpacts.length === 1 ? "" : "s"} visible.` : "No projectile impacts on this step."} ${labels.slice(-3).join(". ")}`;
   }
   async function loadHistory() {
-    historyStatus.textContent = "Loading completed matches..."; historyList.replaceChildren(); historyCanvas.hidden = true; historyReplay.hidden = true; replayFrames = [];
+    historyStatus.textContent = "Loading completed matches..."; historyList.replaceChildren(); historyCanvas.hidden = true; historyReplay.hidden = true; replayResult.textContent = "No replay selected."; replayFrames = [];
     try { const response = await fetch("/api/boombox-history?limit=20"); if (!response.ok) throw new Error("History unavailable"); const payload = await response.json(); const matches = Array.isArray(payload.matches) ? payload.matches : []; if (!matches.length) { const empty = document.createElement("p"); empty.className = "boombox-empty-state"; empty.textContent = "No completed Boom Box matches yet."; historyList.append(empty); historyStatus.textContent = "Completed rooms and terrain changes."; return; }
       matches.forEach((record: any) => { const card = document.createElement("article"); card.className = "boombox-history-card"; const title = document.createElement("strong"); title.textContent = record.name || record.gameId; const meta = document.createElement("small"); const winner = Number.isInteger(record.winner) ? record.players?.[record.winner]?.name || `Seat ${record.winner + 1}` : "No winner"; const when = record.finishedAt ? new Date(record.finishedAt).toLocaleString() : "Unknown time"; const changes = Number(record.changes) || 0; meta.textContent = `${record.gameId} · ${when} · Winner: ${winner} · ${record.players?.length || 0} commanders · ${changes} terrain changes`; const button = document.createElement("button"); button.type = "button"; button.className = "secondary"; button.textContent = "Replay match"; button.addEventListener("click", async () => { button.disabled = true; button.textContent = "Loading replay…"; try { const detailResponse = await fetch(`/api/boombox-history?gameId=${encodeURIComponent(record.gameId)}`); if (!detailResponse.ok) throw new Error("Replay unavailable"); const detailPayload = await detailResponse.json(); const detail = detailPayload.matches?.[0]; if (!detail) throw new Error("Replay unavailable"); replayTerrain(detail.terrainData, changes, Array.isArray(detail.replay) ? detail.replay : []); } catch { historyStatus.textContent = "This replay is temporarily unavailable."; } finally { button.disabled = false; button.textContent = "Replay match"; } }); card.append(title, meta, button); historyList.append(card); }); historyStatus.textContent = `${matches.length} completed match${matches.length === 1 ? "" : "es"} available.`;
     } catch { historyStatus.textContent = "History is temporarily unavailable."; const error = document.createElement("p"); error.className = "boombox-empty-state"; error.textContent = "Could not load the match archive. Try again."; historyList.append(error); }
@@ -522,6 +598,21 @@ export function initBoomBox() {
   }
   function drawTank(tank: Tank, color: string, facing: number) { context.save(); context.translate(tank.x, tank.y); context.globalAlpha = tank.alive ? 1 : .38; if (tank.falling) context.rotate(Math.min(Math.PI / 4, tank.fallVelocity / 260)); context.shadowBlur = tank.alive ? 12 : 0; context.shadowColor = color; context.fillStyle = color; context.beginPath(); context.roundRect(-19, -11, 38, 15, 5); context.fill(); context.shadowBlur = 0; context.fillStyle = "#10182c"; context.beginPath(); context.roundRect(-15, 3, 11, 6, 3); context.roundRect(4, 3, 11, 6, 3); context.fill(); context.fillStyle = "#f6fbff"; context.beginPath(); context.arc(0, -13, 8, 0, Math.PI * 2); context.fill(); context.strokeStyle = color; context.lineWidth = 5; context.beginPath(); context.moveTo(0, -13); context.lineTo(facing * 25, -19); context.stroke(); if ((tank.burning || 0) > 0) { context.fillStyle = "#ffcf5a"; context.beginPath(); context.arc(-facing * 12, -16, 4, 0, Math.PI * 2); context.fill(); } context.restore(); }  function drawAim() { if (!match || match.phase !== "aiming") return; const angle = Number(angleInput.value) * Math.PI / 180; const power = Number(powerInput.value) * 7; const x = match.player.x + 22; const y = match.player.y - 17; context.save(); context.setLineDash([7, 8]); context.strokeStyle = "rgba(255, 224, 154, .72)"; context.lineWidth = 2; context.beginPath(); context.moveTo(x, y); context.lineTo(x + Math.cos(angle) * power * .85, y - Math.sin(angle) * power * .85); context.stroke(); context.restore(); }
   function projectileColor(weaponId: WeaponId) { const mode = WEAPONS[weaponId]?.mode; return mode === "laser" ? "#ff6ff2" : mode === "napalm" ? "#ff8b5e" : mode === "smoke" ? "#c8d0df" : mode === "bounce" ? "#9dff7a" : mode === "piercing" ? "#8be9fd" : "#fff4b0"; }
+  function drawImpactBursts() {
+    const now = performance.now();
+    networkImpactBursts = networkImpactBursts.filter((burst) => now - burst.startedAt < 720);
+    for (const burst of networkImpactBursts) {
+      const age = clamp((now - burst.startedAt) / 720, 0, 1);
+      const radius = 8 + age * (effectsEnabled ? 34 : 14);
+      context.save();
+      context.globalAlpha = (1 - age) * (effectsEnabled ? .82 : .45);
+      context.strokeStyle = burst.color;
+      context.fillStyle = burst.damage > 0 ? "rgba(255, 244, 176, .18)" : "rgba(157, 255, 234, .14)";
+      context.lineWidth = effectsEnabled ? 3 : 2;
+      context.beginPath(); context.arc(burst.center, match?.terrain[clamp(Math.round(burst.center), 0, CANVAS_WIDTH - 1)] || 365, radius, 0, Math.PI * 2); context.fill(); context.stroke();
+      context.restore();
+    }
+  }
   function drawProjectile() {
     if (!match) return;
     if (networkMode && networkFlights.length) {
@@ -535,14 +626,14 @@ export function initBoomBox() {
         context.globalAlpha = 1; context.fillStyle = color; context.shadowBlur = 18; context.shadowColor = color;
         context.beginPath(); context.arc(point.x, point.y, (flight.weapon || networkFlightWeapon) === "laser-line" ? 5 : 7, 0, Math.PI * 2); context.fill();
       }
-      if (networkFlightImpacts.length && networkFlightIndex >= networkFlight.length - 1) { context.globalAlpha = .78; for (const impact of networkFlightImpacts) { const x = clamp(Number(impact.center) || 0, 0, CANVAS_WIDTH - 1); const y = match.terrain[x] || 365; context.fillStyle = impact.damage && impact.damage > 0 ? "#fff4b0" : "#9dffea"; context.beginPath(); context.arc(x, y, 4, 0, Math.PI * 2); context.fill(); } }
+      if (networkFlightImpacts.length && networkFlightIndex >= networkFlight.length - 1) { context.globalAlpha = .78; for (const impact of networkFlightImpacts) { const x = clamp(Number(impact.center) || 0, 0, CANVAS_WIDTH - 1); const y = match.terrain[x] || 365; context.fillStyle = impact.damage && impact.damage > 0 ? "#fff4b0" : "#9dffea"; context.beginPath(); context.arc(x, y, effectsEnabled ? 6 : 4, 0, Math.PI * 2); context.fill(); } }
       context.restore(); return;
     }
     if (!match.projectile) return;
     const projectile = match.projectile; const color = projectileColor(projectile.weaponId);
     context.save(); context.strokeStyle = projectile.owner === "player" ? "rgba(102, 231, 255, .45)" : "rgba(255, 165, 99, .45)"; context.lineWidth = 3; context.beginPath(); projectile.trail.forEach((point, index) => index ? context.lineTo(point.x, point.y) : context.moveTo(point.x, point.y)); context.stroke(); context.fillStyle = color; context.shadowBlur = 16; context.shadowColor = color; context.beginPath(); context.arc(projectile.x, projectile.y, projectile.weaponId === "laser-line" ? 5 : 6, 0, Math.PI * 2); context.fill(); context.restore();
   }
-  function drawScene() { if (!match) return; drawTerrain(); drawTank(match.player, match.player.color, 1); match.opponents.forEach((opponent) => drawTank(opponent, opponent.color, -1)); drawAim(); drawProjectile(); }
+  function drawScene() { if (!match) return; drawTerrain(); drawTank(match.player, match.player.color, 1); match.opponents.forEach((opponent) => drawTank(opponent, opponent.color, -1)); drawAim(); drawProjectile(); drawImpactBursts(); }
   function updateFalling(tank: Tank, dt: number) { if (!tank.falling) return; tank.fallVelocity += 180 * dt; tank.y += tank.fallVelocity * dt; if (tank.y > CANVAS_HEIGHT + 30) { tank.alive = false; tank.health = 0; } }
 
   function resolveImpact(x: number, y: number, owner: "player" | "ai") {
@@ -569,11 +660,11 @@ export function initBoomBox() {
     const terrainIndex = clamp(Math.round(projectile.x), 0, CANVAS_WIDTH - 1); const terrainY = match.terrain[terrainIndex]; const terrainSolid = match.terrainSolid?.[terrainIndex] !== false; const terrainHit = !weapon.ignoreTerrain && terrainSolid && projectile.y >= terrainY; if (crossedTank || terrainHit || projectile.x < -10 || projectile.x > CANVAS_WIDTH + 10 || projectile.y > CANVAS_HEIGHT + 20) { if (!crossedTank && terrainHit && weapon.mode === "bounce" && (projectile.bounces || 0) < (weapon.bounces || 0)) { projectile.y = terrainY - 2; projectile.vy *= -.82; projectile.bounces = (projectile.bounces || 0) + 1; return; } resolveImpact(crossedTank ? target.x : projectile.x, crossedTank ? target.y : projectile.y, projectile.owner); return; }
     if (Math.abs(projectile.x - previousX) > 40 || Math.abs(projectile.y - previousY) > 40) resolveImpact(projectile.x, projectile.y, projectile.owner);
   }  function stepMatch(dt: number) { if (!match) return; updateFalling(match.player, dt); match.opponents.forEach((opponent) => updateFalling(opponent, dt)); if (match.phase === "flight") stepProjectile(dt); if (!match.player.alive) finishMatch("lose"); else if (!match.opponents.some((opponent) => opponent.alive)) finishMatch("win"); }
-  function frame(now: number) { if (!match || matchView !== "match") return; const elapsed = Math.min(.1, (now - lastFrame) / 1000); lastFrame = now; if (!playbackPaused && networkMode && networkFlight.length) { networkFlightIndex = Math.min(networkFlight.length - 1, networkFlightIndex + Math.max(1, Math.round(elapsed * 30 * playbackSpeed))); if (networkFlightIndex >= networkFlight.length - 1 && networkFlightBundleId && !networkFlightAckSent) { networkFlightAckSent = true; sendNetwork({ type: "boombox-flight-ack", gameId: networkGameId, bundleId: networkFlightBundleId }); networkFlight = []; networkFlights = []; networkFlightImpacts = []; } } accumulator += elapsed; while (accumulator >= FIXED_DT) { stepMatch(FIXED_DT); accumulator -= FIXED_DT; } drawScene(); updateControls(); matchAnimation = requestAnimationFrame(frame); }
+  function frame(now: number) { if (!match || matchView !== "match") return; const elapsed = Math.min(.1, (now - lastFrame) / 1000); lastFrame = now; if (!playbackPaused && networkMode && networkFlight.length) { networkFlightIndex = Math.min(networkFlight.length - 1, networkFlightIndex + Math.max(1, Math.round(elapsed * 30 * playbackSpeed))); if (networkFlightIndex >= networkFlight.length - 1 && networkFlightBundleId && !networkFlightAckSent) { networkFlightAckSent = true; networkImpactBursts.push(...networkFlightImpacts.map((impact) => ({ center: clamp(Number(impact.center) || 0, 0, CANVAS_WIDTH - 1), damage: Number(impact.damage) || 0, startedAt: performance.now(), color: Number(impact.damage) > 0 ? "#fff4b0" : "#9dffea" }))); tone(180, .16, .05); announce(`${networkFlightImpacts.length || 1} impact${networkFlightImpacts.length === 1 ? "" : "s"} resolved.`); sendNetwork({ type: "boombox-flight-ack", gameId: networkGameId, bundleId: networkFlightBundleId }); networkFlight = []; networkFlights = []; networkFlightImpacts = []; } } accumulator += elapsed; while (accumulator >= FIXED_DT) { stepMatch(FIXED_DT); accumulator -= FIXED_DT; } drawScene(); updateControls(); matchAnimation = requestAnimationFrame(frame); }
   function moveNetwork(direction: -1 | 1) { if (!match || !networkMode || !networkMovementEnabled || !networkCanSubmit() || match.player.movedThisTurn) return; sendNetwork({ type: "boombox-action", actionId: nextNetworkActionId(), action: { kind: "move", direction, distance: 20 } }); matchStatus.textContent = "Movement submitted. Set your shot before the deadline."; updateControls(); }
   function fire(owner: "player" | "ai", angleDegrees: number, powerPercent: number, shooterIndex = -1) {
     if (!match || match.phase === "flight" || match.phase === "finished") return;
-    if (networkMode && owner === "player") { sendNetwork({ type: "boombox-action", actionId: nextNetworkActionId(), action: { targetIndex: networkOpponentSeats[match.targetIndex] ?? networkOpponentSeats[0], weapon: match.weaponId, angle: angleDegrees, power: powerPercent } }); matchStatus.textContent = "Shot submitted. Waiting for server confirmation..."; updateControls(); return; }
+    if (networkMode && owner === "player") { sendNetwork({ type: "boombox-action", actionId: nextNetworkActionId(), action: { targetIndex: networkOpponentSeats[match.targetIndex] ?? networkOpponentSeats[0], weapon: match.weaponId, angle: angleDegrees, power: powerPercent } }); matchStatus.textContent = "Shot submitted. Waiting for server confirmation..."; announce(`${WEAPONS[match.weaponId].label} fired.`); tone(420, .1); updateControls(); return; }
     const tank = owner === "player" ? match.player : match.opponents[shooterIndex]; const weaponId = owner === "player" ? match.weaponId : "cannon"; const weapon = WEAPONS[weaponId]; if (owner === "player" && weaponId !== "cannon" && match.inventory[weaponId] < 1) { matchStatus.textContent = `No ${weapon.label} left in your loadout.`; return; }
     if (owner === "player" && weaponId !== "cannon") match.inventory[weaponId] -= 1;
     const direction = owner === "player" ? 1 : -1; const angle = angleDegrees * Math.PI / 180; const speed = powerPercent * 7 * weapon.speed; match.projectile = { x: tank.x + direction * 22, y: tank.y - 17, vx: Math.cos(angle) * speed * direction, vy: -Math.sin(angle) * speed, owner, shooterIndex, weaponId, trail: [], bounces: 0 }; match.phase = "flight"; match.shots += 1; recordAction("fire", { owner, shooterIndex, weapon: weaponId, angle: angleDegrees, power: powerPercent }); matchStatus.textContent = owner === "player" ? `${weapon.label} away. Watching the arc...` : `${tank.label} is firing...`; updateControls();
@@ -599,6 +690,10 @@ export function initBoomBox() {
     match.utilities[match.utilityId] = Math.max(0, match.utilities[match.utilityId] - 1); match.utilityUsed = true; recordAction("utility", { utility: match.utilityId, effect: utility.effect, amount }); updateControls();
   }  modeSingleButton.addEventListener("click", () => { const savedName = localStorage.getItem(playerNameKey)?.trim(); if (savedName) soloNameInput.value = savedName; networkMode = false; setPanel("single"); }); modeMultiButton.addEventListener("click", () => { connectNetwork(); setPanel("lobby"); }); modeBackButton.addEventListener("click", () => { close(); window.dispatchEvent(new CustomEvent("boombox-back-games")); }); singleBackButton.addEventListener("click", () => setPanel("mode")); loadoutOpenButton.addEventListener("click", () => { shopCredits = 100; shopInventory = Object.fromEntries((Object.keys(WEAPONS) as WeaponId[]).map((id) => [id, id === "cannon" ? 99 : 0])) as Record<WeaponId, number>; renderShop(); setPanel("loadout"); }); loadoutBackButton.addEventListener("click", () => setPanel("single")); loadoutStartButton.addEventListener("click", () => startSoloMatch()); soloForm.addEventListener("submit", (event) => { event.preventDefault(); const name = soloNameInput.value.trim() || "Commander"; localStorage.setItem(playerNameKey, name); startSoloMatch(); }); createButton.addEventListener("click", openCreate); refreshButton.addEventListener("click", () => { if (networkMode) { sendNetwork({ type: "boombox-list" }); return; } const now = new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }); lobbyStatus.textContent = `Rooms refreshed at ${now}.`; availableRooms = [...availableRooms]; renderRooms(); }); historyOpenButton.addEventListener("click", () => setPanel("history")); historyRefreshButton.addEventListener("click", loadHistory); historyBackButton.addEventListener("click", () => setPanel("lobby")); historyStep.addEventListener("input", () => drawReplayFrame(Number(historyStep.value))); chatSendButton.addEventListener("click", sendChat); chatInput.addEventListener("keydown", (event) => { if (event.key === "Enter") { event.preventDefault(); sendChat(); } }); lobbyBackButton.addEventListener("click", () => setPanel("mode")); createBackButton.addEventListener("click", () => { if (createStep === 1) setPanel("lobby"); else setCreateStep(createStep - 1); }); createNextButton.addEventListener("click", () => setCreateStep(createStep + 1)); createForm.addEventListener("submit", (event) => { event.preventDefault(); if (createStep === 3) createRoom(); }); [roomNameInput, commanderInput, terrainInput, seatsInput, firingModeInput, gravityInput, windModeInput, windLimitInput, boundaryInput, meteorEventsInput, sceneryInput, paceInput, aiDifficultyInput, aiFillInput, startingMoneyInput, fullCatalogueInput, movementInput].forEach((input) => input.addEventListener("input", updateCreateSummary)); [angleInput, powerInput].forEach((input) => input.addEventListener("input", updateControls)); targetInput.addEventListener("change", () => { if (match) match.targetIndex = clamp(Number(targetInput.value), 0, match.opponents.length - 1); updateControls(); }); weaponInput.addEventListener("change", () => { if (match) match.weaponId = weaponInput.value as WeaponId; updateControls(); }); utilityInput.addEventListener("change", () => { if (match) match.utilityId = utilityInput.value as UtilityId; updateControls(); }); buyWeaponButton.addEventListener("click", () => purchaseNetwork("weapon", weaponInput.value)); buyUtilityButton.addEventListener("click", () => purchaseNetwork("utility", utilityInput.value)); utilityButton.addEventListener("click", () => { useSoloUtility(); }); moveLeftButton.addEventListener("click", () => moveNetwork(-1)); moveRightButton.addEventListener("click", () => moveNetwork(1)); fireButton.addEventListener("click", () => fire("player", Number(angleInput.value), Number(powerInput.value))); battlefield.addEventListener("pointerdown", beginFromCanvas); matchExitButton.addEventListener("click", () => { if (networkMode) sendNetwork({ type: networkSpectator ? "boombox-watch-leave" : "boombox-leave", gameId: networkGameId }); stopMatch(); resetSoloNetworkIdentity(); networkGameId = ""; networkSeat = -1; setPanel("mode"); }); resultRestartButton.addEventListener("click", () => networkMode ? (soloNetworkMode ? startSoloMatch() : setPanel("lobby")) : startSoloMatch()); resultBackButton.addEventListener("click", () => { if (networkMode && networkGameId) sendNetwork({ type: networkSpectator ? "boombox-watch-leave" : "boombox-leave", gameId: networkGameId }); stopMatch(); resetSoloNetworkIdentity(); networkGameId = ""; networkSeat = -1; setPanel("mode"); }); speedButtons.forEach((button, index) => button.addEventListener("click", () => { playbackSpeed = [1, 2, 4][index]; playbackPaused = false; speedButtons.forEach((candidate) => candidate.classList.remove("is-selected")); button.classList.add("is-selected"); pauseButton.textContent = "Pause"; })); pauseButton.addEventListener("click", () => { playbackPaused = !playbackPaused; pauseButton.textContent = playbackPaused ? "Resume" : "Pause"; }); window.addEventListener("resize", resizeBattlefield);
   populateSoloWeaponCatalog();
+  updatePresentationLabels();
+  soundToggle.addEventListener("click", () => { soundEnabled = !soundEnabled; savePresentation(); updatePresentationLabels(); if (soundEnabled) tone(660, .08); });
+  effectsToggle.addEventListener("click", () => { effectsEnabled = !effectsEnabled; savePresentation(); updatePresentationLabels(); announce(effectsEnabled ? "Full visual effects enabled." : "Low visual effects enabled."); });
+  matchPanel.addEventListener("pointerdown", () => { if (soundEnabled && audioContext?.state === "suspended") void audioContext.resume(); }, { once: false });
   seatsInput.addEventListener("change", renderSeatPlan);
   historyReplayPlay.addEventListener("click", () => {
     if (replayPlaying) { replayPlaying = false; if (replayTimer) window.clearInterval(replayTimer); replayTimer = 0; historyReplayPlay.textContent = "Play"; return; }

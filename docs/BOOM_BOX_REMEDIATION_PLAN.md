@@ -105,6 +105,8 @@
 
 **Out of scope:** room identity, Coolify persistence, and server performance profiling.
 
+**Status:** Complete. Evidence is recorded in [BOOM_BOX_PACKAGE_F_PRESENTATION.md](./BOOM_BOX_PACKAGE_F_PRESENTATION.md).
+
 ### Package G — scale, archive, and final conformance
 
 **Scope:** measure 10-seat long matches, repeated terrain mutations, large child-projectile resolutions, AI-vs-AI continuation, archive growth, and history retrieval; add pagination/compaction where measurements require it; run one final conformance audit against the original Boom Box reference and this plan.
