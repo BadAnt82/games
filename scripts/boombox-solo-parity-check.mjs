@@ -78,16 +78,23 @@ if (!liveUrl) await wait(900);
 let solo;
 let multiHost;
 let multiGuest;
+let soloGameId = "";
+let multiGameId = "";
+let soloUserId = "";
+let multiHostUserId = "";
 try {
   const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
   const soloId = `solo-parity-${suffix}`;
   const multiHostId = `multi-parity-host-${suffix}`;
   const multiGuestId = `multi-parity-guest-${suffix}`;
+  soloUserId = soloId;
+  multiHostUserId = multiHostId;
 
   solo = await open();
   const soloCreatedPromise = next(solo, "boombox-created");
   send(solo, { type: "boombox-create", userId: soloId, config: { ...config, creator: "Solo fixture", aiSeats: [1] } });
   const soloCreated = await soloCreatedPromise;
+  soloGameId = soloCreated.gameId;
   const soloStartPromise = next(solo, "boombox-state", (message) => message.snapshot?.phase === "turn-prep");
   send(solo, { type: "boombox-start-ai", userId: soloId, gameId: soloCreated.gameId });
   const soloInitial = await soloStartPromise;
@@ -96,6 +103,7 @@ try {
   const multiCreatedPromise = next(multiHost, "boombox-created");
   send(multiHost, { type: "boombox-create", userId: multiHostId, config: { ...config, creator: "Multiplayer fixture", aiFill: false, aiSeats: [] } });
   const multiCreated = await multiCreatedPromise;
+  multiGameId = multiCreated.gameId;
   multiGuest = await open();
   const multiJoinPromise = next(multiGuest, "boombox-joined");
   const multiHostStartPromise = next(multiHost, "boombox-state", (message) => message.snapshot?.phase === "turn-prep");
@@ -134,6 +142,10 @@ try {
 
   console.log("Boom Box solo parity passed: identical authoritative setup, fire outcome, terrain mutation, and illegal-action validation for solo and multiplayer fixtures.");
 } finally {
+  for (const [socket, gameId, userId] of [[solo, soloGameId, soloUserId], [multiHost, multiGameId, multiHostUserId]]) {
+    try { if (socket?.readyState === WebSocket.OPEN && gameId && userId) send(socket, { type: "boombox-cancel", gameId, userId }); } catch {}
+  }
+  await wait(150);
   for (const socket of [solo, multiHost, multiGuest]) { try { socket?.close(); } catch {} }
   server?.kill();
 }
