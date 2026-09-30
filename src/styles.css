@@ -897,6 +897,7 @@ body.fullscreen-fallback-active {
 .boombox-replay-controls { display: flex; flex-wrap: wrap; gap: 6px; }
 .boombox-history-events { display: grid; gap: 4px; max-height: 132px; overflow: auto; padding: 7px 9px; border: 1px solid rgba(137, 227, 255, .16); border-radius: 8px; background: rgba(7, 13, 32, .42); color: rgba(224, 239, 255, .72); font-size: .72rem; }
 .boombox-history-events span { display: block; }
+.boombox-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 .boombox-field-heading { display: block; margin-top: 3px; color: #fff; font-size: .82rem; }
 .boombox-seat-plan { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 8px; margin-top: 8px; }
 .boombox-seat-plan label { display: grid; gap: 5px; color: rgba(224, 239, 255, .8); font-size: .76rem; }
@@ -2016,6 +2017,16 @@ body.fullscreen-fallback-active {
   .boombox-match-footer { align-items: stretch; flex-direction: column; }
   .boombox-match-footer button { width: 100%; }
   .boombox-result-stats { grid-template-columns: 1fr; }
+  .boombox-history-panel { padding-bottom: max(20px, env(safe-area-inset-bottom)); }
+  .boombox-history-card { grid-template-columns: 1fr; gap: 8px; padding: 11px; }
+  .boombox-history-card small { grid-column: 1; }
+  .boombox-history-card button { grid-column: 1; grid-row: auto; width: 100%; min-height: 42px; }
+  .boombox-history-replay { width: 100%; gap: 8px; }
+  #boombox-history-canvas { width: 100%; min-height: 130px; }
+  .boombox-history-events { max-height: 180px; padding: 9px; font-size: .76rem; line-height: 1.35; }
+  .boombox-replay-controls { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .boombox-replay-controls button { min-height: 40px; padding: 0 5px; }
+  .boombox-match-help { font-size: .82rem; }
 
   .overlay-panel {
     gap: 8px;

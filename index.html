@@ -221,7 +221,8 @@
           <div id="boombox-history-panel" class="overlay-panel boombox-panel boombox-history-panel" hidden>
             <header class="boombox-panel-header"><div><div class="boombox-kicker">MATCH ARCHIVE</div><h1>Boom Box history</h1><p id="boombox-history-status">Completed rooms and terrain changes.</p></div><button id="boombox-history-refresh" class="secondary" type="button">Refresh history</button></header>
             <div id="boombox-history-list" class="boombox-history-list" aria-live="polite"></div>
-            <canvas id="boombox-history-canvas" width="480" height="180" aria-label="Selected match terrain replay" hidden></canvas>
+            <canvas id="boombox-history-canvas" width="480" height="180" aria-label="Selected match terrain replay" aria-describedby="boombox-replay-a11y" hidden></canvas>
+            <p id="boombox-replay-a11y" class="boombox-sr-only" aria-live="polite">No replay selected.</p>
             <div id="boombox-history-replay" class="boombox-history-replay" hidden><label for="boombox-history-step">Replay step <output id="boombox-history-step-value">0 / 0</output></label><input id="boombox-history-step" type="range" min="0" max="0" value="0" disabled /><div class="boombox-replay-controls" aria-label="Replay controls"><button id="boombox-replay-play" class="secondary" type="button">Play</button><button id="boombox-replay-1" class="secondary is-selected" type="button">1x</button><button id="boombox-replay-2" class="secondary" type="button">2x</button><button id="boombox-replay-4" class="secondary" type="button">4x</button></div><p id="boombox-history-replay-status">Select a completed match to inspect its turns.</p><div id="boombox-history-events" class="boombox-history-events" aria-live="polite"></div></div>
             <div class="menu-actions"><button id="boombox-history-back" class="secondary" type="button">Back to war room</button></div>
           </div>
