@@ -43,5 +43,4 @@ The software-side parity and restart behavior are now covered. The live health e
 
 The planned original generated art/audio set is also still outstanding; the current battlefield remains a deliberately readable canvas presentation. Human playtesting remains deferred.
 
-**Recommendation: proceed to Pass 25**, focused on configuring and verifying the Coolify `/app/data` persistent volume, then adding the original Boom Box art/audio package and a small asset-loading/accessibility acceptance check. Keep game-rule changes out of that pass.
-
+These are open backlog items, not a newly approved numbered pass: configure and verify the Coolify `/app/data` persistent volume, then decide whether the original Boom Box art/audio package is required before human testing. No new pass number is being created here.
