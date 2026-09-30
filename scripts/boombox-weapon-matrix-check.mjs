@@ -25,10 +25,11 @@ try {
         const purchasePromise = next(socket, "boombox-purchase-result"); socket.send(JSON.stringify({ type: "boombox-purchase", userId, gameId: created.gameId, purchaseId: `purchase-${weaponId}`, category: "weapon", item: weaponId, quantity: 1 }));
         const purchase = await purchasePromise; if (purchase.loadout.inventory[weaponId] !== 1 || purchase.loadout.money !== 10000 - item.cost) throw new Error(`${weaponId}: purchase economy mismatch`);
       }
-      const fireState = next(socket, "boombox-state", (message) => (message.snapshot?.log || []).some((entry) => entry.kind === "fire" && entry.weapon === weaponId));
+      const flightPromise = next(socket, "boombox-flight"); const fireState = next(socket, "boombox-state", (message) => (message.snapshot?.log || []).some((entry) => entry.kind === "fire" && entry.weapon === weaponId));
       socket.send(JSON.stringify({ type: "boombox-action", userId, gameId: created.gameId, actionId: `fire-${weaponId}`, action: { targetIndex: 1, weapon: weaponId, angle: 42, power: 58 } }));
-      const resolved = await fireState; const event = [...resolved.snapshot.log].reverse().find((entry) => entry.kind === "fire" && entry.weapon === weaponId);
+      const flight = await flightPromise; const resolved = await fireState; const event = [...resolved.snapshot.log].reverse().find((entry) => entry.kind === "fire" && entry.weapon === weaponId);
       const expectedChildren = Math.max(1, Number(item.count) || 1); if (!event || event.children !== expectedChildren || !Array.isArray(event.childImpacts) || event.childImpacts.length !== expectedChildren) throw new Error(`${weaponId}: child impact contract mismatch`);
+      if (!Array.isArray(flight.flight?.children) || flight.flight.children.length !== expectedChildren || flight.flight.children.some((child) => !Array.isArray(child.path) || child.path.length < 2)) throw new Error(`${weaponId}: child flight playback contract mismatch`);
       if (!event.terrainChange || event.terrainChange.material !== (item.material || "dirt")) throw new Error(`${weaponId}: terrain material contract mismatch`);
       results.push(`${weaponId}:${event.childImpacts.length}`);
       socket.send(JSON.stringify({ type: "boombox-cancel", userId, gameId: created.gameId }));
