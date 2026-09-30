@@ -1818,10 +1818,22 @@ function restoreBoomBoxRooms() {
       aiTimer: null,
       turnTimer: null,
       turnDeadlineAt: Number(record.turnDeadlineAt) || null,
+      flightBundleId: "",
+      flightTimer: null,
+      flightRequiredSeats: new Set(),
+      flightAcknowledgedSeats: new Set(),
       aiSeats: Array.isArray(record.aiSeats) ? record.aiSeats.map((seat) => Number(seat)).filter((seat) => Number.isInteger(seat) && seat >= 0 && seat < seats.length) : [],
       resolving: false,
     };
-    if (room.state) { room.state.outcome ||= room.phase === "finished" ? (room.state.winner === null ? "draw" : "win") : "in-progress"; for (const player of room.state.players || []) { player.fuel ??= 100; player.movedThisTurn ??= false; } }
+    if (room.state) {
+      room.state.outcome ||= room.phase === "finished" ? (room.state.winner === null ? "draw" : "win") : "in-progress";
+      for (const player of room.state.players || []) { player.fuel ??= 100; player.movedThisTurn ??= false; }
+      // A projectile is resolved atomically before it is broadcast. If the
+      // process is replaced after that commit but before the browser finishes
+      // animating it, resume from the next turn instead of restoring a room
+      // that can never leave the flight phase.
+      if (room.phase === "flight" || room.phase === "resolving") room.phase = "turn-prep";
+    }
     boomboxRooms.set(room.gameId, room);
     for (const seat of room.seats) if (seat.userId) boomboxUserMemberships.set(seat.userId, room.gameId);
     const numericId = Number(String(room.gameId).replace(/^BB-/, ""));
@@ -1856,11 +1868,27 @@ function boomBoxAiBuyBestWeapon(room, seatIndex, targetIndex) {
   const id = preferred?.[0] || options[0][0]; const purchase = boomBoxPurchase(room, seatIndex, "weapon", id, 1); return purchase?.error ? "cannon" : id;
 }
 function boomBoxAiUtility(room, seatIndex) {
-  const player = room.state.players[seatIndex]; const difficulty = boomBoxAiDifficulty(room);
+  const player = room.state.players[seatIndex]; const difficulty = boomBoxAiDifficulty(room); player.upgrades ||= {};
   if (player.health <= (difficulty === "recruit" ? 30 : 48) && (player.utilities["repair-kit"] || 0) > 0) return "repair-kit";
   if (player.health <= 70 && (player.utilities["heavy-shield"] || 0) > 0 && player.shield < 35) return "heavy-shield";
   if (player.shield === 0 && (player.utilities.shield || 0) > 0) return "shield";
+  if (player.shield > 0 && player.shield < 35 && (player.utilities["shield-recharge"] || 0) > 0) return "shield-recharge";
   if (player.falling && (player.utilities.parachute || 0) > 0) return "parachute";
+  if (room.rules.movement && player.fuel < 45 && (player.utilities["fuel-canister"] || 0) > 0) return "fuel-canister";
+  if (!player.upgrades.guidance && (player.utilities["guidance-kit"] || 0) > 0) return "guidance-kit";
+  if (!player.upgrades.turret && (player.utilities["turret-upgrade"] || 0) > 0) return "turret-upgrade";
+  if (player.health < 82 && (player.utilities["terrain-lift"] || 0) > 0) return "terrain-lift";
+  return "";
+}
+function boomBoxAiBuyUtility(room, seatIndex) {
+  const player = room.state.players[seatIndex]; player.utilities ||= {}; player.utilityCapacity ||= {};
+  const preferred = player.health < 65 ? ["repair-kit", "heavy-shield", "shield-recharge"] : ["guidance-kit", "turret-upgrade", "fuel-canister", "terrain-lift", "parachute", "shield-recharge"];
+  for (const id of preferred) {
+    const item = room.rules.utilityCatalog[id];
+    if (!item || (player.utilities[id] || 0) >= (player.utilityCapacity[id] || item.inventory || 0) || player.money < (Number(item.cost) || 0)) continue;
+    const purchase = boomBoxPurchase(room, seatIndex, "utility", id, 1);
+    if (!purchase?.error) return id;
+  }
   return "";
 }
 function boomBoxAiCandidate(room, seatIndex, targetIndex, weapon) {
@@ -1871,7 +1899,10 @@ function boomBoxAiCandidate(room, seatIndex, targetIndex, weapon) {
   candidates.sort((a, b) => b.score - a.score || a.angle - b.angle || a.power - b.power); const top = candidates.slice(0, difficulty === "expert" ? 3 : 1); const pick = top[(room.seed + room.state.turn + seatIndex) % top.length] || candidates[0]; return pick || { angle: 42, power: 58 };
 }
 function boomBoxAiPlan(room, seatIndex) {
-  const targetIndex = boomBoxAiChooseTarget(room, seatIndex); if (targetIndex < 0) return null; const utility = boomBoxAiUtility(room, seatIndex); if (utility) return { kind: "utility", utility, targetIndex, text: `${room.state.players[seatIndex].name} is preparing a ${room.rules.utilityCatalog[utility]?.label || utility}.` };
+  const targetIndex = boomBoxAiChooseTarget(room, seatIndex); if (targetIndex < 0) return null;
+  const player = room.state.players[seatIndex];
+  if (room.rules.movement && !player.movedThisTurn && player.fuel >= 5) return { kind: "move", direction: room.state.players[targetIndex].x >= player.x ? 1 : -1, distance: Math.min(24, player.fuel), targetIndex, text: `${player.name} is repositioning before the next shot.` };
+  const utility = boomBoxAiUtility(room, seatIndex) || boomBoxAiBuyUtility(room, seatIndex); if (utility) return { kind: "utility", utility, targetIndex, text: `${player.name} is preparing a ${room.rules.utilityCatalog[utility]?.label || utility}.` };
   const weaponId = boomBoxAiBuyBestWeapon(room, seatIndex, targetIndex); const weapon = room.rules.weaponCatalog[weaponId] || room.rules.weaponCatalog.cannon; const shot = boomBoxAiCandidate(room, seatIndex, targetIndex, weapon); return { kind: "fire", weapon: weaponId, targetIndex, angle: shot.angle, power: shot.power, text: `${room.state.players[seatIndex].name} is lining up a ${weapon.label || weaponId}.` };
 }
 function boomBoxNextAiSeat(room) {
@@ -1882,11 +1913,48 @@ function boomBoxNextAiSeat(room) {
 function boomBoxTurnDuration(room) { const override = Number(process.env.BOOMBOX_TURN_TIMEOUT_MS); if (Number.isFinite(override) && override > 0) return Math.max(250, Math.min(120000, override)); return room.rules.turnPace === "blitz" ? 30000 : room.rules.turnPace === "relaxed" ? 90000 : 60000; }
 function boomBoxClearTurnDeadline(room) { if (room.turnTimer) clearTimeout(room.turnTimer); room.turnTimer = null; room.turnDeadlineAt = null; }
 function boomBoxFallbackAction(room, seatIndex) { const targetIndex = room.state.players.findIndex((player, index) => index !== seatIndex && player.alive); return targetIndex < 0 ? null : { targetIndex, weapon: "cannon", angle: 42, power: 58 }; }
-function boomBoxSendFlights(room, flights) { for (const flight of flights) { for (const seat of room.seats) if (seat.socket) boomBoxSend(seat.socket, { type: "boombox-flight", flight }); for (const spectator of room.spectators || []) boomBoxSend(spectator, { type: "boombox-flight", flight }); } }
+function boomBoxFlightDuration(flights) {
+  const longestPath = flights.reduce((longest, flight) => {
+    const childLongest = Array.isArray(flight.children) ? flight.children.reduce((value, child) => Math.max(value, Array.isArray(child.path) ? child.path.length : 0), 0) : 0;
+    return Math.max(longest, childLongest || (Array.isArray(flight.path) ? flight.path.length : 0));
+  }, 0);
+  // Browsers animate at roughly 30 path points per second. Keep a generous
+  // safety margin for a paused/backgrounded tab, but never hold a room
+  // forever if a client disappears.
+  return Math.max(1200, Math.min(30000, Math.round((longestPath / 30) * 1000 + 2500)));
+}
+function boomBoxFinishFlight(room, bundleId) {
+  if (!room || room.flightBundleId !== bundleId) return;
+  if (room.flightTimer) clearTimeout(room.flightTimer);
+  room.flightTimer = null;
+  room.flightBundleId = "";
+  room.flightRequiredSeats = new Set();
+  room.flightAcknowledgedSeats = new Set();
+  room.resolving = false;
+  if (room.phase !== "finished") {
+    room.phase = "turn-prep";
+    room.turnDeadlineAt = null;
+    scheduleBoomBoxTurnDeadline(room);
+  }
+  broadcastBoomBoxRoom(room);
+  scheduleBoomBoxAi(room);
+}
+function boomBoxSendFlights(room, flights) {
+  const bundleId = `${room.gameId}-flight-${room.state?.actionSequence || Date.now()}`;
+  const payload = { type: "boombox-flight-bundle", bundleId, flights };
+  room.flightBundleId = bundleId;
+  room.flightRequiredSeats = new Set(room.seats.map((seat, index) => seat.socket ? index : -1).filter((index) => index >= 0));
+  room.flightAcknowledgedSeats = new Set();
+  for (const seat of room.seats) if (seat.socket) boomBoxSend(seat.socket, payload);
+  for (const spectator of room.spectators || []) boomBoxSend(spectator, payload);
+  const duration = boomBoxFlightDuration(flights);
+  room.flightTimer = setTimeout(() => boomBoxFinishFlight(room, bundleId), duration);
+  if (!room.flightRequiredSeats.size && duration <= 1200) boomBoxFinishFlight(room, bundleId);
+}
 function boomBoxDispatchActionResult(room, result) {
   if (!result || result.error) return;
   const flights = Array.isArray(result.flights) && result.flights.length ? result.flights : result.flight ? [result.flight] : [];
-  if (flights.length) { boomBoxClearTurnDeadline(room); room.resolving = true; boomBoxSendFlights(room, flights); setTimeout(() => { if (!boomboxRooms.has(room.gameId)) return; room.resolving = false; if (room.phase !== "finished") { room.phase = "turn-prep"; room.turnDeadlineAt = null; scheduleBoomBoxTurnDeadline(room); } broadcastBoomBoxRoom(room); scheduleBoomBoxAi(room); }, 450); return; }
+  if (flights.length) { boomBoxClearTurnDeadline(room); room.resolving = true; boomBoxSendFlights(room, flights); return; }
   if (result.prepared || result.movement) { room.resolving = false; scheduleBoomBoxTurnDeadline(room); broadcastBoomBoxRoom(room); scheduleBoomBoxAi(room); return; }
   room.resolving = false; boomBoxClearTurnDeadline(room); if (room.phase !== "finished") room.phase = "turn-prep"; scheduleBoomBoxTurnDeadline(room); broadcastBoomBoxRoom(room); scheduleBoomBoxAi(room);
 }
@@ -1899,14 +1967,14 @@ function boomBoxExpireTurn(room, turn) {
   if (finalResult) boomBoxDispatchActionResult(room, finalResult); else { broadcastBoomBoxRoom(room); scheduleBoomBoxTurnDeadline(room); scheduleBoomBoxAi(room); }
 }
 function scheduleBoomBoxTurnDeadline(room) { if (room.turnTimer || !room.started || room.phase === "finished" || room.resolving || !room.state || (room.phase !== "turn-prep" && room.phase !== "prepare")) return; if (!room.turnDeadlineAt) room.turnDeadlineAt = Date.now() + boomBoxTurnDuration(room); const turn = room.state.turn; const delay = Math.max(1, room.turnDeadlineAt - Date.now()); room.turnTimer = setTimeout(() => boomBoxExpireTurn(room, turn), delay); }
-function boomBoxHandleDisconnect(room, seatIndex, reason = "disconnect") { const seat = room.seats[seatIndex]; if (!seat) return; seat.socket = null; seat.connected = false; if (room.started && room.state?.players?.[seatIndex]?.alive) { seat.bot = true; boomBoxAppendEvent(room, { kind: "disconnect", seat: seatIndex, reason }); } room.updatedAt = Date.now(); writeBoomBoxRooms(); broadcastBoomBoxLobby(); if (room.started) { scheduleBoomBoxTurnDeadline(room); scheduleBoomBoxAi(room); } }
+function boomBoxHandleDisconnect(room, seatIndex, reason = "disconnect") { const seat = room.seats[seatIndex]; if (!seat) return; seat.socket = null; seat.connected = false; if (room.started && room.state?.players?.[seatIndex]?.alive) { seat.bot = true; boomBoxAppendEvent(room, { kind: "disconnect", seat: seatIndex, reason }); } if (room.flightRequiredSeats?.has(seatIndex)) { room.flightRequiredSeats.delete(seatIndex); if (room.flightBundleId && [...room.flightRequiredSeats].every((index) => room.flightAcknowledgedSeats?.has(index))) boomBoxFinishFlight(room, room.flightBundleId); } room.updatedAt = Date.now(); writeBoomBoxRooms(); broadcastBoomBoxLobby(); if (room.started) { scheduleBoomBoxTurnDeadline(room); scheduleBoomBoxAi(room); } }
 function scheduleBoomBoxAi(room) {
   if (room.aiTimer || room.resolving || !room.started || (room.phase !== "turn-prep" && room.phase !== "prepare") || !room.state) return;
   const seatIndex = boomBoxNextAiSeat(room); if (seatIndex < 0) return;
   const delayMs = boomBoxAiDelay(room); const plan = boomBoxAiPlan(room, seatIndex); if (!plan) return; room.state.aiIntent = { seat: seatIndex, name: room.state.players[seatIndex].name, text: plan.text, kind: plan.kind, weapon: plan.weapon || null, utility: plan.utility || null, target: plan.targetIndex, turn: room.state.turn, delayMs, readyAt: Date.now() + delayMs }; broadcastBoomBoxRoom(room);
   room.aiTimer = setTimeout(() => {
     room.aiTimer = null; if (!boomboxRooms.has(room.gameId) || room.resolving || !room.started || (room.phase !== "turn-prep" && room.phase !== "prepare") || !room.state || (room.rules.firingMode === "sequential" && room.state.turnSeat !== seatIndex)) return;
-    const action = plan.kind === "utility" ? { kind: "utility", utility: plan.utility } : { targetIndex: plan.targetIndex, angle: plan.angle, power: plan.power, weapon: plan.weapon };
+    const action = plan.kind === "utility" ? { kind: "utility", utility: plan.utility } : plan.kind === "move" ? { kind: "move", direction: plan.direction, distance: plan.distance } : { targetIndex: plan.targetIndex, angle: plan.angle, power: plan.power, weapon: plan.weapon };
     const result = resolveBoomBoxAction(room, seatIndex, action, `ai-${room.gameId}-${room.state.actionSequence + 1}`); if (result?.error) { room.state.aiIntent = { ...room.state.aiIntent, text: `${room.state.players[seatIndex].name} could not complete that action.` }; broadcastBoomBoxRoom(room); return; }
     boomBoxDispatchActionResult(room, result);
   }, delayMs);
@@ -2038,7 +2106,7 @@ function resolveBoomBoxActionNow(room, seatIndex, action, actionId = "", options
     return { index: childIndex, impact: child.impact, target: child.impactTarget, center: Math.round(child.center), damage: actualDamage, absorbed, pathLength: child.path.length, bounces: Number(child.bounces) || 0, material };
   });
   const resolutionOrder = room.state.log.filter((event) => event.kind === "fire").length + 1;
-  const entry = boomBoxAppendEvent(room, { kind: "fire", seat: seatIndex, target: targetIndex, actualTarget: hitTargetIndex, weapon, mode: weaponRules.mode, children: childCount, resolutionOrder, angle, power, hit, impact: trajectory.impact, damage: childImpacts.reduce((total, impact) => total + impact.damage, 0), childImpacts, terrainChange: { center: Math.round(terrainCenter), radius: terrainRadius, depth: terrainDepth, material }, actionId }); player.shots += 1; player.stats.shots += 1; player.stats.terrainChanges += childCount;
+  const entry = boomBoxAppendEvent(room, { kind: "fire", seat: seatIndex, target: targetIndex, actualTarget: hitTargetIndex, weapon, mode: weaponRules.mode, children: childCount, childPaths: trajectories.map((child) => child.path.filter((_, index) => index % 2 === 0)), resolutionOrder, angle, power, hit, impact: trajectory.impact, damage: childImpacts.reduce((total, impact) => total + impact.damage, 0), childImpacts, terrainChange: { center: Math.round(terrainCenter), radius: terrainRadius, depth: terrainDepth, material }, actionId }); player.shots += 1; player.stats.shots += 1; player.stats.terrainChanges += childCount;
   if (advance) { advanceBoomBoxTurn(room, seatIndex); room.phase = room.phase === "finished" ? "finished" : "flight"; room.resolving = true; } room.updatedAt = Date.now(); return { flight: { seat: seatIndex, target: hitTargetIndex >= 0 ? hitTargetIndex : targetIndex, weapon, hit, impact: trajectory.impact, path: trajectory.path, children: trajectories.map((child, index) => ({ index, path: child.path, impact: child.impact, target: child.impactTarget, center: Math.round(child.center), bounces: Number(child.bounces) || 0 })), impacts: childImpacts, sequence: entry.sequence } };
 }
 function resolveBoomBoxAction(room, seatIndex, action, actionId = "") {
@@ -2321,7 +2389,7 @@ boomboxServer.on("connection", (socket) => {
       if (!userId) { boomBoxSend(socket, { type: "boombox-error", message: "A commander identity is required." }); return; }
       if (boomboxUserMemberships.has(userId)) { boomBoxSend(socket, { type: "boombox-error", message: "You already have an active Boom Box room." }); return; }
       const config = message.config || {}; const rules = boomBoxRulesFromConfig(config); const count = rules.seats; const gameId = boomBoxRoomId(); const requestedAiSeats = Array.isArray(config.aiSeats) ? config.aiSeats.map((seat) => Number(seat)).filter((seat) => Number.isInteger(seat) && seat > 0 && seat < count) : (config.aiFill ? Array.from({ length: Math.max(0, count - 1) }, (_, index) => index + 1) : []); const aiSeats = [...new Set(requestedAiSeats)].sort((a, b) => a - b);
-      room = { gameId, inviteToken: `${gameId}-${Math.random().toString(36).slice(2)}-${Date.now().toString(36)}`, ownerUserId: userId, name: String(config.name || "Unnamed room").slice(0, 28), creator: String(config.creator || "Commander").slice(0, 18), seats: Array.from({ length: count }, (_, index) => ({ name: index === 0 ? String(config.creator || "Commander").slice(0, 18) : `Commander ${index + 1}`, userId: index === 0 ? userId : "", sessionId: index === 0 ? `${gameId}-${Math.random().toString(36).slice(2)}` : "", socket: index === 0 ? socket : null, connected: index === 0, bot: false, })), aiSeats, spectators: new Set(), mutedUserIds: new Set(), chatLastAt: new Map(), processedActionIds: new Set(), pendingActions: new Map(), terrain: String(config.terrain || "sunset-range"), pace: rules.turnPace, rules, aiFill: Boolean(config.aiFill), started: false, phase: "setup", resolving: false, state: null, seed: Math.max(1, Math.min(999999, Number(config.seed) || 314159)), updatedAt: Date.now() };
+      room = { gameId, inviteToken: `${gameId}-${Math.random().toString(36).slice(2)}-${Date.now().toString(36)}`, ownerUserId: userId, name: String(config.name || "Unnamed room").slice(0, 28), creator: String(config.creator || "Commander").slice(0, 18), seats: Array.from({ length: count }, (_, index) => ({ name: index === 0 ? String(config.creator || "Commander").slice(0, 18) : `Commander ${index + 1}`, userId: index === 0 ? userId : "", sessionId: index === 0 ? `${gameId}-${Math.random().toString(36).slice(2)}` : "", socket: index === 0 ? socket : null, connected: index === 0, bot: false, })), aiSeats, spectators: new Set(), mutedUserIds: new Set(), chatLastAt: new Map(), processedActionIds: new Set(), pendingActions: new Map(), flightBundleId: "", flightTimer: null, flightRequiredSeats: new Set(), flightAcknowledgedSeats: new Set(), terrain: String(config.terrain || "sunset-range"), pace: rules.turnPace, rules, aiFill: Boolean(config.aiFill), started: false, phase: "setup", resolving: false, state: null, seed: Math.max(1, Math.min(999999, Number(config.seed) || 314159)), updatedAt: Date.now() };
       seatIndex = 0; sessionId = room.seats[0].sessionId; boomboxRooms.set(gameId, room); boomboxUserMemberships.set(userId, gameId); writeBoomBoxRooms(); boomBoxSend(socket, { type: "boombox-created", gameId, inviteToken: room.inviteToken, sessionId, seat: 0, host: true }); boomBoxSend(socket, boomBoxLoadoutPayload(room, 0)); boomBoxSend(socket, boomBoxLobbyPayload(userId)); return;
     }
     if (message.type === "boombox-join") {
@@ -2340,6 +2408,7 @@ boomboxServer.on("connection", (socket) => {
     if (message.type === "boombox-cancel") { const target = boomboxRooms.get(String(message.gameId || room?.gameId || "")); if (!target || target.ownerUserId !== userId) return; if (target.aiTimer) clearTimeout(target.aiTimer); if (target.turnTimer) clearTimeout(target.turnTimer); for (const seat of target.seats) if (seat.socket && seat.socket !== socket) seat.socket.close(1000, "Room cancelled"); for (const watcher of target.spectators || []) if (watcher !== socket) watcher.close(1000, "Room cancelled"); boomboxRooms.delete(target.gameId); for (const seat of target.seats) if (seat.userId) boomboxUserMemberships.delete(seat.userId); writeBoomBoxRooms(); boomBoxSend(socket, { type: "boombox-cancelled", gameId: target.gameId }); broadcastBoomBoxLobby(); room = null; seatIndex = -1; return; }
     if (message.type === "boombox-moderate") { const target = room || boomboxRooms.get(String(message.gameId || "")); const ownerSeat = target?.seats.findIndex((seat) => seat.userId === target.ownerUserId); if (!target || spectator || seatIndex !== ownerSeat) return; const targetUserId = typeof message.targetUserId === "string" ? message.targetUserId.slice(0, 120) : ""; if (!targetUserId || targetUserId === target.ownerUserId) return; const action = message.action === "unmute" ? "unmute" : "mute"; if (action === "mute") target.mutedUserIds.add(targetUserId); else target.mutedUserIds.delete(targetUserId); const payload = { type: "boombox-chat", message: { sender: "System", text: `${targetUserId} was ${action}d by the room host.`, at: Date.now(), system: true } }; for (const seat of target.seats) if (seat.socket) boomBoxSend(seat.socket, payload); for (const watcher of target.spectators || []) boomBoxSend(watcher, payload); return; }
     if (message.type === "boombox-chat") { const target = room || boomboxRooms.get(String(message.gameId || "")); const text = typeof message.text === "string" ? message.text.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim().slice(0, 160) : ""; const senderUserId = spectator ? String(socket.boomboxUserId || userId || "") : target?.seats[seatIndex]?.userId || ""; if (!target || !text || !senderUserId || target.mutedUserIds.has(senderUserId)) return; const now = Date.now(); const previous = target.chatLastAt.get(senderUserId) || 0; if (now - previous < 650) { boomBoxSend(socket, { type: "boombox-error", message: "Please wait a moment before sending another message." }); return; } target.chatLastAt.set(senderUserId, now); const sender = spectator ? "Spectator" : target.seats[seatIndex]?.name || "Commander"; const payload = { type: "boombox-chat", message: { sender, senderUserId, text, at: now } }; for (const seat of target.seats) if (seat.socket) boomBoxSend(seat.socket, payload); for (const watcher of target.spectators || []) boomBoxSend(watcher, payload); return; }
+    if (message.type === "boombox-flight-ack") { const bundleId = typeof message.bundleId === "string" ? message.bundleId : ""; if (!room || spectator || seatIndex < 0 || !bundleId || room.flightBundleId !== bundleId) return; room.flightAcknowledgedSeats ||= new Set(); room.flightAcknowledgedSeats.add(seatIndex); if ([...(room.flightRequiredSeats || [])].every((index) => room.flightAcknowledgedSeats.has(index))) boomBoxFinishFlight(room, bundleId); return; }
     if (!room || spectator || seatIndex < 0) return;
     if (message.type === "boombox-action") { const actionId = typeof message.actionId === "string" ? message.actionId.slice(0, 120) : ""; if (!actionId) { boomBoxSend(socket, { type: "boombox-error", message: "An action ID is required." }); return; } if (room.processedActionIds.has(actionId)) { boomBoxSend(socket, { type: "boombox-error", message: "That action was already processed." }); return; } const result = resolveBoomBoxAction(room, seatIndex, message.action || {}, actionId); if (result?.error) boomBoxSend(socket, { type: "boombox-error", message: result.error }); else { room.processedActionIds.add(actionId); if (room.processedActionIds.size > 500) room.processedActionIds.delete(room.processedActionIds.values().next().value); boomBoxDispatchActionResult(room, result); } return; }
     if (message.type === "boombox-leave") { if (room.seats[seatIndex]) boomBoxHandleDisconnect(room, seatIndex, "leave"); return; }

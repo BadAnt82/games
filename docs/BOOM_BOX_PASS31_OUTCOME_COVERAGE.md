@@ -46,4 +46,4 @@ Commit `9414275` deployed successfully through Coolify as `yakauiv7t9mmno9das02r
 
 ## Loop recommendation
 
-Pass 31 is complete. No correction pass is required for the planned scope. The prototype is ready for structured human testing; any next pass should be driven by observed tester findings rather than another broad readiness audit.
+Pass 31 outcome coverage is complete. The broader readiness audit identified unresolved flight presentation, solo parity, replay fidelity, and browser-matrix gaps, so the prototype should follow [BOOM_BOX_CORRECTION_TRACK.md](./BOOM_BOX_CORRECTION_TRACK.md) before unrestricted human testing. Outcome coverage is a completed sub-pass, not the final release gate.
