@@ -18,6 +18,7 @@
     "test:boombox-visual": "npx -p playwright node scripts/boombox-visual-check.mjs",
     "test:boombox-parity": "node scripts/boombox-parity-check.mjs",
     "test:boombox-weapons": "node scripts/boombox-weapon-matrix-check.mjs",
+    "test:boombox-outcomes": "node scripts/boombox-outcome-check.mjs",
     "test:boombox-contract": "node --experimental-strip-types scripts/boombox-contract-check.mjs",
     "test:boombox-persistence": "node scripts/boombox-persistence-check.mjs",
     "test:smoke": "node scripts/smoke-server.mjs",
