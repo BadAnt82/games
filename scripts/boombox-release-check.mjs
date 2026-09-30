@@ -99,7 +99,8 @@ async function verifyPreparedMode(mode, suffix) {
   const releasedPromise = next(host, "boombox-state", (message) => ["turn-prep", "finished"].includes(message.snapshot?.phase) && message.snapshot.log.filter((entry) => entry.kind === "fire").length >= 2, 7000);
   guest.send(JSON.stringify({ type: "boombox-action", userId: guestId, actionId: `${mode}-guest-1`, action: { targetIndex: 0, weapon: "cannon", angle: 42, power: 58 } }));
   const released = await releasedPromise;
-  if (released.snapshot.rules?.firingMode !== mode || released.snapshot.log.filter((entry) => entry.kind === "fire").length !== 2) throw new Error(`${mode} did not release both prepared actions deterministically`);
+  const fireEvents = released.snapshot.log.filter((entry) => entry.kind === "fire");
+  if (released.snapshot.rules?.firingMode !== mode || fireEvents.length !== 2 || fireEvents[0].resolutionOrder !== 1 || fireEvents[1].resolutionOrder !== 2 || fireEvents[0].seat !== 0 || fireEvents[1].seat !== 1) throw new Error(`${mode} did not release both prepared actions deterministically`);
   close(host); close(guest);
 }
 

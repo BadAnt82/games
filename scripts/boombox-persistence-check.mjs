@@ -1,4 +1,4 @@
-import { rmSync, mkdtempSync } from "node:fs";
+import { rmSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
@@ -39,7 +39,8 @@ try {
   const joined = await joinedPromise;
   if (joined.gameId !== created.gameId || joined.seat !== 0) throw new Error("Persisted creator session did not reclaim its seat");
   resumed.close();
-  console.log("Boom Box persistence check passed: an active room and creator session survived a server restart.");
+  const activeOwner = `pass30-owner-${Date.now()}`; const active = await open(); const activeCreatedPromise = next(active, "boombox-created"); active.send(JSON.stringify({ type: "boombox-create", userId: activeOwner, config: { name: "Pass 30 replay persistence", creator: "Pass 30", seats: 2, aiFill: true, seed: 3001 } })); const activeCreated = await activeCreatedPromise; const activeStartPromise = next(active, "boombox-state", 5000); active.send(JSON.stringify({ type: "boombox-start-ai", userId: activeOwner, gameId: activeCreated.gameId })); await activeStartPromise; const activeFirePromise = nextWhere(active, "boombox-state", (message) => message.snapshot?.log?.some((entry) => entry.kind === "fire"), 5000); active.send(JSON.stringify({ type: "boombox-action", userId: activeOwner, gameId: activeCreated.gameId, actionId: "pass30-fire", action: { targetIndex: 1, weapon: "cannon", angle: 42, power: 58 } })); await activeFirePromise; await wait(350); const persistedBefore = JSON.parse(readFileSync(roomStore, "utf8")).find((room) => room.gameId === activeCreated.gameId); if (!persistedBefore?.state?.replay?.length) throw new Error("Replay snapshot was not written to the active-room store"); const activeSession = activeCreated.sessionId; active.close(); await stop(server); await wait(250); server = start(); await wait(700); const restored = await open(); const restoredJoinPromise = next(restored, "boombox-joined"); const restoredStatePromise = next(restored, "boombox-state"); restored.send(JSON.stringify({ type: "boombox-join", userId: activeOwner, gameId: activeCreated.gameId, sessionId: activeSession, name: "Pass 30" })); await restoredJoinPromise; const restoredState = await restoredStatePromise; const persistedAfter = JSON.parse(readFileSync(roomStore, "utf8")).find((room) => room.gameId === activeCreated.gameId); if (!restoredState.snapshot.log?.some((entry) => entry.kind === "fire") || !persistedAfter?.state?.replay?.length) throw new Error("Replay and fire log did not survive a server restart"); restored.close();
+  console.log("Boom Box persistence check passed: active room, creator session, replay snapshot, and fire log survived a server restart.");
 } finally {
   await stop(server);
   rmSync(root, { recursive: true, force: true });

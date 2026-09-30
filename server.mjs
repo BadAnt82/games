@@ -1953,7 +1953,7 @@ function boomBoxSegmentHitsTerrain(room, from, to, weapon) {
 }
 function boomBoxProjectilePath(room, shooterIndex, requestedTargetIndex, weapon, angleDegrees, power) {
   const shooter = room.state.players[shooterIndex]; const requestedTarget = room.state.players[requestedTargetIndex]; const direction = requestedTarget.x >= shooter.x ? 1 : -1; const angle = angleDegrees * Math.PI / 180; const gravity = room.rules.gravity; const speed = power * 5.4 * (Number(weapon.speed) || 1); let x = shooter.x + direction * 22; let y = shooter.y - 17; let vx = Math.cos(angle) * speed * direction; let vy = -Math.sin(angle) * speed; let bounces = 0; const maxBounces = Math.max(0, Number(weapon.bounces) || 3); const path = [{ x, y }]; let impact = "miss"; let impactX = x; let impactTarget = -1;
-  if (weapon.mode === "laser") { const end = { x: requestedTarget.x, y: requestedTarget.y - 12 }; const steps = 16; for (let step = 1; step <= steps; step += 1) path.push({ x: x + (end.x - x) * step / steps, y: y + (end.y - y) * step / steps }); impact = "tank"; impactTarget = requestedTargetIndex; impactX = end.x; return { path, impact, impactTarget, center: impactX, weapon }; }
+  if (weapon.mode === "laser") { const end = { x: requestedTarget.x, y: requestedTarget.y - 12 }; const steps = 16; for (let step = 1; step <= steps; step += 1) path.push({ x: x + (end.x - x) * step / steps, y: y + (end.y - y) * step / steps }); impact = "tank"; impactTarget = requestedTargetIndex; impactX = end.x; return { path, impact, impactTarget, center: impactX, bounces, weapon }; }
   for (let step = 0; step < 360; step += 1) {
     const previous = { x, y }; const dt = 1 / 30; vx += room.state.wind * 20 * dt; vy += gravity * dt; x += vx * dt; y += vy * dt;
     if (weapon.guided) { vx += (requestedTarget.x - x) * .012; vy += ((requestedTarget.y - 12) - y) * .012; }
@@ -1977,7 +1977,7 @@ function boomBoxProjectilePath(room, shooterIndex, requestedTargetIndex, weapon,
     if (hitSeat >= 0) { impact = "tank"; impactTarget = hitSeat; break; }
     if (y > 590) { impact = "bounds"; break; }
   }
-  const center = impact === "tank" && impactTarget >= 0 ? room.state.players[impactTarget].x : impactX; return { path, impact, impactTarget, center, weapon };
+  const center = impact === "tank" && impactTarget >= 0 ? room.state.players[impactTarget].x : impactX; return { path, impact, impactTarget, center, bounces, weapon };
 }
 function boomBoxMutateTerrain(room, center, radius, depth, material = "dirt", solid = true) {
   const before = room.state.players.map((player) => ({ x: player.x, y: player.y, surface: room.state.terrain[Math.max(0, Math.min(959, Math.round(player.x)))] }));
@@ -2035,10 +2035,11 @@ function resolveBoomBoxActionNow(room, seatIndex, action, actionId = "", options
       if (childDamageTarget.health === 0) { childDamageTarget.alive = false; boomBoxRecordElimination(room, room.state.players.indexOf(childDamageTarget), weaponRules.mode === "napalm" ? "napalm" : "damage"); }
     }
     boomBoxMutateTerrain(room, child.center, weaponRules.radius, terrainDepth, material, weaponRules.mode !== "remover");
-    return { index: childIndex, impact: child.impact, target: child.impactTarget, center: Math.round(child.center), damage: actualDamage, absorbed, pathLength: child.path.length, material };
+    return { index: childIndex, impact: child.impact, target: child.impactTarget, center: Math.round(child.center), damage: actualDamage, absorbed, pathLength: child.path.length, bounces: Number(child.bounces) || 0, material };
   });
-  const entry = boomBoxAppendEvent(room, { kind: "fire", seat: seatIndex, target: targetIndex, actualTarget: hitTargetIndex, weapon, mode: weaponRules.mode, children: childCount, angle, power, hit, impact: trajectory.impact, damage: childImpacts.reduce((total, impact) => total + impact.damage, 0), childImpacts, terrainChange: { center: Math.round(terrainCenter), radius: terrainRadius, depth: terrainDepth, material }, actionId }); player.shots += 1; player.stats.shots += 1; player.stats.terrainChanges += childCount;
-  if (advance) { advanceBoomBoxTurn(room, seatIndex); room.phase = room.phase === "finished" ? "finished" : "flight"; room.resolving = true; } room.updatedAt = Date.now(); return { flight: { seat: seatIndex, target: hitTargetIndex >= 0 ? hitTargetIndex : targetIndex, weapon, hit, impact: trajectory.impact, path: trajectory.path, children: trajectories.map((child, index) => ({ index, path: child.path, impact: child.impact, target: child.impactTarget, center: Math.round(child.center) })), impacts: childImpacts, sequence: entry.sequence } };
+  const resolutionOrder = room.state.log.filter((event) => event.kind === "fire").length + 1;
+  const entry = boomBoxAppendEvent(room, { kind: "fire", seat: seatIndex, target: targetIndex, actualTarget: hitTargetIndex, weapon, mode: weaponRules.mode, children: childCount, resolutionOrder, angle, power, hit, impact: trajectory.impact, damage: childImpacts.reduce((total, impact) => total + impact.damage, 0), childImpacts, terrainChange: { center: Math.round(terrainCenter), radius: terrainRadius, depth: terrainDepth, material }, actionId }); player.shots += 1; player.stats.shots += 1; player.stats.terrainChanges += childCount;
+  if (advance) { advanceBoomBoxTurn(room, seatIndex); room.phase = room.phase === "finished" ? "finished" : "flight"; room.resolving = true; } room.updatedAt = Date.now(); return { flight: { seat: seatIndex, target: hitTargetIndex >= 0 ? hitTargetIndex : targetIndex, weapon, hit, impact: trajectory.impact, path: trajectory.path, children: trajectories.map((child, index) => ({ index, path: child.path, impact: child.impact, target: child.impactTarget, center: Math.round(child.center), bounces: Number(child.bounces) || 0 })), impacts: childImpacts, sequence: entry.sequence } };
 }
 function resolveBoomBoxAction(room, seatIndex, action, actionId = "") {
   if (room.rules.firingMode === "sequential") return resolveBoomBoxActionNow(room, seatIndex, action, actionId);

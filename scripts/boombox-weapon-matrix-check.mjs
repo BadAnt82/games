@@ -28,8 +28,11 @@ try {
       const flightPromise = next(socket, "boombox-flight"); const fireState = next(socket, "boombox-state", (message) => (message.snapshot?.log || []).some((entry) => entry.kind === "fire" && entry.weapon === weaponId));
       socket.send(JSON.stringify({ type: "boombox-action", userId, gameId: created.gameId, actionId: `fire-${weaponId}`, action: { targetIndex: 1, weapon: weaponId, angle: 42, power: 58 } }));
       const flight = await flightPromise; const resolved = await fireState; const event = [...resolved.snapshot.log].reverse().find((entry) => entry.kind === "fire" && entry.weapon === weaponId);
-      const expectedChildren = Math.max(1, Number(item.count) || 1); if (!event || event.children !== expectedChildren || !Array.isArray(event.childImpacts) || event.childImpacts.length !== expectedChildren) throw new Error(`${weaponId}: child impact contract mismatch`);
+      const expectedChildren = Math.max(1, Number(item.count) || 1); if (!event || event.children !== expectedChildren || !Number.isInteger(event.resolutionOrder) || !Array.isArray(event.childImpacts) || event.childImpacts.length !== expectedChildren) throw new Error(`${weaponId}: child impact contract mismatch`);
       if (!Array.isArray(flight.flight?.children) || flight.flight.children.length !== expectedChildren || flight.flight.children.some((child) => !Array.isArray(child.path) || child.path.length < 2)) throw new Error(`${weaponId}: child flight playback contract mismatch`);
+      if (weaponId === "bouncing-bomb" && Number(flight.flight.children[0].bounces) < 1) throw new Error("bouncing-bomb did not report a terrain bounce");
+      if (weaponId === "napalm" && event.childImpacts.some((impact) => impact.target >= 0) && !resolved.snapshot.players.some((player) => player.burning > 0)) throw new Error("napalm did not preserve its burning status");
+      if (item.material && !resolved.snapshot.terrainMaterial.includes(item.material)) throw new Error(`${weaponId}: material effect was not persisted in the snapshot`);
       if (!event.terrainChange || event.terrainChange.material !== (item.material || "dirt")) throw new Error(`${weaponId}: terrain material contract mismatch`);
       results.push(`${weaponId}:${event.childImpacts.length}`);
       socket.send(JSON.stringify({ type: "boombox-cancel", userId, gameId: created.gameId }));
