@@ -51,6 +51,8 @@
 
 **Scope:** verify the deployed `/app/data` persistent volume, recovery of one active room and one completed history record across a controlled container replacement, actual writable-store failure reporting, and a deployment health check that validates the Boom Box health contract.
 
+**Status:** Complete. Evidence is recorded in [BOOM_BOX_PACKAGE_A_RECOVERY.md](./BOOM_BOX_PACKAGE_A_RECOVERY.md).
+
 **Exit evidence:** Coolify mapping is recorded; replacement recovery succeeds; a write failure is visible; the configured health check fails when the service or persistence is unhealthy.
 
 **Out of scope:** gameplay rules, UI redesign, art, AI balance, and archive pagination.
