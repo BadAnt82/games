@@ -48,7 +48,7 @@ The game is materially closer to the desired scope, but this track is not the fi
 
 ## Correction pass 3 — gameplay observability and multi-seat acceptance
 
-**Status:** implementation complete; verification in progress
+**Status:** complete
 
 This pass closes the most concrete acceptance gaps from the audit:
 
@@ -57,6 +57,8 @@ This pass closes the most concrete acceptance gaps from the audit:
 - network coverage asserts that an impacted tank receives authoritative damage statistics;
 - a Playwright matrix covers 4, 6, and 10 human seats, including creator labels, every join, synchronized canvases, opponent rows, and the opening turn;
 - a landscape, reduced-motion, and keyboard-focus browser check guards the compact presentation path.
+- history list responses are lightweight summaries, with replay details loaded only when selected;
+- abandoned rooms with no commander or spectator audience pause AI and turn timers and resume on reconnect.
 
 The matrix deliberately stops at match start so it remains deterministic and does not pretend to cover the separate long-running AI and terrain suites. Those remain the next correction scope.
 
