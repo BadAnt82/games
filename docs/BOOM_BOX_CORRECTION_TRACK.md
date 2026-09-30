@@ -88,3 +88,15 @@ Pass 4 does not claim final human-testing readiness. The next correction should 
 - The live Pass 5 suite passed after deployment; the existing 2-human browser check and 4/6/10-seat matrix also passed.
 
 Pass 5 still does not cover terrain edge/chained support behavior or final art, effects, audio, mute controls, and performance. Those remain the next correction scopes before human-testing readiness.
+
+## Correction pass 6 — terrain boundaries and fall continuity
+
+**Status: complete**
+
+- Boundary bounce now works for ordinary shells even when the weapon itself has no bounce count; wrap handling also normalizes both horizontal directions.
+- Edge terrain mutations no longer apply the same crater depth repeatedly to the clamped edge cell.
+- Terrain changes now settle every living tank, clear stale buried state, and record fall/support events across chained terrain changes.
+- Added deterministic coverage for stop, bounce, and wrap boundaries plus chained terrain-remover falls.
+- Build, network authority, and the full release matrix passed after the changes.
+
+This completes the bounded Pass 6 work. The audit after this pass should report remaining product gaps only; it should not create another numbered phase implicitly.

@@ -14,6 +14,7 @@
     "test:boombox": "node --experimental-strip-types scripts/boombox-determinism-check.mjs",
     "test:boombox-network": "node scripts/boombox-network-check.mjs",
     "test:boombox-ai": "node scripts/boombox-ai-strategy-check.mjs",
+    "test:boombox-terrain": "node scripts/boombox-terrain-check.mjs",
     "test:boombox-release": "node scripts/boombox-release-check.mjs",
     "test:boombox-browser": "npx -p playwright node scripts/boombox-browser-check.mjs",
     "test:boombox-browser-matrix": "npx -p playwright node scripts/boombox-browser-matrix-check.mjs",
