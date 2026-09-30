@@ -25,7 +25,7 @@ try {
   await host.locator("#boombox-seats").selectOption("2");
   await host.locator("#boombox-create-next").click();
   await host.locator("#boombox-seat-plan").waitFor({ state: "visible" });
-  await host.locator("#boombox-seat-plan select").selectOption("human");
+  await host.locator("#boombox-seat-plan select").nth(1).selectOption("human");
   await host.locator("#boombox-create-next").click();
   if (!(await host.locator("#boombox-create-summary").innerText()).includes("S2 Human")) throw new Error("Seat control was not included in the review step");
   await host.locator("#boombox-create-submit").click();
@@ -54,6 +54,12 @@ try {
   await host.locator("#boombox-result-panel").waitFor({ state: "visible", timeout: 10000 });
   if (!(await host.locator("#boombox-result-title").innerText()).length) throw new Error("The result panel did not report an outcome");
   console.log(`Boom Box browser acceptance passed: ${roomName}, two human seats, review summary, join flow, synchronized turns, and result panel.`);
+} catch (error) {
+  console.error("Boom Box browser acceptance failed", error);
+  console.error("Host status:", await host.locator("#boombox-lobby-status").textContent().catch(() => "unavailable"), "Guest status:", await guest.locator("#boombox-lobby-status").textContent().catch(() => "unavailable"));
+  await host.screenshot({ path: "boombox-browser-host-failure.png", fullPage: true }).catch(() => {});
+  await guest.screenshot({ path: "boombox-browser-guest-failure.png", fullPage: true }).catch(() => {});
+  throw error;
 } finally {
   await hostContext.close();
   await guestContext.close();
