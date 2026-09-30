@@ -61,6 +61,8 @@
 
 **Scope:** separate display names from per-device/session identity; preserve name display everywhere; make create, join, cancel, reconnect, started-room watch, spectator leave, and room cleanup consistent for one user across devices; eliminate membership collisions and stale lobby state.
 
+**Status:** Complete. Evidence is recorded in [BOOM_BOX_PACKAGE_B_IDENTITY.md](./BOOM_BOX_PACKAGE_B_IDENTITY.md).
+
 **Exit evidence:** browser and protocol tests cover two devices with the same display name, multiple rooms, cancellation, reconnect, spectator entry/exit, and stale-session recovery with no cross-room takeover.
 
 **Out of scope:** solo rules parity, weapon behavior, art, sound, and performance tuning.
