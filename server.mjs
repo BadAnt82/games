@@ -1521,7 +1521,8 @@ async function handleApi(request, response) {
     const limit = Math.max(1, Math.min(50, Number.isFinite(requestedLimit) ? Math.floor(requestedLimit) : 50));
     const gameId = url.searchParams.get("gameId") || "";
     const matches = boomBoxHistory.slice().reverse().filter((match) => !gameId || match.gameId === gameId).slice(0, limit);
-    sendJson(response, 200, { matches });
+    const payload = gameId ? matches : matches.map((match) => ({ gameId: match.gameId, name: match.name, terrain: match.terrain, seed: match.seed, winner: match.winner, eliminationOrder: match.eliminationOrder, placements: match.placements, players: (match.players || []).map((player) => ({ name: player.name, color: player.color })), finishedAt: match.finishedAt, changes: Array.isArray(match.log) ? match.log.filter((entry) => entry.terrainChange || entry.kind === "fire").length : 0 }));
+    sendJson(response, 200, { matches: payload });
     return true;
   }
   if (request.url === "/api/high-scores" && request.method === "GET") {
