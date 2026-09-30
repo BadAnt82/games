@@ -63,3 +63,16 @@ This pass closes the most concrete acceptance gaps from the audit:
 The matrix deliberately stops at match start so it remains deterministic and does not pretend to cover the separate long-running AI and terrain suites. Those remain the next correction scope.
 
 The next implementation should be an explicit correction or presentation pass from this list; do not treat the current result as the unrestricted finished-game release.
+
+## Correction pass 4 — AI strategy ordering and permanent upgrades
+
+**Status: complete**
+
+This pass hardens the computer commander path that was still under-tested:
+
+- AI now resolves an available utility before choosing movement, so protection and recovery decisions are not delayed by repositioning.
+- Guidance and turret upgrades are treated as permanent state. Once active, the AI will not buy the same upgrade again.
+- Added a deterministic local strategy fixture for recruit, veteran, ace, and expert commanders, plus a movement-enabled expert room. It verifies the starter shield, guidance upgrade, turret upgrade, and utility-before-movement ordering through the authoritative WebSocket path.
+- The existing network and release suites were rerun after the changes to confirm no regression in turn ownership, synchronized flight bundles, reconnect, replay, persistence, or prepared firing modes.
+
+Pass 4 does not claim final human-testing readiness. The next correction should cover browser-level spectator/reconnect/cancel flows and a long-running multi-seat match, then terrain edge/chained support behavior. Presentation work for original art, sound, effects, mute controls, and performance remains a separate final pass.

@@ -1886,6 +1886,7 @@ function boomBoxAiBuyUtility(room, seatIndex) {
   const preferred = player.health < 65 ? ["repair-kit", "heavy-shield", "shield-recharge"] : ["guidance-kit", "turret-upgrade", "fuel-canister", "terrain-lift", "parachute", "shield-recharge"];
   for (const id of preferred) {
     const item = room.rules.utilityCatalog[id];
+    if ((id === "guidance-kit" && player.upgrades.guidance) || (id === "turret-upgrade" && player.upgrades.turret)) continue;
     if (!item || (player.utilities[id] || 0) >= (player.utilityCapacity[id] || item.inventory || 0) || player.money < (Number(item.cost) || 0)) continue;
     const purchase = boomBoxPurchase(room, seatIndex, "utility", id, 1);
     if (!purchase?.error) return id;
@@ -1902,8 +1903,8 @@ function boomBoxAiCandidate(room, seatIndex, targetIndex, weapon) {
 function boomBoxAiPlan(room, seatIndex) {
   const targetIndex = boomBoxAiChooseTarget(room, seatIndex); if (targetIndex < 0) return null;
   const player = room.state.players[seatIndex];
-  if (room.rules.movement && !player.movedThisTurn && player.fuel >= 5) return { kind: "move", direction: room.state.players[targetIndex].x >= player.x ? 1 : -1, distance: Math.min(24, player.fuel), targetIndex, text: `${player.name} is repositioning before the next shot.` };
   const utility = boomBoxAiUtility(room, seatIndex) || boomBoxAiBuyUtility(room, seatIndex); if (utility) return { kind: "utility", utility, targetIndex, text: `${player.name} is preparing a ${room.rules.utilityCatalog[utility]?.label || utility}.` };
+  if (room.rules.movement && !player.movedThisTurn && player.fuel >= 5) return { kind: "move", direction: room.state.players[targetIndex].x >= player.x ? 1 : -1, distance: Math.min(24, player.fuel), targetIndex, text: `${player.name} is repositioning before the next shot.` };
   const weaponId = boomBoxAiBuyBestWeapon(room, seatIndex, targetIndex); const weapon = room.rules.weaponCatalog[weaponId] || room.rules.weaponCatalog.cannon; const shot = boomBoxAiCandidate(room, seatIndex, targetIndex, weapon); return { kind: "fire", weapon: weaponId, targetIndex, angle: shot.angle, power: shot.power, text: `${room.state.players[seatIndex].name} is lining up a ${weapon.label || weaponId}.` };
 }
 function boomBoxNextAiSeat(room) {
