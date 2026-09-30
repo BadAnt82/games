@@ -34,14 +34,30 @@ The current checkout passes:
 - Two-human browser acceptance
 - Mobile solo browser acceptance
 - Mobile visual and replay accessibility check
+- 4/6/10-human browser matrix
+- Landscape, reduced-motion, and keyboard-focus browser acceptance
 
 ## Remaining correction work
 
 The game is materially closer to the desired scope, but this track is not the final release gate yet. Remaining work is a separate pass for:
 
-1. Browser coverage for 4/6/10 human seats, synchronous/simultaneous UI, spectator viewing, reconnect, cancellation, landscape, keyboard focus, and reduced motion.
+1. Browser coverage for synchronous/simultaneous UI, spectator viewing, reconnect, cancellation, and long-running multi-seat play.
 2. Full AI strategy fixtures for every utility and difficulty, including terrain tools, fuel, guidance, turret upgrades, and elimination continuation.
-3. Terrain edge behavior and result-stat completeness.
+3. Terrain edge behavior and chained terrain/support rules.
 4. Original Boom Box art, effects, sound, mute/low-effects controls, and final performance review.
+
+## Correction pass 3 — gameplay observability and multi-seat acceptance
+
+**Status:** implementation complete; verification in progress
+
+This pass closes the most concrete acceptance gaps from the audit:
+
+- authoritative `damageTaken` and `stats.damageTaken` now include direct fire, burn, and fall damage;
+- network results show per-player damage dealt and damage taken alongside placements;
+- network coverage asserts that an impacted tank receives authoritative damage statistics;
+- a Playwright matrix covers 4, 6, and 10 human seats, including creator labels, every join, synchronized canvases, opponent rows, and the opening turn;
+- a landscape, reduced-motion, and keyboard-focus browser check guards the compact presentation path.
+
+The matrix deliberately stops at match start so it remains deterministic and does not pretend to cover the separate long-running AI and terrain suites. Those remain the next correction scope.
 
 The next implementation should be an explicit correction or presentation pass from this list; do not treat the current result as the unrestricted finished-game release.
