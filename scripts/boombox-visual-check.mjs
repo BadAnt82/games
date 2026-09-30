@@ -6,7 +6,7 @@ const context = await browser.newContext({ viewport: { width: 390, height: 844 }
 const page = await context.newPage();
 await page.addInitScript(() => localStorage.setItem("badant-games-player-name", "Mobile Visual"));
 try {
-  await page.goto(base, { waitUntil: "networkidle" });
+  await page.goto(base, { waitUntil: "domcontentloaded", timeout: 15000 });
   await page.locator("#select-boombox").click(); await page.locator("#boombox-mode-single").click();
   await page.locator("#boombox-loadout-open").click(); await page.locator("#boombox-shop-list article").first().waitFor({ state: "visible" });
   const splitCard = page.locator("#boombox-shop-list article", { hasText: "Split shell" }).first(); if (!(await splitCard.isVisible())) throw new Error("Split shell is missing from the mobile loadout");
