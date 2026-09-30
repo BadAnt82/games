@@ -3,15 +3,17 @@ import { WebSocket } from "ws";
 import { BOOM_BOX_UTILITY_CATALOG, BOOM_BOX_WEAPON_CATALOG } from "../boombox-rules.mjs";
 
 const port = 4344;
-const server = spawn(process.execPath, ["server.mjs"], { env: { ...process.env, PORT: String(port) }, stdio: ["ignore", "pipe", "pipe"] });
+const liveUrl = process.env.BOOMBOX_LIVE_URL || "";
+const server = liveUrl ? null : spawn(process.execPath, ["server.mjs"], { env: { ...process.env, PORT: String(port) }, stdio: ["ignore", "pipe", "pipe"] });
+const endpoint = liveUrl || `ws://localhost:${port}`;
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-const open = () => new Promise((resolve, reject) => { const socket = new WebSocket(`ws://localhost:${port}/boombox`); socket._messages = []; socket.on("message", (data) => { try { const message = JSON.parse(data.toString()); socket._messages.push(message); if (message.type === "boombox-flight-bundle" && message.bundleId) socket.send(JSON.stringify({ type: "boombox-flight-ack", gameId: message.gameId, bundleId: message.bundleId })); } catch {} }); socket.once("open", () => resolve(socket)); socket.once("error", reject); });
+const open = () => new Promise((resolve, reject) => { const socket = new WebSocket(`${endpoint}/boombox`); socket._messages = []; socket.on("message", (data) => { try { const message = JSON.parse(data.toString()); socket._messages.push(message); if (message.type === "boombox-flight-bundle" && message.bundleId) socket.send(JSON.stringify({ type: "boombox-flight-ack", gameId: message.gameId, bundleId: message.bundleId })); } catch {} }); socket.once("open", () => resolve(socket)); socket.once("error", reject); });
 const take = (socket, type, predicate = () => true) => { const index = socket._messages.findIndex((message) => message.type === type && predicate(message)); return index < 0 ? null : socket._messages.splice(index, 1)[0]; };
 const next = (socket, type, predicate = () => true, timeout = 9000) => new Promise((resolve, reject) => { const queued = take(socket, type, predicate); if (queued) return resolve(queued); const timer = setTimeout(() => { socket.off("message", onMessage); reject(new Error(`Timed out waiting for ${type}`)); }, timeout); const onMessage = (data) => { let message; try { message = JSON.parse(data.toString()); } catch { return; } if (message.type !== type || !predicate(message)) return; clearTimeout(timer); socket.off("message", onMessage); take(socket, type, predicate); resolve(message); }; socket.on("message", onMessage); });
 const send = (socket, message) => socket.send(JSON.stringify(message));
 const started = async (socket, userId, config) => { const createdPromise = next(socket, "boombox-created"); send(socket, { type: "boombox-create", userId, config }); const created = await createdPromise; const statePromise = next(socket, "boombox-state", (message) => message.snapshot?.phase === "turn-prep"); send(socket, { type: "boombox-start-ai", userId, gameId: created.gameId }); return { created, state: await statePromise }; };
 const allUtilityIds = Object.keys(BOOM_BOX_UTILITY_CATALOG);
-await wait(700);
+if (!liveUrl) await wait(700);
 try {
   const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
   for (const [id, item] of Object.entries(BOOM_BOX_WEAPON_CATALOG)) {
@@ -37,4 +39,4 @@ try {
   const aiWeapons = []; for (const difficulty of ["recruit", "veteran", "ace", "expert"]) { const aiId = `d-ai-${difficulty}-${suffix}`; const aiSocket = await open(); const aiRoom = await started(aiSocket, aiId, { name: `D AI ${difficulty}`, creator: "D AI host", seats: 2, aiFill: true, aiDifficulty: difficulty, startingMoney: 10000, disabledUtilities: allUtilityIds, pace: "blitz", seed: 38000 + difficulty.length }); const aiFire = next(aiSocket, "boombox-state", (message) => message.snapshot?.log?.some((entry) => entry.kind === "fire" && entry.seat === 1)); send(aiSocket, { type: "boombox-action", userId: aiId, gameId: aiRoom.created.gameId, actionId: `d-ai-fire-${difficulty}`, action: { targetIndex: 1, weapon: "cannon", angle: 42, power: 58 } }); const aiResult = await aiFire; aiWeapons.push(aiResult.snapshot.log.filter((entry) => entry.kind === "fire" && entry.seat === 1).at(-1)?.weapon || "unknown"); aiSocket.close(); }
   if (new Set(aiWeapons).size < 3) throw new Error(`AI personalities did not produce distinct equipment choices: ${aiWeapons.join(", ")}`);
   console.log("Boom Box Package D content check passed: complete catalogue economy metadata, smoke cover damage reduction, buried-tank freeing, and terrain collapse behavior.");
-} finally { server.kill(); }
+} finally { server?.kill(); }
