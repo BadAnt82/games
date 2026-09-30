@@ -43,6 +43,7 @@
           <div id="platform-panel" class="overlay-panel platform-panel">
             <h1>Game Select</h1>
             <div class="player-identity" aria-live="polite"><span>Playing as</span><strong id="player-name-label">Player 1</strong><button id="player-name-change" class="secondary" type="button">Change name</button></div>
+            <div class="platform-admin-action"><button id="admin-open" class="secondary" type="button">Admin</button></div>
             <div class="game-grid" aria-label="Available games">
               <button id="select-plane" class="game-tile" type="button" aria-label="Open Jumpy Plane">
                 <span class="tile-plane" aria-hidden="true">
@@ -165,6 +166,20 @@
                 <span class="tile-details"><strong>Boom Box</strong><dl class="tile-scores" aria-label="Boom Box features"><div><dt>Players</dt><dd>2-10</dd></div><div><dt>Modes</dt><dd>Solo + online</dd></div><div><dt>Style</dt><dd>Artillery</dd></div></dl></span>
               </button>
             </div>
+          </div>
+          <div id="admin-panel" class="overlay-panel admin-panel" hidden>
+            <div class="admin-kicker">GAMES ADMIN</div>
+            <h1>Admin access</h1>
+            <p id="admin-intro">Sign in to manage the Games platform.</p>
+            <form id="admin-form" class="admin-form">
+              <label>Email<input id="admin-email" type="email" autocomplete="username" value="ant1982@gmail.com" required /></label>
+              <label>Password<input id="admin-password" type="password" autocomplete="current-password" minlength="6" required /></label>
+              <label id="admin-confirm-row" hidden>Confirm password<input id="admin-confirm-password" type="password" autocomplete="new-password" minlength="6" /></label>
+              <p id="admin-password-help" class="admin-help">Use at least 6 characters, including one uppercase letter, one number, and one symbol.</p>
+              <p id="admin-form-message" class="admin-form-message" role="status" aria-live="polite"></p>
+              <div class="menu-actions"><button id="admin-submit" type="submit">Sign in</button><button id="admin-logout" class="secondary" type="button" hidden>Sign out</button><button id="admin-back" class="secondary" type="button">Back to games</button></div>
+            </form>
+            <p id="admin-session-note" class="admin-session-note" hidden></p>
           </div>
           <div id="boombox-mode-panel" class="overlay-panel boombox-panel boombox-mode-panel" hidden>
             <div class="boombox-kicker">AUTHORITATIVE WAR ROOMS</div>

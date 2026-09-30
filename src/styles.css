@@ -1130,6 +1130,19 @@ body.fullscreen-fallback-active {
 .player-identity { display: flex; align-items: center; justify-content: center; gap: 9px; width: min(100%, 420px); padding: 8px 11px; border: 1px solid rgba(143, 204, 255, .22); border-radius: 999px; color: rgba(224, 239, 255, .66); background: rgba(10, 22, 48, .52); font-size: .76rem; }
 .player-identity strong { color: #fff; }
 .player-identity button { min-height: 30px; padding: 4px 9px; font-size: .7rem; }
+.platform-admin-action { display: flex; justify-content: center; width: 100%; }
+.platform-admin-action button { min-height: 34px; padding: 6px 16px; }
+.admin-panel { width: min(100%, 520px); padding: clamp(22px, 5vw, 42px); border: 1px solid rgba(126, 221, 255, .3); border-radius: 18px; background: linear-gradient(150deg, rgba(13, 30, 62, .96), rgba(31, 20, 67, .95)); box-shadow: 0 22px 65px rgba(0, 0, 0, .35); }
+.admin-panel h1 { margin: 0; color: #f1f8ff; font-size: clamp(2rem, 6vw, 3.1rem); }
+.admin-kicker { color: #78e8ff; font-size: .72rem; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; }
+.admin-panel > p { color: rgba(224, 239, 255, .76); text-align: center; }
+.admin-form { display: grid; width: min(100%, 370px); gap: 12px; text-align: left; }
+.admin-form label { display: grid; gap: 6px; color: rgba(224, 239, 255, .82); font-size: .82rem; font-weight: 700; }
+.admin-form input { width: 100%; min-height: 42px; box-sizing: border-box; border: 1px solid rgba(143, 204, 255, .28); border-radius: 9px; background: rgba(4, 14, 34, .76); color: #fff; padding: 9px 11px; }
+.admin-form input:focus { outline: 2px solid #78e8ff; outline-offset: 2px; }
+.admin-help, .admin-form-message, .admin-session-note { margin: 0; color: rgba(224, 239, 255, .7); font-size: .78rem; line-height: 1.45; }
+.admin-form-message { min-height: 1.25rem; color: #ffd28a; }
+.admin-session-note { color: #9dffcf; text-align: center; }
 
 .platform-panel h1 {
   color: #edf7ff;

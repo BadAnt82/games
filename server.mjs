@@ -1,4 +1,5 @@
 import { accessSync, constants as fsConstants, createReadStream, existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
+import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 import { createServer } from "node:http";
 import { extname, join, normalize, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -17,6 +18,10 @@ const bridgeJackpotStorePath =
   process.env.BRIDGE_JACKPOT_STORE_PATH || resolve(__dirname, "data", "glass-bridge-jackpot.json");
 const boomBoxHistoryPath = process.env.BOOM_BOX_HISTORY_STORE_PATH || resolve(__dirname, "data", "boombox-match-history.json");
 const boomBoxRoomStorePath = process.env.BOOM_BOX_ROOM_STORE_PATH || resolve(__dirname, "data", "boombox-active-rooms.json");
+const gamesAdminStorePath = process.env.GAMES_ADMIN_STORE_PATH || resolve(__dirname, "data", "games-admin.json");
+const gamesAdminEmail = "ant1982@gmail.com";
+const gamesAdminSessionTtlMs = 8 * 60 * 60 * 1000;
+const gamesAdminSessions = new Map();
 const issueStorePaths = {
   "glass-bridge": process.env.GLASS_BRIDGE_ISSUE_STORE_PATH || resolve(__dirname, "data", "glass-bridge-issues.json"),
   "jumpy-plane": process.env.JUMPY_PLANE_ISSUE_STORE_PATH || resolve(__dirname, "data", "jumpy-plane-issues.json"),
@@ -1445,12 +1450,72 @@ function cleanIssueText(value) {
   return (typeof value === "string" ? value.trim() : "").slice(0, 900);
 }
 
-function sendJson(response, status, body) {
+function sendJson(response, status, body, extraHeaders = {}) {
   response.writeHead(status, {
     "Cache-Control": "no-store",
     "Content-Type": contentTypes[".json"],
+    ...extraHeaders,
   });
   response.end(JSON.stringify(body));
+}
+
+function readGamesAdminAccount() {
+  try {
+    const account = JSON.parse(readFileSync(gamesAdminStorePath, "utf8"));
+    return account && account.email === gamesAdminEmail && typeof account.passwordHash === "string" && typeof account.salt === "string" ? account : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeGamesAdminAccount(account) {
+  mkdirSync(resolve(gamesAdminStorePath, ".."), { recursive: true });
+  const temporaryPath = `${gamesAdminStorePath}.tmp`;
+  writeFileSync(temporaryPath, JSON.stringify(account, null, 2));
+  renameSync(temporaryPath, gamesAdminStorePath);
+}
+
+function validGamesAdminPassword(password) {
+  return typeof password === "string" && password.length >= 6 && /[A-Z]/.test(password) && /\d/.test(password) && /[^A-Za-z0-9]/.test(password);
+}
+
+function hashGamesAdminPassword(password, salt = randomBytes(16).toString("hex")) {
+  return { passwordHash: scryptSync(password, salt, 64).toString("hex"), salt };
+}
+
+function verifyGamesAdminPassword(account, password) {
+  try {
+    const expected = Buffer.from(account.passwordHash, "hex");
+    const actual = scryptSync(password, account.salt, expected.length);
+    return expected.length === actual.length && timingSafeEqual(expected, actual);
+  } catch {
+    return false;
+  }
+}
+
+function requestCookies(request) {
+  return Object.fromEntries(String(request.headers.cookie || "").split(";").map((part) => part.trim().split("=")).filter(([key, value]) => key && value).map(([key, ...value]) => [key, decodeURIComponent(value.join("="))]));
+}
+
+function gamesAdminSession(request) {
+  const token = requestCookies(request).games_admin_session;
+  const session = token ? gamesAdminSessions.get(token) : null;
+  if (!session || session.expiresAt <= Date.now()) {
+    if (token) gamesAdminSessions.delete(token);
+    return null;
+  }
+  session.expiresAt = Date.now() + gamesAdminSessionTtlMs;
+  return { ...session, token };
+}
+
+function gamesAdminCookie(token, maxAge = Math.floor(gamesAdminSessionTtlMs / 1000)) {
+  return `games_admin_session=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}`;
+}
+
+function startGamesAdminSession(email) {
+  const token = randomBytes(32).toString("base64url");
+  gamesAdminSessions.set(token, { email, expiresAt: Date.now() + gamesAdminSessionTtlMs });
+  return token;
 }
 
 function readRequestBody(request) {
@@ -1550,6 +1615,70 @@ function handlePixelLobbyJoin(response, lobbyId) {
 
 async function handleApi(request, response) {
   const url = new URL(request.url || "/", "http://localhost");
+  if (url.pathname === "/api/admin/status" && request.method === "GET") {
+    const account = readGamesAdminAccount();
+    const session = gamesAdminSession(request);
+    sendJson(response, 200, { configured: Boolean(account), email: gamesAdminEmail, authenticated: Boolean(session) });
+    return true;
+  }
+  if (url.pathname === "/api/admin/session" && request.method === "GET") {
+    const session = gamesAdminSession(request);
+    sendJson(response, 200, session ? { authenticated: true, email: session.email } : { authenticated: false });
+    return true;
+  }
+  if (url.pathname === "/api/admin/bootstrap" && request.method === "POST") {
+    if (readGamesAdminAccount()) {
+      sendJson(response, 409, { code: "already_configured", error: "The Games admin account is already configured." });
+      return true;
+    }
+    try {
+      const body = JSON.parse(await readRequestBody(request));
+      const email = String(body.email || "").trim().toLowerCase();
+      const password = typeof body.password === "string" ? body.password : "";
+      if (email !== gamesAdminEmail) {
+        sendJson(response, 400, { code: "invalid_email", error: `Use the bootstrap email ${gamesAdminEmail}.` });
+        return true;
+      }
+      if (!validGamesAdminPassword(password)) {
+        sendJson(response, 400, { code: "weak_password", error: "Password must be at least 6 characters and include an uppercase letter, a number, and a symbol." });
+        return true;
+      }
+      const now = new Date().toISOString();
+      writeGamesAdminAccount({ email: gamesAdminEmail, ...hashGamesAdminPassword(password), createdAt: now, updatedAt: now });
+      const token = startGamesAdminSession(gamesAdminEmail);
+      sendJson(response, 201, { authenticated: true, email: gamesAdminEmail }, { "Set-Cookie": gamesAdminCookie(token) });
+    } catch {
+      sendJson(response, 400, { code: "invalid_payload", error: "Enter the bootstrap email and a valid password." });
+    }
+    return true;
+  }
+  if (url.pathname === "/api/admin/login" && request.method === "POST") {
+    const account = readGamesAdminAccount();
+    if (!account) {
+      sendJson(response, 409, { code: "setup_required", error: "Complete first-run admin setup before signing in." });
+      return true;
+    }
+    try {
+      const body = JSON.parse(await readRequestBody(request));
+      const email = String(body.email || "").trim().toLowerCase();
+      const password = typeof body.password === "string" ? body.password : "";
+      if (email !== gamesAdminEmail || !verifyGamesAdminPassword(account, password)) {
+        sendJson(response, 401, { code: "invalid_credentials", error: "The admin email or password is incorrect." });
+        return true;
+      }
+      const token = startGamesAdminSession(gamesAdminEmail);
+      sendJson(response, 200, { authenticated: true, email: gamesAdminEmail }, { "Set-Cookie": gamesAdminCookie(token) });
+    } catch {
+      sendJson(response, 400, { code: "invalid_payload", error: "Enter your admin email and password." });
+    }
+    return true;
+  }
+  if (url.pathname === "/api/admin/logout" && request.method === "POST") {
+    const token = requestCookies(request).games_admin_session;
+    if (token) gamesAdminSessions.delete(token);
+    sendJson(response, 200, { authenticated: false }, { "Set-Cookie": gamesAdminCookie("", 0) });
+    return true;
+  }
   if (url.pathname === "/api/boombox-health" && request.method === "GET") {
     const storage = (path, kind) => {
       const present = existsSync(path);

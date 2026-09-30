@@ -489,6 +489,20 @@ const pixelCreateLobbyButton = requireElement<HTMLButtonElement>("#pixel-create-
 const pixelLobbyStatus = requireElement<HTMLElement>("#pixel-lobby-status");
 const pixelMenuTurrets = requireElement<HTMLElement>("#pixel-menu-turrets");
 const pixelRotateNotice = requireElement<HTMLElement>("#pixel-rotate-notice");
+const adminOpenButton = requireElement<HTMLButtonElement>("#admin-open");
+const adminPanel = requireElement<HTMLElement>("#admin-panel");
+const adminForm = requireElement<HTMLFormElement>("#admin-form");
+const adminEmailInput = requireElement<HTMLInputElement>("#admin-email");
+const adminPasswordInput = requireElement<HTMLInputElement>("#admin-password");
+const adminConfirmRow = requireElement<HTMLElement>("#admin-confirm-row");
+const adminConfirmPasswordInput = requireElement<HTMLInputElement>("#admin-confirm-password");
+const adminIntro = requireElement<HTMLElement>("#admin-intro");
+const adminPasswordHelp = requireElement<HTMLElement>("#admin-password-help");
+const adminFormMessage = requireElement<HTMLElement>("#admin-form-message");
+const adminSubmitButton = requireElement<HTMLButtonElement>("#admin-submit");
+const adminLogoutButton = requireElement<HTMLButtonElement>("#admin-logout");
+const adminBackButton = requireElement<HTMLButtonElement>("#admin-back");
+const adminSessionNote = requireElement<HTMLElement>("#admin-session-note");
 const reportPanel = requireElement<HTMLElement>("#report-panel");
 const issueForm = requireElement<HTMLFormElement>("#issue-form");
 const issueText = requireElement<HTMLTextAreaElement>("#issue-text");
@@ -5727,6 +5741,76 @@ function addScore(points: number) {
   scoreEl.textContent = formatScore(score);
 }
 
+type GamesAdminStatus = { configured?: boolean; authenticated?: boolean; email?: string };
+let gamesAdminMode: "login" | "setup" = "login";
+
+function setGamesAdminMessage(message: string, error = false) {
+  adminFormMessage.textContent = message;
+  adminFormMessage.style.color = error ? "#ffb5b5" : "";
+}
+
+function renderGamesAdmin(status: GamesAdminStatus) {
+  const authenticated = status.authenticated === true;
+  gamesAdminMode = status.configured === true ? "login" : "setup";
+  adminEmailInput.value = status.email || "ant1982@gmail.com";
+  adminEmailInput.disabled = authenticated;
+  adminPasswordInput.value = "";
+  adminPasswordInput.disabled = authenticated;
+  adminConfirmPasswordInput.value = "";
+  adminConfirmPasswordInput.disabled = authenticated;
+  adminConfirmRow.hidden = authenticated || gamesAdminMode !== "setup";
+  adminPasswordHelp.hidden = authenticated;
+  adminSubmitButton.hidden = authenticated;
+  adminLogoutButton.hidden = !authenticated;
+  adminSessionNote.hidden = !authenticated;
+  adminSessionNote.textContent = authenticated ? `Signed in as ${status.email || "Games admin"}. The balance dashboard will be added in the next pass.` : "";
+  adminIntro.textContent = authenticated ? "Your Games admin session is active." : gamesAdminMode === "setup" ? "Create the isolated Games admin password to continue." : "Sign in to manage the Games platform.";
+  adminSubmitButton.textContent = gamesAdminMode === "setup" ? "Create admin password" : "Sign in";
+  adminPasswordInput.autocomplete = gamesAdminMode === "setup" ? "new-password" : "current-password";
+  setGamesAdminMessage("");
+}
+
+async function loadGamesAdminPanel() {
+  reset("platform");
+  platformPanel.hidden = true;
+  adminPanel.hidden = false;
+  overlay.hidden = false;
+  homeButton.hidden = true;
+  setGamesAdminMessage("Loading admin access...");
+  try {
+    const response = await fetch("/api/admin/status", { cache: "no-store" });
+    const status = (await response.json()) as GamesAdminStatus;
+    if (!response.ok) throw new Error("Admin status unavailable.");
+    renderGamesAdmin(status);
+  } catch {
+    renderGamesAdmin({ configured: true });
+    setGamesAdminMessage("Admin access is temporarily unavailable.", true);
+  }
+}
+
+async function submitGamesAdminForm(event: SubmitEvent) {
+  event.preventDefault();
+  const email = adminEmailInput.value.trim().toLowerCase();
+  const password = adminPasswordInput.value;
+  if (gamesAdminMode === "setup" && password !== adminConfirmPasswordInput.value) {
+    setGamesAdminMessage("The passwords do not match.", true);
+    return;
+  }
+  setGamesAdminMessage(gamesAdminMode === "setup" ? "Creating secure admin access..." : "Signing in...");
+  try {
+    const response = await fetch(gamesAdminMode === "setup" ? "/api/admin/bootstrap" : "/api/admin/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+    const body = (await response.json()) as GamesAdminStatus & { error?: string };
+    if (!response.ok) throw new Error(body.error || "Admin access could not be completed.");
+    renderGamesAdmin({ ...body, configured: true, authenticated: true });
+  } catch (error) {
+    setGamesAdminMessage(error instanceof Error ? error.message : "Admin access could not be completed.", true);
+  }
+}
+
 function updateRollButton() {
   const ready = state === "running" && rollTimer <= 0 && (freeRollAvailable || score >= rollPointCost);
   rollButton.hidden = state !== "running";
@@ -5793,6 +5877,7 @@ function reset(nextState: GameState) {
   bridgeDeadPanel.hidden = true;
   pixelMenuPanel.hidden = true;
   pixelOptionsPanel.hidden = true;
+  adminPanel.hidden = true;
   reportPanel.hidden = true;
   snakeDeadPanel.hidden = true;
   snakeControls.hidden = true;
@@ -7189,6 +7274,18 @@ selectBoomBoxButton.addEventListener("click", () => {
   leaveSnakeRoom();
   leavePixelWarsNetwork();
   boomBoxGame.open();
+});
+adminOpenButton.addEventListener("click", () => void loadGamesAdminPanel());
+adminBackButton.addEventListener("click", () => reset("platform"));
+adminForm.addEventListener("submit", (event) => void submitGamesAdminForm(event));
+adminLogoutButton.addEventListener("click", async () => {
+  adminLogoutButton.disabled = true;
+  try {
+    await fetch("/api/admin/logout", { method: "POST" });
+  } finally {
+    adminLogoutButton.disabled = false;
+    void loadGamesAdminPanel();
+  }
 });
 snakeOptionsButton.addEventListener("click", showSnakeOptions);
 snakeMenuBackButton.addEventListener("click", () => reset("platform"));
