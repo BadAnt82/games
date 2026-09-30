@@ -1,19 +1,27 @@
-import { readFileSync } from "node:fs";
 import { spawn } from "node:child_process";
+import { BOOM_BOX_RULES_VERSION, BOOM_BOX_UTILITY_CATALOG, BOOM_BOX_WEAPON_CATALOG } from "../boombox-rules.mjs";
 
 const port = 4324;
 const server = spawn(process.execPath, ["server.mjs"], { env: { ...process.env, PORT: String(port) }, stdio: ["ignore", "pipe", "pipe"] });
+let serverError = "";
+server.stderr.on("data", (chunk) => { serverError += chunk.toString(); });
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+async function getJson(path) {
+  let lastError;
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    try { const response = await fetch(`http://localhost:${port}${path}`); if (response.ok) return response.json(); lastError = new Error(`HTTP ${response.status}`); } catch (error) { lastError = error; }
+    await wait(150);
+  }
+  throw new Error(`${lastError?.message || `Unable to reach ${path}`} ${serverError}`);
+}
 try {
-  await wait(700);
-  const rules = await (await fetch(`http://localhost:${port}/api/boombox-rules`)).json();
-  const health = await (await fetch(`http://localhost:${port}/api/boombox-health`)).json();
-  const source = readFileSync(new URL("../src/boom-box.ts", import.meta.url), "utf8");
-  const clientSection = source.slice(source.indexOf("const WEAPONS"), source.indexOf("const UTILITIES"));
-  const clientIds = [...clientSection.matchAll(/^\s*(?:"([a-z0-9-]+)"|([a-z0-9-]+))\s*:/gim)].map((match) => match[1] || match[2]).filter((id) => id !== "Record").sort();
+  const rules = await getJson("/api/boombox-rules");
+  const health = await getJson("/api/boombox-health");
+  const clientIds = Object.keys(BOOM_BOX_WEAPON_CATALOG).sort();
   const serverIds = Object.keys(rules.weapons || {}).sort();
   if (JSON.stringify(clientIds) !== JSON.stringify(serverIds)) throw new Error(`Solo and server weapon catalogs drifted: client=${clientIds.join(",")} server=${serverIds.join(",")}`);
-  if (rules.version !== 2 || rules.weapons["bouncing-bomb"]?.mode !== "bounce" || !source.includes('description: "Bounces off walls and terrain."')) throw new Error("Bouncing weapon parity contract is incomplete");
+  if (rules.version !== BOOM_BOX_RULES_VERSION || rules.version !== 3 || rules.weapons["bouncing-bomb"]?.mode !== "bounce" || BOOM_BOX_WEAPON_CATALOG["bouncing-bomb"]?.description !== "Bounces off walls and terrain.") throw new Error("Bouncing weapon parity contract is incomplete");
+  if (JSON.stringify(Object.keys(BOOM_BOX_UTILITY_CATALOG).sort()) !== JSON.stringify(Object.keys(rules.utilities || {}).sort())) throw new Error("Solo and server utility catalogs drifted");
   if (health.status !== "ok" || health.rulesVersion !== rules.version || health.persistence?.activeRooms?.writable !== true || health.persistence?.history?.writable !== true) throw new Error(`Persistence health contract failed: ${JSON.stringify(health)}`);
   console.log(`Boom Box parity check passed: ${serverIds.length} weapon IDs match, bouncing rules align, and persistence health is writable.`);
 } finally {

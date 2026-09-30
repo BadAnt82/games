@@ -3,6 +3,7 @@ import { createServer } from "node:http";
 import { extname, join, normalize, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { WebSocket, WebSocketServer } from "ws";
+import { BOOM_BOX_RULES_VERSION as BOOMBOX_RULES_VERSION, BOOM_BOX_WEAPON_CATALOG as BOOMBOX_WEAPON_CATALOG, BOOM_BOX_UTILITY_CATALOG as BOOMBOX_UTILITY_CATALOG, boomBoxInitialCapacity, boomBoxInitialInventory, boomBoxRulesFromConfig, boomBoxTerrain } from "./boombox-rules.mjs";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const distDir = resolve(__dirname, "dist");
@@ -1830,68 +1831,6 @@ function restoreBoomBoxRooms() {
 }
 
 function boomBoxRoomId() { return `BB-${String(nextBoomBoxRoomId++).padStart(4, "0")}`; }
-function boomBoxTerrain(seed, profile = "sunset-range") {
-  let value = seed >>> 0; const random = () => { value = (value * 1664525 + 1013904223) >>> 0; return value / 4294967296; };
-  const baseline = profile === "ice-shelf" ? 342 : profile === "lunar-crater" ? 378 : 365; const roughness = profile === "ice-shelf" ? 16 : profile === "lunar-crater" ? 34 : 24;
-  const terrain = Array.from({ length: 960 }, (_, x) => Math.max(245, Math.min(450, baseline + Math.sin(x / 82) * 28 + Math.sin(x / 31 + 1.4) * 12 + (random() - .5) * roughness)));
-  for (let pass = 0; pass < 3; pass += 1) for (let x = 1; x < terrain.length - 1; x += 1) terrain[x] = (terrain[x - 1] + terrain[x] + terrain[x + 1]) / 3;
-  return terrain;
-}
-const BOOMBOX_RULES_VERSION = 2;
-const BOOMBOX_WEAPON_CATALOG = {
-  cannon: { label: "Cannon", cost: 0, inventory: 99, starter: 99, damage: 70, radius: 58, depth: 24, mode: "single" },
-  "heavy-cannon": { label: "Heavy cannon", cost: 45, inventory: 2, damage: 82, radius: 72, depth: 36, mode: "single", speed: .86 },
-  "heavy-shell": { label: "Heavy shell", cost: 30, inventory: 2, damage: 78, radius: 84, depth: 40, mode: "single", speed: .9 },
-  "precision-round": { label: "Precision round", cost: 20, inventory: 3, damage: 92, radius: 34, depth: 12, mode: "single", speed: 1.18 },
-  "split-shell": { label: "Split shell", cost: 25, inventory: 3, damage: 54, radius: 42, depth: 24, mode: "spread", count: 2, spread: 7 },
-  "mini-nuke": { label: "Mini nuke", cost: 70, inventory: 1, damage: 100, radius: 150, depth: 68, mode: "area", speed: .72 },
-  mirv: { label: "MIRV", cost: 65, inventory: 1, damage: 54, radius: 54, depth: 28, mode: "spread", count: 3, spread: 10 },
-  "triple-shot": { label: "Triple shot", cost: 50, inventory: 2, damage: 44, radius: 38, depth: 18, mode: "spread", count: 3, spread: 14 },
-  "bouncing-bomb": { label: "Bouncing bomb", cost: 40, inventory: 2, damage: 64, radius: 52, depth: 30, mode: "bounce", bounces: 5 },
-  "riot-bomb": { label: "Riot bomb", cost: 35, inventory: 2, damage: 58, radius: 68, depth: 34, mode: "impact" },
-  "piercing-round": { label: "Piercing round", cost: 40, inventory: 2, damage: 78, radius: 36, depth: 20, mode: "piercing", ignoreTerrain: true, speed: .92 },
-  napalm: { label: "Napalm", cost: 55, inventory: 2, damage: 40, radius: 62, depth: 16, mode: "napalm", burningTurns: 2 },
-  "smoke-shell": { label: "Smoke shell", cost: 20, inventory: 2, damage: 0, radius: 80, depth: 0, mode: "smoke", material: "smoke" },
-  "liquid-dirt": { label: "Liquid dirt", cost: 25, inventory: 2, damage: 0, radius: 74, depth: -32, mode: "filler", material: "liquid-dirt" },
-  "terrain-tool": { label: "Terrain tool", cost: 15, inventory: 2, damage: 0, radius: 76, depth: -26, mode: "filler", material: "reinforced" },
-  "terrain-remover": { label: "Terrain remover", cost: 20, inventory: 2, damage: 0, radius: 88, depth: 56, mode: "remover", material: "excavated" },
-  "tracer-round": { label: "Tracer round", cost: 28, inventory: 2, damage: 62, radius: 30, depth: 18, mode: "guided", guided: true, speed: 1.1 },
-  "laser-line": { label: "Laser line", cost: 60, inventory: 1, damage: 74, radius: 8, depth: 0, mode: "laser", ignoreTerrain: true },
-  "area-charge": { label: "Area charge", cost: 40, inventory: 1, damage: 68, radius: 110, depth: 48, mode: "area" },
-};
-const BOOMBOX_UTILITY_CATALOG = {
-  "repair-kit": { label: "Repair kit", cost: 20, inventory: 2, starter: 1, effect: "repair", amount: 30 },
-  shield: { label: "Light shield", cost: 25, inventory: 2, starter: 1, effect: "shield", amount: 35 },
-  "heavy-shield": { label: "Heavy shield", cost: 45, inventory: 1, effect: "shield", amount: 70 },
-  "shield-recharge": { label: "Shield recharge", cost: 30, inventory: 2, effect: "shield-recharge", amount: 25 },
-  "terrain-lift": { label: "Terrain lift", cost: 15, inventory: 2, starter: 1, effect: "terrain-lift" },
-  parachute: { label: "Parachute", cost: 15, inventory: 2, starter: 1, effect: "parachute" },
-  "fuel-canister": { label: "Fuel canister", cost: 15, inventory: 2, effect: "fuel", amount: 50 },
-  "guidance-kit": { label: "Guidance kit", cost: 30, inventory: 1, effect: "guidance" },
-  "turret-upgrade": { label: "Turret upgrade", cost: 50, inventory: 1, effect: "turret-upgrade" },
-};
-function boomBoxRulesFromConfig(config = {}) {
-  const firingModes = new Set(["sequential", "synchronous", "simultaneous"]);
-  const boundaries = new Set(["stop", "bounce", "wrap"]);
-  const pace = ["relaxed", "standard", "blitz"].includes(String(config.pace)) ? String(config.pace) : "standard";
-  const aiDifficulty = ["recruit", "veteran", "ace", "expert"].includes(String(config.aiDifficulty)) ? String(config.aiDifficulty) : "veteran";
-  return {
-    version: BOOMBOX_RULES_VERSION,
-    seats: Math.max(2, Math.min(10, Number(config.seats) || 2)),
-    firingMode: firingModes.has(String(config.firingMode)) ? String(config.firingMode) : "sequential",
-    movement: Boolean(config.movement) && String(config.firingMode || "sequential") === "sequential",
-    gravity: Math.max(60, Math.min(260, Number(config.gravity) || 150)),
-    windMode: config.windMode === "fixed" ? "fixed" : "variable",
-    windLimit: Math.max(0, Math.min(2, Number(config.windLimit) || 1.2)),
-    boundary: boundaries.has(String(config.boundary)) ? String(config.boundary) : "stop",
-    startingMoney: Math.max(0, Math.min(10000, Number(config.startingMoney) || 100)),
-    turnPace: pace,
-    aiDifficulty,
-    events: { meteorShower: Boolean(config.events?.meteorShower), scenery: Boolean(config.events?.scenery) },
-    weaponCatalog: Object.fromEntries(Object.entries(BOOMBOX_WEAPON_CATALOG).filter(([id]) => !Array.isArray(config.disabledWeapons) || !config.disabledWeapons.includes(id))),
-    utilityCatalog: Object.fromEntries(Object.entries(BOOMBOX_UTILITY_CATALOG).filter(([id]) => !Array.isArray(config.disabledUtilities) || !config.disabledUtilities.includes(id))),
-  };
-}
 function boomBoxSend(socket, payload) { if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify(payload)); }
 function boomBoxPublicRoom(room, userId = "") { return { gameId: room.gameId, name: room.name, creator: room.creator, seats: room.seats.length, connected: room.seats.filter((seat) => seat.connected).length, spectators: room.spectators?.size || 0, terrain: room.terrain, pace: room.rules?.turnPace || room.pace, firingMode: room.rules?.firingMode || "sequential", aiFill: room.aiFill, aiSeats: Array.isArray(room.aiSeats) ? room.aiSeats : [], started: room.started, phase: room.phase, mine: userId === room.ownerUserId, inviteToken: userId === room.ownerUserId ? room.inviteToken : "", resumable: room.seats.some((seat) => seat.userId === userId && Boolean(seat.sessionId)) }; }
 function boomBoxLobbyPayload(userId = "") { const games = [...boomboxRooms.values()].map((room) => boomBoxPublicRoom(room, userId)); return { type: "boombox-lobby-list", games, created: games.filter((room) => room.mine), available: games.filter((room) => !room.mine && (!room.started ? room.connected < room.seats : true)) }; }
@@ -1903,8 +1842,6 @@ function broadcastBoomBoxRoom(room) { const snapshot = boomBoxSnapshot(room); fo
 function boomBoxReplaySnapshot(room) { return { sequence: room.state.log.at(-1)?.sequence || 0, turn: room.state.turn, turnSeat: room.state.turnSeat, phase: room.phase, terrain: room.state.terrain.filter((_, index) => index % 6 === 0), terrainSolid: room.state.terrainSolid.filter((_, index) => index % 6 === 0), terrainMaterial: room.state.terrainMaterial.filter((_, index) => index % 6 === 0), players: room.state.players.map(({ socket, ...player }) => ({ ...player })), eliminationOrder: room.state.eliminationOrder, placements: room.state.placements, aiIntent: room.state.aiIntent || null, events: room.state.log.slice(-25).map((event) => ({ ...event })) }; }
 function boomBoxRecordReplay(room) { if (!room.state) return; room.state.replay.push(boomBoxReplaySnapshot(room)); if (room.state.replay.length > 100) room.state.replay.shift(); }
 function boomBoxRecordHistory(room) { if (!room.state || room.historyRecorded) return; room.historyRecorded = true; boomBoxHistory.push({ gameId: room.gameId, name: room.name, creator: room.creator, terrain: room.terrain, seed: room.seed, rules: room.rules, finishedAt: new Date().toISOString(), winner: room.state.winner, eliminationOrder: room.state.eliminationOrder, placements: room.state.placements, players: room.state.players.map(({ socket, ...player }) => player), terrainData: room.state.terrain, terrainSolid: room.state.terrainSolid, terrainMaterial: room.state.terrainMaterial, replay: room.state.replay, log: room.state.log }); writeBoomBoxHistory(boomBoxHistory); }
-function boomBoxInitialInventory(catalog) { return Object.fromEntries(Object.entries(catalog).map(([id, item]) => [id, Math.max(0, Number(item.starter) || 0)])); }
-function boomBoxInitialCapacity(catalog) { return Object.fromEntries(Object.entries(catalog).map(([id, item]) => [id, Math.max(0, Number(item.inventory) || 0)])); }
 function createBoomBoxState(room) { const positions = room.seats.length === 2 ? [146, 814] : room.seats.map((_, index) => 146 + Math.round(index * (814 - 146) / Math.max(1, room.seats.length - 1))); const colors = ["#54e7ff", "#ff8b63", "#d98cff", "#b8f266", "#ffd166", "#f78fb3", "#8be9fd", "#ff79c6", "#50fa7b", "#f1fa8c"]; const inventory = boomBoxInitialInventory(room.rules.weaponCatalog); const utilities = boomBoxInitialInventory(room.rules.utilityCatalog); return { terrain: boomBoxTerrain(room.seed, room.terrain), terrainSolid: Array(960).fill(true), terrainMaterial: Array(960).fill("dirt"), wind: room.rules.windMode === "fixed" ? 0 : (room.seed % 17 - 8) / 10, turn: 1, turnSeat: 0, actionSequence: 0, winner: null, outcome: "in-progress", eliminationOrder: [], placements: [], aiIntent: null, log: [], replay: [], players: room.seats.map((seat, index) => ({ name: seat.name, x: positions[index], y: 0, turretAngle: 42, power: 58, health: 100, maxHealth: 100, alive: true, falling: false, buried: false, fallDistance: 0, burning: 0, color: colors[index % colors.length], shots: 0, hits: 0, damage: 0, damageTaken: 0, shield: 0, fuel: 100, movedThisTurn: false, money: room.rules.startingMoney, inventory: { ...inventory }, inventoryCapacity: boomBoxInitialCapacity(room.rules.weaponCatalog), utilities: { ...utilities }, utilityCapacity: boomBoxInitialCapacity(room.rules.utilityCatalog), upgrades: {}, eliminatedAtTurn: null, eliminationOrder: null, placement: null, stats: { shots: 0, hits: 0, damage: 0, terrainChanges: 0, purchases: 0 } })) }; }
 function startBoomBoxRoom(room) { room.started = true; room.phase = "turn-prep"; room.resolving = false; room.pendingActions = new Map(); room.state = createBoomBoxState(room); room.state.players.forEach((player) => { player.y = room.state.terrain[player.x] - 17; }); boomBoxSeedScenery(room); room.updatedAt = Date.now(); room.turnDeadlineAt = null; scheduleBoomBoxTurnDeadline(room); broadcastBoomBoxRoom(room); scheduleBoomBoxAi(room); }
 function fillBoomBoxAi(room) { for (const [index, seat] of room.seats.entries()) if (!seat.connected && room.aiSeats?.includes(index)) { seat.connected = true; seat.bot = true; seat.name = `AI ${seat.name}`; } if (room.seats.every((seat) => seat.connected)) startBoomBoxRoom(room); else { room.updatedAt = Date.now(); broadcastBoomBoxLobby(); writeBoomBoxRooms(); } }
