@@ -298,11 +298,11 @@ export function initBoomBox() {
     const weapons = rules.weaponCatalog || {};
     weaponInput.replaceChildren(...Object.entries(weapons).map(([id, item]: any) => { const option = document.createElement("option"); option.value = id; const owned = inventory[id as WeaponId] || 0; const capacity = Number(item.inventory) || 0; option.textContent = `${item.label || id} · ${item.cost ? `${item.cost} cr` : "included"} · ${owned}/${capacity} · ${item.description || ""}`; return option; }));
     const utilityRules = rules.utilityCatalog || {};
-    utilityInput.replaceChildren(...Object.entries(utilityRules).map(([id, item]: any) => { const option = document.createElement("option"); option.value = id; const owned = utilities[id as UtilityId] || 0; const capacity = Number(item.inventory) || 0; option.textContent = `${item.label || id} · ${item.cost || 0} cr · ${owned}/${capacity} · ${item.description || ""}`; return option; }));
+    utilityInput.replaceChildren(...Object.entries(utilityRules).map(([id, item]: any) => { const option = document.createElement("option"); option.value = id; const owned = utilities[id as UtilityId] || 0; const capacity = Number(item.inventory) || 0; option.textContent = `${item.label || id} · ${item.cost || 0} cr · ${owned}/${capacity} · ${item.description || ""} ${item.economy || "Match-local purchase; limited by capacity."}`; return option; }));
   }
   function populateSoloWeaponCatalog() {
     const selected = soloWeaponInput.value;
-    soloWeaponInput.replaceChildren(...Object.entries(WEAPONS).map(([id, item]: any) => { const option = document.createElement("option"); option.value = id; option.textContent = `${item.label} · ${item.cost ? `${item.cost} credits` : "included"}`; return option; }));
+    soloWeaponInput.replaceChildren(...Object.entries(WEAPONS).map(([id, item]: any) => { const option = document.createElement("option"); option.value = id; option.textContent = `${item.label} · ${item.cost ? `${item.cost} credits` : "included"} · ${item.economy || "Match-local purchase; limited by capacity."}`; return option; }));
     soloWeaponInput.value = Object.prototype.hasOwnProperty.call(WEAPONS, selected) ? selected : "cannon";
   }
   function applyNetworkLoadout(loadout: any) {
@@ -464,11 +464,11 @@ export function initBoomBox() {
     const weaponCards = (Object.keys(WEAPONS) as WeaponId[]).filter((id) => id !== "cannon").map((id) => {
       const card = document.createElement("article"); card.className = "boombox-shop-card";
       const title = document.createElement("strong"); title.textContent = WEAPONS[id].label;
-      const capacity = Number(WEAPONS[id].inventory) || 0; const owned = Number(shopInventory[id]) || 0; const description = document.createElement("small"); description.textContent = `${WEAPONS[id].description} ${WEAPONS[id].cost} credits per shot · ${owned}/${capacity} loaded.`;
+      const capacity = Number(WEAPONS[id].inventory) || 0; const owned = Number(shopInventory[id]) || 0; const description = document.createElement("small"); description.textContent = `${WEAPONS[id].description} ${WEAPONS[id].economy || "Match-local purchase; limited by capacity."} ${WEAPONS[id].cost} credits per shot · ${owned}/${capacity} loaded.`;
       const button = document.createElement("button"); button.type = "button"; button.textContent = owned >= capacity ? "Capacity reached" : `Buy for ${WEAPONS[id].cost}`; button.disabled = owned >= capacity || shopCredits < WEAPONS[id].cost; button.addEventListener("click", () => { if (button.disabled) return; shopCredits -= WEAPONS[id].cost; shopInventory[id] = Math.min(capacity, owned + 1); renderShop(); });
       card.append(title, description, button); return card;
     });
-    const utilityCards = (Object.keys(UTILITIES) as UtilityId[]).map((id) => { const card = document.createElement("article"); card.className = "boombox-shop-card"; const title = document.createElement("strong"); title.textContent = UTILITIES[id].label; const description = document.createElement("small"); description.textContent = `${UTILITIES[id].description} ${UTILITIES[id].cost} credits.`; const button = document.createElement("button"); button.type = "button"; button.className = "secondary"; button.textContent = "Available in match utilities"; button.disabled = true; card.append(title, description, button); return card; });
+    const utilityCards = (Object.keys(UTILITIES) as UtilityId[]).map((id) => { const card = document.createElement("article"); card.className = "boombox-shop-card"; const title = document.createElement("strong"); title.textContent = UTILITIES[id].label; const description = document.createElement("small"); description.textContent = `${UTILITIES[id].description} ${UTILITIES[id].economy || "Match-local purchase; limited by capacity."} ${UTILITIES[id].cost} credits.`; const button = document.createElement("button"); button.type = "button"; button.className = "secondary"; button.textContent = "Available in match utilities"; button.disabled = true; card.append(title, description, button); return card; });
     shopList.replaceChildren(...weaponCards, ...utilityCards);
   }
 

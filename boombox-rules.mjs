@@ -17,9 +17,9 @@ export const BOOM_BOX_WEAPON_CATALOG = {
   "riot-bomb": { label: "Riot bomb", cost: 35, inventory: 2, damage: 58, directDamage: 58, splashDamage: 58, radius: 68, depth: 34, mode: "impact", speed: 1, description: "Strong close-range impact." },
   "piercing-round": { label: "Piercing round", cost: 40, inventory: 2, damage: 78, directDamage: 78, splashDamage: 24, radius: 36, depth: 20, mode: "piercing", ignoreTerrain: true, speed: .92, description: "Cuts through terrain." },
   napalm: { label: "Napalm", cost: 55, inventory: 2, damage: 40, directDamage: 40, splashDamage: 32, radius: 62, depth: 16, mode: "napalm", burningTurns: 2, speed: .9, description: "Leaves a burning target effect." },
-  "smoke-shell": { label: "Smoke shell", cost: 20, inventory: 2, damage: 0, directDamage: 0, splashDamage: 0, radius: 80, depth: 0, mode: "smoke", material: "smoke", speed: 1, description: "Creates a smoke-covered impact zone." },
+  "smoke-shell": { label: "Smoke shell", cost: 20, inventory: 2, damage: 0, directDamage: 0, splashDamage: 0, radius: 80, depth: 0, mode: "smoke", material: "smoke", smokeTurns: 3, smokeDamageMultiplier: .7, speed: 1, economy: "Low-cost cover; best before a risky shot.", description: "Creates a smoke-covered impact zone that reduces incoming damage." },
   "liquid-dirt": { label: "Liquid dirt", cost: 25, inventory: 2, damage: 0, directDamage: 0, splashDamage: 0, radius: 74, depth: -32, mode: "filler", material: "liquid-dirt", speed: .9, description: "Adds raised terrain for cover." },
-  "terrain-tool": { label: "Terrain tool", cost: 15, inventory: 2, damage: 0, directDamage: 0, splashDamage: 0, radius: 76, depth: -26, mode: "filler", material: "reinforced", speed: .9, description: "Raises reinforced terrain." },
+  "terrain-tool": { label: "Terrain tool", cost: 15, inventory: 2, damage: 0, directDamage: 0, splashDamage: 0, radius: 120, depth: -26, mode: "filler", material: "reinforced", reinforcedDamageMultiplier: .75, speed: .9, economy: "Cheap cover that trades damage for position.", description: "Raises reinforced terrain that absorbs part of blast damage." },
   "terrain-remover": { label: "Terrain remover", cost: 20, inventory: 2, damage: 0, directDamage: 0, splashDamage: 0, radius: 88, depth: 56, mode: "remover", material: "excavated", speed: .9, description: "Digs a broad trench." },
   "tracer-round": { label: "Tracer round", cost: 28, inventory: 2, damage: 62, directDamage: 62, splashDamage: 26, radius: 30, depth: 18, mode: "guided", guided: true, speed: 1.1, description: "Guides toward the marked target." },
   "laser-line": { label: "Laser line", cost: 60, inventory: 1, damage: 74, directDamage: 74, splashDamage: 0, radius: 8, depth: 0, mode: "laser", ignoreTerrain: true, speed: 1.4, description: "Instant line attack." },
@@ -27,13 +27,13 @@ export const BOOM_BOX_WEAPON_CATALOG = {
 };
 
 export const BOOM_BOX_UTILITY_CATALOG = {
-  "repair-kit": { label: "Repair kit", cost: 20, inventory: 2, starter: 1, effect: "repair", amount: 30, description: "Restore 30 health." },
+  "repair-kit": { label: "Repair kit", cost: 20, inventory: 2, starter: 1, effect: "repair", amount: 30, economy: "Reliable recovery after a direct hit.", description: "Restore 30 health." },
   shield: { label: "Light shield", cost: 25, inventory: 2, starter: 1, effect: "shield", amount: 35, description: "Absorb 35 damage." },
   "heavy-shield": { label: "Heavy shield", cost: 45, inventory: 1, effect: "shield", amount: 70, description: "Absorb 70 damage." },
   "shield-recharge": { label: "Shield recharge", cost: 30, inventory: 2, effect: "shield-recharge", amount: 25, description: "Restore 25 shield." },
   "terrain-lift": { label: "Terrain lift", cost: 15, inventory: 2, starter: 1, effect: "terrain-lift", description: "Raise reinforced cover." },
   parachute: { label: "Parachute", cost: 15, inventory: 2, starter: 1, effect: "parachute", description: "Protect the next terrain fall." },
-  "fuel-canister": { label: "Fuel canister", cost: 15, inventory: 2, effect: "fuel", amount: 50, description: "Restore 50 movement fuel." },
+  "fuel-canister": { label: "Fuel canister", cost: 15, inventory: 2, effect: "fuel", amount: 50, economy: "Keeps movement available in long matches.", description: "Restore 50 movement fuel." },
   "guidance-kit": { label: "Guidance kit", cost: 30, inventory: 1, effect: "guidance", description: "Adds steering to later shots." },
   "turret-upgrade": { label: "Turret upgrade", cost: 50, inventory: 1, effect: "turret-upgrade", description: "Permanent turret upgrade slot." },
 };

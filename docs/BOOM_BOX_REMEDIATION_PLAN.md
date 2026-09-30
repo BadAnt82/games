@@ -83,6 +83,8 @@
 
 **Exit evidence:** every catalogue item has a distinct authoritative effect, inventory and purchase path, player-facing explanation, deterministic fixture, and AI decision coverage where legal; elimination causes and standings remain correct after secondary effects.
 
+**Status:** Complete. Evidence is recorded in [BOOM_BOX_PACKAGE_D_CONTENT.md](./BOOM_BOX_PACKAGE_D_CONTENT.md).
+
 **Out of scope:** browser viewport certification, original presentation assets, Coolify operations, and archive scaling.
 
 ### Package E — browser, multiplayer, and device acceptance
