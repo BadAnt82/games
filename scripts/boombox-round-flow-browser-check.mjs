@@ -32,11 +32,26 @@ try {
   await page.locator("#boombox-weapon").selectOption("mini-nuke");
   await page.locator("#boombox-fire").click();
   await page.waitForTimeout(500);
+  let destructionSeen = false;
   for (let attempt = 0; attempt < 5 && !(await page.locator("#boombox-intermission-panel").isVisible()); attempt += 1) {
-    await page.waitForFunction(() => !document.querySelector("#boombox-intermission-panel")?.hasAttribute("hidden") || !document.querySelector("#boombox-fire")?.disabled, null, { timeout: 30000 });
-    if (!(await page.locator("#boombox-intermission-panel").isVisible())) await page.locator("#boombox-fire").click();
+    await page.waitForFunction(() => {
+      const fire = document.querySelector("#boombox-fire");
+      return document.querySelector("#boombox-canvas")?.getAttribute("data-destruction-effect") === "active"
+        || !document.querySelector("#boombox-intermission-panel")?.hasAttribute("hidden")
+        || (fire instanceof HTMLElement && fire.offsetParent !== null && !fire.hasAttribute("disabled"));
+    }, null, { timeout: 30000 });
+    if (await page.locator("#boombox-canvas").getAttribute("data-destruction-effect") === "active") { destructionSeen = true; await page.waitForFunction(() => document.querySelector("#boombox-canvas")?.getAttribute("data-destruction-effect") !== "active", null, { timeout: 8000 }); }
+    if (!(await page.locator("#boombox-intermission-panel").isVisible())) {
+      await page.waitForFunction(() => {
+        const fire = document.querySelector("#boombox-fire");
+        return !document.querySelector("#boombox-intermission-panel")?.hasAttribute("hidden")
+          || (fire instanceof HTMLElement && fire.offsetParent !== null && !fire.hasAttribute("disabled"));
+      }, null, { timeout: 30000 });
+      if (!(await page.locator("#boombox-intermission-panel").isVisible())) await page.locator("#boombox-fire").click();
+    }
   }
   if (!(await page.locator("#boombox-intermission-panel").isVisible())) { const diagnostic = await page.evaluate(() => ({ status: document.querySelector("#boombox-match-status")?.textContent, round: document.querySelector("#boombox-match-round")?.textContent, player: document.querySelector("#boombox-player-health-value")?.textContent, opponents: document.querySelector("#boombox-opponent-health-list")?.textContent, resultVisible: !document.querySelector("#boombox-result-panel")?.hasAttribute("hidden"), fireDisabled: document.querySelector("#boombox-fire")?.disabled })); throw new Error(`Round did not reach intermission: ${JSON.stringify(diagnostic)}`); }
+  if (!destructionSeen) throw new Error("The destroyed tank did not enter the visible explosion/removal state before intermission");
   if (await page.locator("#boombox-result-panel").isVisible()) throw new Error("A non-final elimination opened the final result panel");
   if ((await page.locator("#boombox-standings .boombox-standings-row").count()) !== 3) throw new Error("The two-player intermission standings were not rendered");
   const standingsText = await page.locator("#boombox-standings").innerText();
@@ -65,7 +80,7 @@ try {
   if ((await page.locator("#boombox-match-round").textContent())?.trim() !== "Round 2 / 3") throw new Error(`Ready-up did not begin Round 2: ${await page.locator("#boombox-match-round").textContent()}`);
   const roundTwoCredits = Number(await page.locator("#boombox-credits").innerText());
   if (roundTwoCredits !== postShopCredits + Math.floor(postShopCredits * .1)) throw new Error(`Round-start interest was incorrect: ${roundTwoCredits}`);
-  console.log(`Boom Box round-flow browser check passed${externalBase ? " live" : ""}: elimination stayed authoritative, intermission rankings/shop appeared legibly without viewport overflow, and Round 2 began with post-shop interest.`);
+  console.log(`Boom Box round-flow browser check passed${externalBase ? " live" : ""}: full-turn counting stayed authoritative, the destroyed tank exploded and left the board, intermission rankings/shop rendered without overflow, and Round 2 began with post-shop interest.`);
 } finally {
   await browser?.close();
   server?.kill();

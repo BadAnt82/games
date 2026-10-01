@@ -2,6 +2,13 @@
 
 This is the handoff record for Boom Box only. Each entry records the product-facing result and the verification that accompanied it. Detailed pass reports remain in the linked `docs/BOOM_BOX_*.md` files.
 
+## 2026-10-01 — Turn-cycle and destruction presentation (working tree)
+
+- Define one displayed turn as one complete cycle in which every living commander acts once; sequential matches advance on seat-order wrap and simultaneous matches advance once per resolved volley.
+- Reset the turn counter to Turn 1 at each new round and change variable wind/environment effects only when a complete turn finishes.
+- Hide a destroyed tank at impact, hold a visible explosion in its place, and keep eliminated tanks off the battlefield for the remainder of the round.
+- Verification passed: production build; sequential and simultaneous turn-cycle protocol checks; rules, persistence, AI, outcome, and scale suites; destruction/intermission browser flow; and 4/6/10-player browser matrices.
+
 ## 2026-10-01 — Ten-player solo setup (working tree)
 
 - Raise solo setup from three rivals to nine rivals so solo and multiplayer both support ten total commanders.

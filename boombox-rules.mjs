@@ -1,7 +1,7 @@
 // Shared Boom Box rules contract. The browser and authoritative server import
 // this module so catalogue ids, effects, inventory limits, and seeded terrain
 // cannot drift between execution paths.
-export const BOOM_BOX_RULES_VERSION = 5;
+export const BOOM_BOX_RULES_VERSION = 6;
 export const BOOM_BOX_CANVAS = { width: 960, height: 540 };
 
 // Theme and asset IDs are deliberately data, so artwork can be replaced later

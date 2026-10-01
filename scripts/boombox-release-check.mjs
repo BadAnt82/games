@@ -95,7 +95,7 @@ async function verifyPreparedMode(mode, suffix) {
   const preparedPromise = next(host, "boombox-state", (message) => message.snapshot?.phase === "prepare" && message.snapshot.preparedSeats?.includes(0));
   host.send(JSON.stringify({ type: "boombox-action", userId: hostId, actionId: `${mode}-host-1`, action: { targetIndex: 1, weapon: "cannon", angle: 42, power: 58 } }));
   const prepared = await preparedPromise;
-  if (prepared.snapshot.log.some((entry) => entry.kind === "fire")) throw new Error(`${mode} resolved before every commander prepared`);
+  if (prepared.snapshot.log.some((entry) => entry.kind === "fire") || prepared.snapshot.turn !== 1) throw new Error(`${mode} resolved or advanced the turn before every commander prepared`);
   const hostFlightPromise = next(host, "boombox-flight-bundle", (message) => message.flights?.length === 2, 7000);
   const guestFlightPromise = next(guest, "boombox-flight-bundle", (message) => message.flights?.length === 2, 7000);
   const releasedPromise = next(host, "boombox-state", (message) => ["turn-prep", "finished"].includes(message.snapshot?.phase) && message.snapshot.log.filter((entry) => entry.kind === "fire").length >= 2, 7000);
@@ -108,7 +108,7 @@ async function verifyPreparedMode(mode, suffix) {
   guest.send(JSON.stringify({ type: "boombox-flight-ack", userId: guestId, gameId: created.gameId, bundleId: guestFlight.bundleId }));
   const released = await releasedPromise;
   const fireEvents = released.snapshot.log.filter((entry) => entry.kind === "fire");
-  if (released.snapshot.rules?.firingMode !== mode || fireEvents.length !== 2 || fireEvents[0].resolutionOrder !== 1 || fireEvents[1].resolutionOrder !== 2 || fireEvents[0].seat !== 0 || fireEvents[1].seat !== 1) throw new Error(`${mode} did not release both prepared actions deterministically`);
+  if (released.snapshot.rules?.firingMode !== mode || released.snapshot.turn !== 2 || fireEvents.length !== 2 || fireEvents[0].resolutionOrder !== 1 || fireEvents[1].resolutionOrder !== 2 || fireEvents[0].seat !== 0 || fireEvents[1].seat !== 1) throw new Error(`${mode} did not release both prepared actions as one complete turn`);
   close(host); close(guest);
 }
 
@@ -219,7 +219,7 @@ try {
   const active = await open();
   const activeCreated = await createRoom(active, activeId, { name: `Active ${suffix}`, creator: "Active Host", seats: 2, aiFill: true, aiDifficulty: "expert", firingMode: "sequential", seed: 123456 });
   const activeState = await startAi(active, activeCreated.gameId, activeId);
-  if (activeState.snapshot.rules?.version !== 5 || activeState.snapshot.players.length !== 2) throw new Error("Started room did not expose versioned state");
+  if (activeState.snapshot.rules?.version !== 6 || activeState.snapshot.players.length !== 2) throw new Error("Started room did not expose versioned state");
   await waitForPersistedRoom(activeCreated.gameId, true);
   const persistedActive = JSON.parse(readFileSync(roomStore, "utf8")).find((room) => room.gameId === activeCreated.gameId);
   if (persistedActive?.schemaVersion !== 2 || !Number.isFinite(Number(persistedActive.turnDeadlineAt))) throw new Error("Active room persistence did not include the versioned turn deadline");
@@ -233,7 +233,7 @@ try {
   restored.send(JSON.stringify({ type: "boombox-join", gameId: activeCreated.gameId, userId: activeId, sessionId: activeSession, name: "Active Host" }));
   await restoredJoinPromise;
   const restoredState = await restoredStatePromise;
-  if (restoredState.snapshot.rules?.version !== 5 || restoredState.snapshot.players.length !== 2 || restoredState.snapshot.gameId !== activeCreated.gameId) throw new Error("Started room state did not survive restart");
+  if (restoredState.snapshot.rules?.version !== 6 || restoredState.snapshot.players.length !== 2 || restoredState.snapshot.gameId !== activeCreated.gameId) throw new Error("Started room state did not survive restart");
   close(restored);
 
   console.log("Boom Box Pass 20 release matrix passed: malformed payload rejection, setup restart recovery, started-match restart recovery, 2/4/6/10-seat rules, setup rules and event normalization, deterministic scenery markers, movement and fuel, turn deadlines, disconnect takeover, catalogue filtering, simultaneous deterministic release, versioned atomic persistence, and session continuity.");
