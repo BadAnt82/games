@@ -531,22 +531,23 @@ export function initBoomBox() {
     const actions = document.createElement("div"); actions.className = "boombox-room-actions"; const action = document.createElement("button"); action.type = "button";
     if (mine) {
       action.className = "secondary";
-      if (networkMode && room.aiFill && room.connected < room.seats) {
-        action.textContent = "Start with AI";
+      const humanReady = Number(room.connectedHumans) >= Number(room.humanCount || room.seats);
+      if (networkMode && !room.started && humanReady) {
+        action.textContent = room.aiCount ? "Start match with AI" : "Start match";
         action.addEventListener("click", () => sendNetwork({ type: "boombox-start-ai", gameId: room.id }));
-        const cancel = document.createElement("button");
-        cancel.type = "button";
-        cancel.className = "secondary";
-        cancel.textContent = "Cancel room";
-        cancel.addEventListener("click", () => sendNetwork({ type: "boombox-cancel", gameId: room.id }));
-        actions.append(cancel);
       } else {
-        action.textContent = "Cancel room";
-        action.addEventListener("click", () => {
-          if (!networkMode) { lobbyStatus.textContent = "The authoritative room service is unavailable. Refresh to reconnect."; return; }
-          sendNetwork({ type: "boombox-cancel", gameId: room.id });
-        });
+        action.textContent = room.started ? "Match in progress" : "Waiting for commanders";
+        action.disabled = true;
       }
+      const cancel = document.createElement("button");
+      cancel.type = "button";
+      cancel.className = "secondary";
+      cancel.textContent = "Cancel room";
+      cancel.addEventListener("click", () => {
+        if (!networkMode) { lobbyStatus.textContent = "The authoritative room service is unavailable. Refresh to reconnect."; return; }
+        sendNetwork({ type: "boombox-cancel", gameId: room.id });
+      });
+      actions.append(cancel);
     }
     else if (room.id === joinedRoomId) { action.className = "secondary"; action.textContent = "Joined"; action.disabled = true; }
     else { action.textContent = room.started ? "Watch room" : room.connected === room.seats ? "Full" : "Join room"; action.disabled = !room.started && (room.connected >= room.seats); action.addEventListener("click", () => { if (!networkMode) { lobbyStatus.textContent = "The authoritative room service is unavailable. Refresh to reconnect."; return; } sendNetwork({ type: room.started ? "boombox-watch" : "boombox-join", gameId: room.id, name: networkDisplayName() }); }); }

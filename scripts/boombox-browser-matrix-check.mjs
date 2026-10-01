@@ -29,12 +29,13 @@ async function runSeatMatrix(seats) {
     await host.locator("#boombox-room-name").fill(roomName);
     await host.locator("#boombox-seats").selectOption(String(seats));
     await host.locator("#boombox-create-next").click();
+    await host.locator("#boombox-human-count").selectOption(String(seats));
+    await host.locator("#boombox-ai-count").selectOption("0");
     await host.locator("#boombox-seat-plan").waitFor({ state: "visible" });
-    const controls = host.locator("#boombox-seat-plan select");
-    if (await controls.count() !== seats) throw new Error(`${seats}-seat setup rendered ${await controls.count()} controls`);
-    for (let index = 1; index < seats; index += 1) await controls.nth(index).selectOption("human");
+    const controls = host.locator("#boombox-seat-plan .boombox-seat-plan-item");
+    if (await controls.count() !== seats) throw new Error(`${seats}-seat setup rendered ${await controls.count()} seat summaries`);
     await host.locator("#boombox-create-next").click();
-    if (!(await host.locator("#boombox-create-summary").innerText()).includes(`S${seats} Human`)) throw new Error(`${seats}-seat review omitted the last human seat`);
+    if (!(await host.locator("#boombox-create-summary").innerText()).includes(`${seats} human`)) throw new Error(`${seats}-seat review omitted the last human seat`);
     await host.locator("#boombox-create-submit").click();
     await host.locator(`#boombox-created-list article:has-text("${roomName}")`).waitFor({ state: "visible", timeout: 15000 });
 
