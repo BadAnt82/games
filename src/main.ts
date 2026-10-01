@@ -502,6 +502,7 @@ const adminFormMessage = requireElement<HTMLElement>("#admin-form-message");
 const adminSubmitButton = requireElement<HTMLButtonElement>("#admin-submit");
 const adminLogoutButton = requireElement<HTMLButtonElement>("#admin-logout");
 const adminBackButton = requireElement<HTMLButtonElement>("#admin-back");
+const adminSessionActions = requireElement<HTMLElement>("#admin-session-actions");
 const adminSessionNote = requireElement<HTMLElement>("#admin-session-note");
 const adminGameSelectorWrap = requireElement<HTMLElement>("#admin-game-selector-wrap");
 const adminGameSelect = requireElement<HTMLSelectElement>("#admin-game-select");
@@ -513,6 +514,7 @@ const adminConfigFields = requireElement<HTMLElement>("#admin-config-fields");
 const adminConfigStatus = requireElement<HTMLElement>("#admin-config-status");
 const adminConfigSaveButton = requireElement<HTMLButtonElement>("#admin-config-save");
 const adminConfigReloadButton = requireElement<HTMLButtonElement>("#admin-config-reload");
+const adminConfigRestoreButton = requireElement<HTMLButtonElement>("#admin-config-restore");
 const reportPanel = requireElement<HTMLElement>("#report-panel");
 const issueForm = requireElement<HTMLFormElement>("#issue-form");
 const issueText = requireElement<HTMLTextAreaElement>("#issue-text");
@@ -5754,11 +5756,14 @@ function addScore(points: number) {
 type GamesAdminStatus = { configured?: boolean; authenticated?: boolean; email?: string };
 type GamesAdminConfig = { version: number; economy: Record<string, number>; tank: Record<string, number>; terrain: Record<string, number>; ai: Record<string, number>; timing: Record<string, number>; weapons: Record<string, Record<string, number>>; utilities: Record<string, Record<string, number>> };
 type GamesAdminCatalog = Record<string, { label: string; description?: string; mode?: string; material?: string; effect?: string; amountUnit?: string; hasAmount?: boolean }>;
-type GamesAdminConfigPayload = { version: number; config: GamesAdminConfig; catalogs: { weapons: GamesAdminCatalog; utilities: GamesAdminCatalog } };
+type GamesAdminConfigPayload = { version: number; config: GamesAdminConfig; defaults: GamesAdminConfig; custom: Partial<GamesAdminConfig>; catalogs: { weapons: GamesAdminCatalog; utilities: GamesAdminCatalog } };
 let gamesAdminMode: "login" | "setup" = "login";
 let adminConfigDraft: GamesAdminConfig | null = null;
+let adminConfigDefaults: GamesAdminConfig | null = null;
+let adminConfigCustom: Partial<GamesAdminConfig> = {};
 let adminConfigCatalogs: GamesAdminConfigPayload["catalogs"] = { weapons: {}, utilities: {} };
 let adminConfigTab = "economy";
+let adminConfigAutosaveTimer = 0;
 
 const adminConfigDefinitions: Record<string, Array<{ path: string; label: string; step: string; help: string }>> = {
   economy: [
@@ -5798,26 +5803,74 @@ function escapeAdminHtml(value: string) {
   return value.replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character] || character);
 }
 
-function adminConfigValue(path: string) {
-  return path.split(".").reduce<unknown>((value, key) => (value && typeof value === "object" ? (value as Record<string, unknown>)[key] : undefined), adminConfigDraft) as number;
+function adminConfigValueAt(root: unknown, path: string) {
+  return path.split(".").reduce<unknown>((value, key) => (value && typeof value === "object" ? (value as Record<string, unknown>)[key] : undefined), root) as number | undefined;
 }
 
-function setAdminConfigValue(path: string, value: number) {
-  if (!adminConfigDraft) return;
+function adminConfigDefaultValue(path: string) {
+  return adminConfigValueAt(adminConfigDefaults, path) as number;
+}
+
+function adminConfigCustomValue(path: string) {
+  return adminConfigValueAt(adminConfigCustom, path);
+}
+
+function setAdminConfigValue(path: string, value: number, targetConfig: GamesAdminConfig | Partial<GamesAdminConfig> | null = adminConfigCustom) {
+  if (!targetConfig) return;
   const parts = path.split(".");
   const field = parts.pop();
   if (!field) return;
-  let target: Record<string, unknown> = adminConfigDraft as unknown as Record<string, unknown>;
-  for (const part of parts) target = target[part] as Record<string, unknown>;
+  let target: Record<string, unknown> = targetConfig as unknown as Record<string, unknown>;
+  for (const part of parts) target = (target[part] ||= {}) as Record<string, unknown>;
   target[field] = Number.isFinite(value) ? value : 0;
 }
 
-function captureAdminConfigFields() {
-  adminConfigFields.querySelectorAll<HTMLInputElement>("input[data-admin-path]").forEach((input) => setAdminConfigValue(input.dataset.adminPath || "", Number(input.value)));
+function deleteAdminConfigValue(path: string, targetConfig: Partial<GamesAdminConfig>) {
+  const parts = path.split(".");
+  const remove = (target: Record<string, unknown>, index: number): boolean => {
+    const key = parts[index];
+    if (index === parts.length - 1) {
+      delete target[key];
+      return Object.keys(target).length === 0;
+    }
+    const child = target[key];
+    if (!child || typeof child !== "object") return false;
+    if (remove(child as Record<string, unknown>, index + 1)) delete target[key];
+    return Object.keys(target).length === 0;
+  };
+  remove(targetConfig as unknown as Record<string, unknown>, 0);
 }
 
-function adminConfigInput(path: string, label: string, value: number, step: string, help: string) {
-  return `<label class="admin-config-field"><span>${escapeAdminHtml(label)}</span><input data-admin-path="${escapeAdminHtml(path)}" type="number" step="${step}" value="${Number.isFinite(value) ? value : 0}" /><small>${escapeAdminHtml(help)}</small></label>`;
+function captureAdminConfigFields() {
+  if (!adminConfigDraft || !adminConfigDefaults) return true;
+  const previousDefaults = structuredClone(adminConfigDefaults);
+  let defaultsChanged = false;
+  adminConfigFields.querySelectorAll<HTMLInputElement>("input[data-admin-default-path]").forEach((input) => {
+    const path = input.dataset.adminDefaultPath || "";
+    if (Number(input.value) !== Number(adminConfigDefaultValue(path))) defaultsChanged = true;
+  });
+  if (defaultsChanged && !window.confirm("Changing a default baseline permanently removes its current baseline value. Continue?")) {
+    renderAdminConfigFields();
+    adminConfigStatus.textContent = "Default baseline changes were not saved.";
+    return false;
+  }
+  adminConfigFields.querySelectorAll<HTMLInputElement>("input[data-admin-default-path]").forEach((input) => setAdminConfigValue(input.dataset.adminDefaultPath || "", Number(input.value), adminConfigDefaults));
+  adminConfigFields.querySelectorAll<HTMLInputElement>("input[data-admin-custom-path]").forEach((input) => {
+    const path = input.dataset.adminCustomPath || "";
+    const value = Number(input.value);
+    const previousDefault = Number(adminConfigValueAt(previousDefaults, path));
+    const nextDefault = Number(adminConfigDefaultValue(path));
+    const hasExistingOverride = input.dataset.adminCustomExplicit === "true" || Number.isFinite(adminConfigCustomValue(path));
+    if ((!hasExistingOverride && value === previousDefault) || value === nextDefault) deleteAdminConfigValue(path, adminConfigCustom);
+    else setAdminConfigValue(path, value, adminConfigCustom);
+  });
+  return true;
+}
+
+function adminConfigInput(path: string, label: string, defaultValue: number, customValue: number | undefined, step: string, help: string) {
+  const effective = Number.isFinite(customValue) ? Number(customValue) : Number(defaultValue);
+  const customState = Number.isFinite(customValue) ? "Custom override" : "Using default";
+  return `<div class="admin-config-field"><span>${escapeAdminHtml(label)}</span><div class="admin-config-value-pair"><label><small>Default baseline</small><input data-admin-default-path="${escapeAdminHtml(path)}" type="number" step="${step}" value="${Number.isFinite(defaultValue) ? defaultValue : 0}" /></label><label><small>Custom value</small><input data-admin-custom-path="${escapeAdminHtml(path)}" data-admin-custom-explicit="${Number.isFinite(customValue)}" type="number" step="${step}" value="${Number.isFinite(effective) ? effective : 0}" /></label></div><small>${escapeAdminHtml(help)} · ${escapeAdminHtml(customState)}</small></div>`;
 }
 
 type AdminCatalogField = [string, string, string, string];
@@ -5856,13 +5909,13 @@ function renderAdminConfigFields() {
   if (adminConfigDefinitions[adminConfigTab]) {
     const definitions = adminConfigDefinitions[adminConfigTab];
     const title = adminConfigTab[0].toUpperCase() + adminConfigTab.slice(1);
-    adminConfigFields.innerHTML = `<section class="admin-config-section"><h3>${title} defaults</h3><p>These values are stored globally and apply to new authoritative Boom Box matches.</p><div class="admin-config-grid">${definitions.map((definition) => adminConfigInput(definition.path, definition.label, adminConfigValue(definition.path), definition.step, definition.help)).join("")}</div></section>`;
+    adminConfigFields.innerHTML = `<section class="admin-config-section"><h3>${title} defaults</h3><p>Custom values change new games immediately. Changing a default baseline requires confirmation and changes the starting point for future custom values.</p><div class="admin-config-grid">${definitions.map((definition) => adminConfigInput(definition.path, definition.label, adminConfigDefaultValue(definition.path), adminConfigCustomValue(definition.path), definition.step, definition.help)).join("")}</div></section>`;
     return;
   }
   const isWeapon = adminConfigTab === "weapons";
   const values = isWeapon ? adminConfigDraft.weapons : adminConfigDraft.utilities;
   const catalog = isWeapon ? adminConfigCatalogs.weapons : adminConfigCatalogs.utilities;
-  adminConfigFields.innerHTML = `<section class="admin-config-section"><h3>${isWeapon ? "Weapon" : "Utility"} catalog</h3><p>${isWeapon ? "Only settings that apply to each weapon are shown. A cannon creates one projectile automatically; spread weapons expose their separate projectile count." : "Each purchase has a cost, adds a defined number of copies, respects the maximum capacity, and can optionally expire after a number of rounds."}</p><div class="admin-catalog-list">${Object.entries(values).map(([id, item]) => { const metadata = catalog[id] || { label: id, description: "" }; const fields = isWeapon ? adminWeaponFields(metadata) : adminUtilityFields(metadata); return `<article class="admin-catalog-card"><header><strong>${escapeAdminHtml(metadata.label)}</strong><small>${escapeAdminHtml(id)}</small></header><p>${escapeAdminHtml(metadata.description || "")}</p><div class="admin-config-grid">${fields.map(([field, label, step, help]) => adminConfigInput(`${isWeapon ? "weapons" : "utilities"}.${id}.${field}`, label, item[field] ?? 0, step, help)).join("")}</div></article>`; }).join("")}</div></section>`;
+  adminConfigFields.innerHTML = `<section class="admin-config-section"><h3>${isWeapon ? "Weapon" : "Utility"} catalog</h3><p>${isWeapon ? "Only settings that apply to each weapon are shown. A cannon creates one projectile automatically; spread weapons expose their separate projectile count." : "Each purchase has a cost, adds a defined number of copies, respects the maximum capacity, and can optionally expire after a number of rounds."}</p><div class="admin-catalog-list">${Object.entries(values).map(([id]) => { const metadata = catalog[id] || { label: id, description: "" }; const fields = isWeapon ? adminWeaponFields(metadata) : adminUtilityFields(metadata); return `<article class="admin-catalog-card"><header><strong>${escapeAdminHtml(metadata.label)}</strong><small>${escapeAdminHtml(id)}</small></header><p>${escapeAdminHtml(metadata.description || "")}</p><div class="admin-config-grid">${fields.map(([field, label, step, help]) => { const path = `${isWeapon ? "weapons" : "utilities"}.${id}.${field}`; return adminConfigInput(path, label, adminConfigDefaultValue(path), adminConfigCustomValue(path), step, help); }).join("")}</div></article>`; }).join("")}</div></section>`;
 }
 
 async function loadAdminConfig() {
@@ -5872,6 +5925,8 @@ async function loadAdminConfig() {
     const body = (await response.json()) as GamesAdminConfigPayload & { error?: string; savedAt?: string };
     if (!response.ok || !body.config) throw new Error(body.error || "Configuration could not be loaded.");
     adminConfigDraft = body.config;
+    adminConfigDefaults = body.defaults || body.config;
+    adminConfigCustom = body.custom || {};
     adminConfigCatalogs = body.catalogs || adminConfigCatalogs;
     adminConfigVersion.textContent = `Version ${body.version}`;
     adminConfigStatus.textContent = "Saved values loaded.";
@@ -5882,15 +5937,17 @@ async function loadAdminConfig() {
 }
 
 async function saveAdminConfig() {
-  if (!adminConfigDraft) return;
-  captureAdminConfigFields();
+  if (!adminConfigDraft || !adminConfigDefaults) return;
+  if (!captureAdminConfigFields()) return;
   adminConfigSaveButton.disabled = true;
   adminConfigStatus.textContent = "Saving changes...";
   try {
-    const response = await fetch("/api/admin/config", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ config: adminConfigDraft }) });
+    const response = await fetch("/api/admin/config", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ defaults: adminConfigDefaults, custom: adminConfigCustom }) });
     const body = (await response.json()) as GamesAdminConfigPayload & { error?: string; savedAt?: string };
     if (!response.ok || !body.config) throw new Error(body.error || "Configuration could not be saved.");
     adminConfigDraft = body.config;
+    adminConfigDefaults = body.defaults || adminConfigDefaults;
+    adminConfigCustom = body.custom || adminConfigCustom;
     adminConfigStatus.textContent = `Saved ${new Date(body.savedAt || Date.now()).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}.`;
     renderAdminConfigFields();
   } catch (error) {
@@ -5898,6 +5955,18 @@ async function saveAdminConfig() {
   } finally {
     adminConfigSaveButton.disabled = false;
   }
+}
+
+function scheduleAdminConfigAutosave() {
+  if (adminConfigAutosaveTimer) window.clearTimeout(adminConfigAutosaveTimer);
+  adminConfigAutosaveTimer = window.setTimeout(() => { adminConfigAutosaveTimer = 0; void saveAdminConfig(); }, 350);
+}
+
+async function restoreAdminDefaults() {
+  if (!adminConfigDefaults) return;
+  if (!window.confirm("Restore default values? This permanently removes every custom override for Boom Box.")) return;
+  adminConfigCustom = {};
+  await saveAdminConfig();
 }
 
 function setGamesAdminMessage(message: string, error = false) {
@@ -5922,10 +5991,12 @@ function renderGamesAdmin(status: GamesAdminStatus) {
   adminPasswordInput.disabled = authenticated;
   adminConfirmPasswordInput.value = "";
   adminConfirmPasswordInput.disabled = authenticated;
+  adminForm.hidden = authenticated;
   adminConfirmRow.hidden = authenticated || gamesAdminMode !== "setup";
   adminPasswordHelp.hidden = authenticated;
   adminSubmitButton.hidden = authenticated;
   adminLogoutButton.hidden = !authenticated;
+  adminSessionActions.hidden = !authenticated;
   adminSessionNote.hidden = !authenticated;
   adminGameSelect.value = adminGameSelect.value || "boombox";
   adminGameSelectorWrap.hidden = !authenticated;
@@ -7460,13 +7531,27 @@ adminLogoutButton.addEventListener("click", async () => {
 adminConfigTabs.addEventListener("click", (event) => {
   const target = (event.target as HTMLElement).closest<HTMLButtonElement>("button[data-admin-tab]");
   if (!target) return;
-  captureAdminConfigFields();
+  if (!captureAdminConfigFields()) return;
   adminConfigTab = target.dataset.adminTab || "economy";
   adminConfigTabs.querySelectorAll<HTMLButtonElement>("button[data-admin-tab]").forEach((button) => button.setAttribute("aria-selected", `${button === target}`));
   renderAdminConfigFields();
 });
 adminConfigSaveButton.addEventListener("click", () => void saveAdminConfig());
 adminConfigReloadButton.addEventListener("click", () => void loadAdminConfig());
+adminConfigRestoreButton.addEventListener("click", () => void restoreAdminDefaults());
+adminConfigFields.addEventListener("focusout", (event) => {
+  const target = event.target as HTMLInputElement;
+  if (target.matches("input[data-admin-custom-path]")) scheduleAdminConfigAutosave();
+  if (target.matches("input[data-admin-default-path]")) scheduleAdminConfigAutosave();
+});
+adminConfigFields.addEventListener("change", (event) => {
+  const target = event.target as HTMLInputElement;
+  if (target.matches("input[data-admin-custom-path], input[data-admin-default-path]")) scheduleAdminConfigAutosave();
+});
+adminConfigFields.addEventListener("input", (event) => {
+  const target = event.target as HTMLInputElement;
+  if (target.matches("input[data-admin-custom-path], input[data-admin-default-path]")) scheduleAdminConfigAutosave();
+});
 adminGameSelect.addEventListener("change", () => {
   updateAdminGameView();
   if (adminGameSelect.value === "boombox" && !adminSessionNote.hidden) void loadAdminConfig();

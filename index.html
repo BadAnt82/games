@@ -177,9 +177,10 @@
               <label id="admin-confirm-row" hidden>Confirm password<input id="admin-confirm-password" type="password" autocomplete="new-password" minlength="6" /></label>
               <p id="admin-password-help" class="admin-help">Use at least 6 characters, including one uppercase letter, one number, and one symbol.</p>
               <p id="admin-form-message" class="admin-form-message" role="status" aria-live="polite"></p>
-              <div class="menu-actions"><button id="admin-submit" type="submit">Sign in</button><button id="admin-logout" class="secondary" type="button" hidden>Sign out</button><button id="admin-back" class="secondary" type="button">Back to games</button></div>
+              <div class="menu-actions"><button id="admin-submit" type="submit">Sign in</button></div>
             </form>
             <p id="admin-session-note" class="admin-session-note" hidden></p>
+            <div id="admin-session-actions" class="menu-actions admin-session-actions" hidden><button id="admin-logout" class="secondary" type="button">Sign out</button><button id="admin-back" class="secondary" type="button">Back to games</button></div>
             <div id="admin-game-selector-wrap" class="admin-game-selector-wrap" hidden>
               <label for="admin-game-select">Game</label>
               <select id="admin-game-select">
@@ -195,13 +196,13 @@
             <p id="admin-game-placeholder" class="admin-game-placeholder" hidden>Admin controls for this game are reserved for a future pass. Choose Boom Box to edit its global defaults.</p>
             <section id="admin-dashboard" class="admin-dashboard" hidden aria-labelledby="admin-dashboard-title">
               <div class="admin-dashboard-heading"><div><div class="admin-kicker">GLOBAL BALANCE CONTROLS</div><h2 id="admin-dashboard-title">Game defaults</h2></div><span id="admin-config-version" class="admin-config-version">Version 1</span></div>
-              <p class="admin-dashboard-intro">Adjust the stored global defaults used to balance Boom Box. Save changes together so every value stays reviewable.</p>
+              <p class="admin-dashboard-intro">Custom values apply to new authoritative Boom Box matches; active matches keep the rules they started with. The default baseline is the fallback for any field without a custom value. Leaving a custom field saves it automatically; changing a default baseline requires a second confirmation.</p>
               <div id="admin-config-tabs" class="admin-config-tabs" role="tablist" aria-label="Admin configuration sections">
                 <button type="button" role="tab" data-admin-tab="economy" aria-selected="true">Economy</button><button type="button" role="tab" data-admin-tab="tank" aria-selected="false">Tank</button><button type="button" role="tab" data-admin-tab="terrain" aria-selected="false">Terrain</button><button type="button" role="tab" data-admin-tab="ai" aria-selected="false">AI</button><button type="button" role="tab" data-admin-tab="timing" aria-selected="false">Timing</button><button type="button" role="tab" data-admin-tab="weapons" aria-selected="false">Weapons</button><button type="button" role="tab" data-admin-tab="utilities" aria-selected="false">Utilities</button>
               </div>
               <div id="admin-config-fields" class="admin-config-fields"></div>
               <p id="admin-config-status" class="admin-config-status" role="status" aria-live="polite"></p>
-              <div class="menu-actions"><button id="admin-config-save" type="button">Save changes</button><button id="admin-config-reload" class="secondary" type="button">Reload saved values</button></div>
+              <div class="menu-actions"><button id="admin-config-save" type="button">Save changes</button><button id="admin-config-reload" class="secondary" type="button">Discard unsaved edits</button><button id="admin-config-restore" class="secondary" type="button">Restore default values</button></div>
             </section>
           </div>
           <div id="boombox-mode-panel" class="overlay-panel boombox-panel boombox-mode-panel" hidden>

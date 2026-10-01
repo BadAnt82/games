@@ -32,9 +32,19 @@ try {
   result = await request("/api/admin/session", { headers: { Cookie: cookie } });
   if (!result.body.authenticated || result.body.email !== "ant1982@gmail.com") throw new Error("Admin session was not established.");
   result = await request("/api/admin/config", { headers: { Cookie: cookie } });
-  if (result.response.status !== 200 || result.body.config?.economy?.startingCredits !== 100 || !result.body.config?.weapons?.cannon || !result.body.catalogs?.utilities?.["guidance-kit"]) throw new Error("Admin configuration defaults were not returned.");
-  result = await request("/api/admin/config", { method: "PUT", headers: { "Content-Type": "application/json", Cookie: cookie }, body: JSON.stringify({ config: { ...result.body.config, economy: { ...result.body.config.economy, startingCredits: 50000 }, weapons: { ...result.body.config.weapons, cannon: { ...result.body.config.weapons.cannon, cost: 42 } } } }) });
-  if (result.response.status !== 200 || result.body.config.economy.startingCredits !== 10000 || result.body.config.weapons.cannon.cost !== 42) throw new Error("Admin configuration save or validation failed.");
+  if (result.response.status !== 200 || result.body.config?.economy?.startingCredits !== 100 || result.body.defaults?.economy?.startingCredits !== 100 || Object.keys(result.body.custom || {}).length || !result.body.config?.weapons?.cannon || !result.body.catalogs?.utilities?.["guidance-kit"]) throw new Error("Admin configuration defaults or split model were not returned.");
+  for (const [id, weapon] of Object.entries(result.body.defaults.weapons)) if (weapon.count !== undefined && weapon.count < 1) throw new Error(`Unsafe default projectile count for ${id}.`);
+  for (const [id, utility] of Object.entries(result.body.defaults.utilities)) {
+    if (utility.purchaseAmount < 1 || utility.inventory < utility.purchaseAmount) throw new Error(`Unsafe default utility capacity for ${id}.`);
+    if (utility.amount !== undefined && utility.amount <= 0) throw new Error(`Non-positive default utility effect for ${id}.`);
+  }
+  const savedDefaults = result.body.defaults;
+  result = await request("/api/admin/config", { method: "PUT", headers: { "Content-Type": "application/json", Cookie: cookie }, body: JSON.stringify({ defaults: savedDefaults, custom: { economy: { startingCredits: 275 }, weapons: { cannon: { cost: 42 } } } }) });
+  if (result.response.status !== 200 || result.body.config.economy.startingCredits !== 275 || result.body.defaults.economy.startingCredits !== 100 || result.body.custom.economy.startingCredits !== 275 || result.body.config.weapons.cannon.cost !== 42) throw new Error("Admin custom values did not merge with the default baseline.");
+  result = await request("/api/admin/config", { headers: { Cookie: cookie } });
+  if (result.body.config.economy.startingCredits !== 275 || result.body.custom.economy.startingCredits !== 275) throw new Error("Admin custom values did not persist.");
+  result = await request("/api/admin/config", { method: "PUT", headers: { "Content-Type": "application/json", Cookie: cookie }, body: JSON.stringify({ defaults: result.body.defaults, custom: {} }) });
+  if (result.response.status !== 200 || result.body.config.economy.startingCredits !== 100 || Object.keys(result.body.custom || {}).length) throw new Error("Restore-default behavior did not clear custom overrides.");
   result = await request("/api/admin/logout", { method: "POST", headers: { Cookie: cookie } });
   if (result.response.status !== 200 || result.body.authenticated) throw new Error("Admin logout failed.");
   result = await request("/api/admin/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: "ant1982@gmail.com", password: "wrong1!" }) });
@@ -45,8 +55,8 @@ try {
   const saved = readFileSync(adminPath, "utf8");
   if (saved.includes("Strong1!") || !saved.includes("passwordHash") || !saved.includes("salt")) throw new Error("Admin credential storage is not hashed.");
   result = await request("/api/admin/config", { headers: { Cookie: restoredCookie } });
-  if (result.body.config.economy.startingCredits !== 10000 || result.body.config.weapons.cannon.cost !== 42) throw new Error("Admin configuration did not persist.");
-  console.log("Games admin check passed: bootstrap policy, hashed storage, session/logout, invalid login rejection, persisted login, typed config defaults, validation, and config persistence.");
+  if (result.body.config.economy.startingCredits !== 100 || result.body.config.weapons.cannon.cost !== 0) throw new Error("Restored admin configuration did not persist.");
+  console.log("Games admin check passed: bootstrap policy, hashed storage, session/logout, invalid login rejection, split default/custom persistence, validation, restore-default behavior, and sane projectile defaults.");
 } finally {
   server.kill();
   await wait(100);

@@ -231,22 +231,55 @@ function normalizeGamesAdminConfig(input = {}) {
   }
   for (const [id, fields] of Object.entries(defaults.weapons)) for (const field of Object.keys(fields)) {
     const decimalField = new Set(["speed", "smokeDamageMultiplier", "reinforcedDamageMultiplier"]).has(field);
-    const range = field === "speed" ? [0.1, 3] : decimalField ? [0, 1] : [0, 10000];
+    const range = field === "speed" ? [0.1, 3] : field === "inventory" ? [1, 10000] : field === "count" ? [1, 100] : decimalField ? [0, 1] : [0, 10000];
     output.weapons[id][field] = adminNumber(input?.weapons?.[id]?.[field], fields[field], range, !decimalField);
   }
-  for (const [id, fields] of Object.entries(defaults.utilities)) for (const field of Object.keys(fields)) { const range = adminNumberRanges[field] || [0, 10000]; output.utilities[id][field] = adminNumber(input?.utilities?.[id]?.[field], fields[field], range, true); }
+  for (const [id, fields] of Object.entries(defaults.utilities)) for (const field of Object.keys(fields)) { const range = field === "inventory" ? [1, 10000] : adminNumberRanges[field] || [0, 10000]; output.utilities[id][field] = adminNumber(input?.utilities?.[id]?.[field], fields[field], range, true); }
   return output;
 }
-function readGamesAdminConfig() {
-  try { return normalizeGamesAdminConfig(JSON.parse(readFileSync(gamesAdminConfigPath, "utf8"))); } catch { return defaultGamesAdminConfig(); }
+function mergeGamesAdminConfig(defaults, custom) {
+  const merged = structuredClone(defaults);
+  for (const section of ["economy", "tank", "terrain", "ai", "timing", "weapons", "utilities"]) for (const [key, value] of Object.entries(custom?.[section] || {})) {
+    if (merged[section]?.[key] !== undefined) merged[section][key] = value;
+    else if (merged[section]?.[key] === undefined && ["weapons", "utilities"].includes(section)) merged[section][key] = value;
+  }
+  return normalizeGamesAdminConfig(merged);
 }
-function writeGamesAdminConfig(config) {
+function normalizeGamesAdminCustom(input = {}, defaults = defaultGamesAdminConfig()) {
+  const output = {};
+  const candidate = structuredClone(defaults);
+  for (const section of ["economy", "tank", "terrain", "ai", "timing"]) if (input?.[section] && typeof input[section] === "object") Object.assign(candidate[section], input[section]);
+  for (const section of ["weapons", "utilities"]) if (input?.[section] && typeof input[section] === "object") for (const [id, values] of Object.entries(input[section])) if (candidate[section]?.[id] && values && typeof values === "object") Object.assign(candidate[section][id], values);
+  const normalizedInput = normalizeGamesAdminConfig(candidate);
+  for (const [section, fields] of Object.entries(defaults)) {
+    if (!fields || typeof fields !== "object") continue;
+    const source = input?.[section];
+    if (!source || typeof source !== "object") continue;
+    output[section] = {};
+    if (["weapons", "utilities"].includes(section)) {
+      for (const [id, item] of Object.entries(fields)) if (source[id] && typeof source[id] === "object") {
+        output[section][id] = {};
+        for (const field of Object.keys(item)) if (Object.prototype.hasOwnProperty.call(source[id], field)) output[section][id][field] = normalizedInput[section][id][field];
+      }
+    } else for (const field of Object.keys(fields)) if (Object.prototype.hasOwnProperty.call(source, field)) output[section][field] = normalizedInput[section][field];
+  }
+  return output;
+}
+function readGamesAdminStore() {
+  try {
+    const parsed = JSON.parse(readFileSync(gamesAdminConfigPath, "utf8"));
+    const defaults = normalizeGamesAdminConfig(parsed?.defaults || defaultGamesAdminConfig());
+    const custom = normalizeGamesAdminCustom(parsed?.custom || (parsed?.defaults ? {} : parsed), defaults);
+    return { defaults, custom, config: mergeGamesAdminConfig(defaults, custom) };
+  } catch { const defaults = defaultGamesAdminConfig(); return { defaults, custom: {}, config: defaults }; }
+}
+function writeGamesAdminConfig(defaults, custom) {
   mkdirSync(resolve(gamesAdminConfigPath, ".."), { recursive: true });
   const temporaryPath = `${gamesAdminConfigPath}.tmp`;
-  writeFileSync(temporaryPath, JSON.stringify(config, null, 2));
+  writeFileSync(temporaryPath, JSON.stringify({ version: gamesAdminConfigVersion, defaults, custom }, null, 2));
   renameSync(temporaryPath, gamesAdminConfigPath);
 }
-let gamesAdminConfig = readGamesAdminConfig();
+let { defaults: gamesAdminDefaults, custom: gamesAdminCustom, config: gamesAdminConfig } = readGamesAdminStore();
 
 function boomBoxRulesWithAdminConfig(config = {}) {
   const defaults = { startingMoney: 100, gravity: 150, windLimit: 1.2 };
@@ -1707,6 +1740,8 @@ async function handleApi(request, response) {
     sendJson(response, 200, {
       version: gamesAdminConfigVersion,
       config: gamesAdminConfig,
+      defaults: gamesAdminDefaults,
+      custom: gamesAdminCustom,
       catalogs: {
         weapons: Object.fromEntries(Object.entries(BOOMBOX_WEAPON_CATALOG).map(([id, item]) => [id, { label: item.label, description: item.description, mode: item.mode, material: item.material }])),
         utilities: Object.fromEntries(Object.entries(BOOMBOX_UTILITY_CATALOG).map(([id, item]) => [id, { label: item.label, description: item.description, effect: item.effect, amountUnit: item.amountUnit || "", hasAmount: item.amount !== undefined }])),
@@ -1722,10 +1757,12 @@ async function handleApi(request, response) {
     }
     try {
       const body = JSON.parse(await readRequestBody(request));
-      const candidate = body?.config && typeof body.config === "object" ? body.config : body;
-      gamesAdminConfig = normalizeGamesAdminConfig(candidate);
-      writeGamesAdminConfig(gamesAdminConfig);
-      sendJson(response, 200, { version: gamesAdminConfigVersion, config: gamesAdminConfig, savedAt: new Date().toISOString() });
+      const hasSplitModel = body?.defaults && typeof body.defaults === "object";
+      gamesAdminDefaults = normalizeGamesAdminConfig(hasSplitModel ? body.defaults : gamesAdminDefaults);
+      gamesAdminCustom = normalizeGamesAdminCustom(hasSplitModel ? body.custom : (body?.config && typeof body.config === "object" ? body.config : body), gamesAdminDefaults);
+      gamesAdminConfig = mergeGamesAdminConfig(gamesAdminDefaults, gamesAdminCustom);
+      writeGamesAdminConfig(gamesAdminDefaults, gamesAdminCustom);
+      sendJson(response, 200, { version: gamesAdminConfigVersion, config: gamesAdminConfig, defaults: gamesAdminDefaults, custom: gamesAdminCustom, savedAt: new Date().toISOString() });
     } catch {
       sendJson(response, 400, { code: "invalid_config", error: "The configuration payload could not be saved." });
     }

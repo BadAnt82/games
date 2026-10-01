@@ -20,6 +20,7 @@ try {
   await page.locator("#admin-confirm-password").fill("Strong1!");
   await page.locator("#admin-submit").click();
   await page.locator("#admin-dashboard").waitFor({ state: "visible", timeout: 5000 });
+  if (await page.locator("#admin-form").isVisible() || !(await page.locator("#admin-session-actions").isVisible())) throw new Error("Admin login controls were not hidden after authentication.");
   const gameOptions = await page.locator("#admin-game-select option").allTextContents();
   if (gameOptions.length < 7 || !gameOptions.includes("Boom Box") || !gameOptions.includes("Digital Cribbage")) throw new Error("Admin game selector did not include the Games catalog.");
   await page.locator("#admin-game-select").selectOption("digital-cribbage");
@@ -27,7 +28,7 @@ try {
   await page.locator("#admin-game-select").selectOption("boombox");
   await page.locator("#admin-dashboard").waitFor({ state: "visible" });
   await page.waitForFunction(() => !document.querySelector("#admin-config-status")?.textContent?.includes("Loading"), null, { timeout: 5000 });
-  if (!(await page.locator("#admin-config-fields").innerText()).includes("Default starting credits")) throw new Error("Economy dashboard did not render.");
+  if (!(await page.locator("#admin-config-fields").innerText()).includes("Default starting credits") || await page.locator("input[data-admin-default-path='economy.startingCredits']").count() !== 1 || await page.locator("input[data-admin-custom-path='economy.startingCredits']").count() !== 1) throw new Error("Economy dashboard did not render split default/custom fields.");
   await page.locator("button[data-admin-tab='weapons']").click();
   const weaponText = await page.locator("#admin-config-fields").innerText();
   const cannonText = await page.locator(".admin-catalog-card").evaluateAll((cards) => cards.find((card) => card.querySelector("header strong")?.textContent === "Cannon")?.textContent || "");
@@ -37,12 +38,14 @@ try {
   if (!utilityText.includes("Amount per purchase") || !utilityText.includes("Expiration (rounds)") || !utilityText.includes("Effect amount (health points)") || utilityText.includes("Effect amount (units)")) throw new Error("Utility catalog tab did not render clear purchase, capacity, duration, and applicable effect fields.");
   await page.locator("#overlay").evaluate((element) => { element.scrollTop = 0; });
   await page.locator("button[data-admin-tab='economy']").click();
-  await page.locator("input[data-admin-path='economy.startingCredits']").fill("275");
-  await page.locator("#admin-config-save").click();
-  await page.waitForFunction(() => document.querySelector("#admin-config-status")?.textContent?.includes("Saved"), null, { timeout: 5000 });
-  const saved = await page.evaluate(async () => (await fetch("/api/admin/config", { cache: "no-store" })).json());
-  if (saved.config?.economy?.startingCredits !== 275) throw new Error("Dashboard save did not persist starting credits.");
-  console.log("Games admin browser check passed: bootstrap, dashboard tabs, weapon catalog, numeric edit, save status, and persisted value.");
+  await page.locator("input[data-admin-custom-path='economy.startingCredits']").fill("275");
+  await page.locator("input[data-admin-custom-path='economy.startingCredits']").press("Tab");
+  await page.waitForFunction(async () => { const body = await (await fetch("/api/admin/config", { cache: "no-store" })).json(); return body.config?.economy?.startingCredits === 275 && body.defaults?.economy?.startingCredits === 100 && body.custom?.economy?.startingCredits === 275; }, null, { timeout: 5000 });
+  page.once("dialog", dialog => dialog.accept());
+  await page.locator("#admin-config-restore").click();
+  await page.waitForFunction(async () => { const body = await (await fetch("/api/admin/config", { cache: "no-store" })).json(); return body.custom && Object.keys(body.custom).length === 0 && body.config?.economy?.startingCredits === 100; }, null, { timeout: 5000 });
+  await page.waitForFunction(async () => { const body = await (await fetch("/api/admin/config", { cache: "no-store" })).json(); return body.config?.economy?.startingCredits === 100 && body.custom && Object.keys(body.custom).length === 0; }, null, { timeout: 5000 });
+  console.log("Games admin browser check passed: login hiding, dashboard tabs, split default/custom fields, blur autosave, catalog clarity, and restore defaults.");
 } finally {
   await browser.close();
   server.kill();

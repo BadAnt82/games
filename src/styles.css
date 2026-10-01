@@ -1152,6 +1152,7 @@ body.fullscreen-fallback-active {
 .admin-kicker { color: #78e8ff; font-size: .72rem; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; }
 .admin-panel > p { color: rgba(224, 239, 255, .76); text-align: center; }
 .admin-form { display: grid; width: min(100%, 370px); gap: 12px; text-align: left; }
+.admin-form[hidden] { display: none !important; }
 .admin-form label { display: grid; gap: 6px; color: rgba(224, 239, 255, .82); font-size: .82rem; font-weight: 700; }
 .admin-form [hidden] { display: none; }
 .admin-form input { width: 100%; min-height: 42px; box-sizing: border-box; border: 1px solid rgba(143, 204, 255, .28); border-radius: 9px; background: rgba(4, 14, 34, .76); color: #fff; padding: 9px 11px; }
@@ -1179,6 +1180,11 @@ body.fullscreen-fallback-active {
 .admin-config-section > p { margin: 0; color: rgba(224, 239, 255, .62); font-size: .75rem; line-height: 1.4; }
 .admin-config-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
 .admin-config-field { display: grid; gap: 5px; padding: 10px; border: 1px solid rgba(143, 204, 255, .16); border-radius: 10px; background: rgba(4, 14, 34, .48); }
+.admin-config-value-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.admin-config-value-pair label { display: grid; gap: 4px; }
+.admin-config-value-pair label small { color: rgba(224, 239, 255, .56); font-size: .68rem; font-weight: 800; }
+.admin-config-value-pair input { width: 100%; min-width: 0; }
+.admin-session-actions { margin-top: 10px; }
 .admin-config-field > span { color: rgba(224, 239, 255, .88); font-size: .76rem; font-weight: 800; }
 .admin-config-field small { color: rgba(224, 239, 255, .52); font-size: .68rem; line-height: 1.35; }
 .admin-config-field input { width: 100%; min-height: 36px; box-sizing: border-box; border: 1px solid rgba(143, 204, 255, .24); border-radius: 7px; background: rgba(4, 14, 34, .76); color: #fff; padding: 7px 9px; }
