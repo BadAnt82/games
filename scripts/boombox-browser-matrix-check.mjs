@@ -47,6 +47,7 @@ async function runSeatMatrix(seats) {
       if (!(await card.innerText()).includes(`Matrix ${seats} P1`)) throw new Error(`${seats}-seat lobby did not show its creator name`);
       await card.getByRole("button", { name: "Join room" }).click();
     }
+    await host.locator("#boombox-created-list article", { hasText: roomName }).getByRole("button", { name: /Start match/ }).click();
     for (const page of pages) {
       await page.locator("#boombox-canvas").waitFor({ state: "visible", timeout: 12000 });
       await page.locator("#boombox-match-status").waitFor({ state: "visible", timeout: 3000 });
