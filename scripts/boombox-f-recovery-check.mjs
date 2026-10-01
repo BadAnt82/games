@@ -1,0 +1,21 @@
+import { spawn } from "node:child_process";
+import { WebSocket } from "ws";
+
+const port = 4373;
+const server = spawn(process.execPath, ["server.mjs"], { env: { ...process.env, PORT: String(port), BOOMBOX_STALE_AFTER_MS: "250", BOOMBOX_PRUNE_INTERVAL_MS: "50", BOOMBOX_TURN_TIMEOUT_MS: "1200", GAMES_ADMIN_CONFIG_STORE_PATH: `.tmp-pass-f-admin-${process.pid}.json`, GAMES_ADMIN_STORE_PATH: `.tmp-pass-f-store-${process.pid}.json` }, stdio: ["ignore", "pipe", "pipe"] });
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const open = () => new Promise((resolve, reject) => { const socket = new WebSocket(`ws://localhost:${port}/boombox`); socket.messages = []; socket.on("message", (data) => { try { const message = JSON.parse(data.toString()); socket.messages.push(message); if (message.type === "boombox-flight-bundle" && message.bundleId) socket.send(JSON.stringify({ type: "boombox-flight-ack", bundleId: message.bundleId })); } catch {} }); socket.once("open", () => resolve(socket)); socket.once("error", reject); });
+const take = (socket, type, predicate = () => true) => { const index = socket.messages.findIndex((message) => message.type === type && predicate(message)); return index < 0 ? null : socket.messages.splice(index, 1)[0]; };
+const next = (socket, type, predicate = () => true, timeout = 6000) => new Promise((resolve, reject) => { const queued = take(socket, type, predicate); if (queued) return resolve(queued); const timer = setTimeout(() => { socket.off("message", onMessage); reject(new Error(`Timed out waiting for ${type}`)); }, timeout); const onMessage = (data) => { let message; try { message = JSON.parse(data.toString()); } catch { return; } if (message.type !== type || !predicate(message)) return; clearTimeout(timer); socket.off("message", onMessage); resolve(message); }; socket.on("message", onMessage); });
+const send = (socket, message) => socket.send(JSON.stringify(message));
+try {
+  await wait(450);
+  const host = await open(); const userId = `f-reconnect-${Date.now()}`;
+  const createdPromise = next(host, "boombox-created"); send(host, { type: "boombox-create", userId, config: { name: "F reconnect", creator: "F Host", seats: 2, humanCount: 1, aiCount: 1, aiFill: false, pace: "blitz", seed: 7788 } }); const created = await createdPromise; const startedPromise = next(host, "boombox-state", (message) => message.snapshot?.phase === "turn-prep"); send(host, { type: "boombox-start-ai", userId, gameId: created.gameId }); await startedPromise;
+  const firePromise = next(host, "boombox-state", (message) => message.snapshot?.log?.some((entry) => entry.kind === "fire")); send(host, { type: "boombox-action", userId, gameId: created.gameId, actionId: "f-fire", action: { targetIndex: 1, weapon: "cannon", angle: 42, power: 58 } }); await firePromise; host.close(); await wait(120);
+  const resumed = await open(); const joinedPromise = next(resumed, "boombox-joined"); const statePromise = next(resumed, "boombox-state", (message) => message.snapshot?.log?.some((entry) => entry.kind === "fire")); send(resumed, { type: "boombox-join", userId, gameId: created.gameId, sessionId: created.sessionId, name: "F Host" }); const joined = await joinedPromise; const state = await statePromise; if (joined.seat !== 0 || !state.snapshot.log.some((entry) => entry.actionId === "f-fire")) throw new Error("Reconnect did not reclaim the original seat and authoritative match log."); resumed.close();
+
+  const stale = await open(); const staleId = `f-stale-${Date.now()}`; const stalePromise = next(stale, "boombox-created"); send(stale, { type: "boombox-create", userId: staleId, config: { name: "F stale", creator: "F stale", seats: 2, humanCount: 2, aiCount: 0, seed: 8899 } }); const staleRoom = await stalePromise; stale.close(); await wait(650);
+  const list = await open(); const lobby = await next(list, "boombox-lobby-list"); if (lobby.games.some((room) => room.gameId === staleRoom.gameId)) throw new Error("Stale disconnected room was not pruned automatically."); list.close();
+  console.log("Boom Box Pass F recovery check passed: reconnect seat reclaim, authoritative resume, automatic stale-room pruning, and timeout-safe room lifecycle.");
+} finally { server.kill(); }

@@ -2489,7 +2489,7 @@ function resolveBoomBoxAction(room, seatIndex, action, actionId = "") {
   room.phase = room.phase === "finished" ? "finished" : "flight"; room.resolving = room.phase !== "finished"; room.updatedAt = Date.now();
   return { flight: flights[0] || null, flights };
 }
-function pruneBoomBoxRooms() { const cutoff = Date.now() - 45 * 60 * 1000; let changed = false; for (const [id, room] of boomboxRooms) if (room.updatedAt < cutoff) { if (room.aiTimer) clearTimeout(room.aiTimer); if (room.turnTimer) clearTimeout(room.turnTimer); boomboxRooms.delete(id); for (const seat of room.seats) if (seat.userId && boomboxUserMemberships.get(seat.userId) === id) boomboxUserMemberships.delete(seat.userId); changed = true; } if (changed) writeBoomBoxRooms(); }
+function pruneBoomBoxRooms() { const configuredAge = Number(process.env.BOOMBOX_STALE_AFTER_MS); const staleAfter = Number.isFinite(configuredAge) && configuredAge > 0 ? configuredAge : 45 * 60 * 1000; const cutoff = Date.now() - staleAfter; let changed = false; for (const [id, room] of boomboxRooms) if (room.updatedAt < cutoff) { if (room.aiTimer) clearTimeout(room.aiTimer); if (room.turnTimer) clearTimeout(room.turnTimer); if (room.flightTimer) clearTimeout(room.flightTimer); boomboxRooms.delete(id); for (const seat of room.seats) if (seat.userId && boomboxUserMemberships.get(seat.userId) === id) boomboxUserMemberships.delete(seat.userId); changed = true; } if (changed) { writeBoomBoxRooms(); broadcastBoomBoxLobby(); } }
 
 function cribbageRoomId() {
   return `crib-${String(nextCribbageRoomId++).padStart(4, "0")}`;
@@ -2889,6 +2889,9 @@ pixelServer.on("connection", (socket) => {
 });
 
 restoreBoomBoxRooms();
+const boomBoxPruneIntervalMs = Number(process.env.BOOMBOX_PRUNE_INTERVAL_MS) > 0 ? Number(process.env.BOOMBOX_PRUNE_INTERVAL_MS) : 60_000;
+const boomBoxPruneTimer = setInterval(pruneBoomBoxRooms, boomBoxPruneIntervalMs);
+boomBoxPruneTimer.unref?.();
 
 server.listen(port, "0.0.0.0", () => {
   console.log(`Bad Ant Games listening on ${port}`);

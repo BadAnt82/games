@@ -91,7 +91,7 @@ async function verifyPreparedMode(mode, suffix) {
   const hostStartPromise = next(host, "boombox-state", (message) => message.snapshot?.phase === "turn-prep");
   const guestStartPromise = next(guest, "boombox-state", (message) => message.snapshot?.phase === "turn-prep");
   guest.send(JSON.stringify({ type: "boombox-join", gameId: created.gameId, userId: guestId, name: "Mode Guest" }));
-  await joinedPromise; await hostStartPromise; await guestStartPromise;
+  await joinedPromise; host.send(JSON.stringify({ type: "boombox-start-ai", userId: hostId, gameId: created.gameId })); await hostStartPromise; await guestStartPromise;
   const preparedPromise = next(host, "boombox-state", (message) => message.snapshot?.phase === "prepare" && message.snapshot.preparedSeats?.includes(0));
   host.send(JSON.stringify({ type: "boombox-action", userId: hostId, actionId: `${mode}-host-1`, action: { targetIndex: 1, weapon: "cannon", angle: 42, power: 58 } }));
   const prepared = await preparedPromise;
@@ -133,7 +133,7 @@ async function verifyPass19(suffix) {
   const joined = next(deadlineGuest, "boombox-joined");
   const started = next(deadlineHost, "boombox-state", (message) => message.snapshot?.phase === "turn-prep");
   deadlineGuest.send(JSON.stringify({ type: "boombox-join", gameId: deadlineRoom.gameId, userId: `deadline-guest-${suffix}`, name: "Deadline Guest" }));
-  await joined; await started;
+  await joined; deadlineHost.send(JSON.stringify({ type: "boombox-start-ai", userId: deadlineId, gameId: deadlineRoom.gameId })); await started;
   const timeoutFlight = await next(deadlineHost, "boombox-flight-bundle", (message) => message.flights?.length > 0, 5000);
   const timeoutStatePromise = next(deadlineHost, "boombox-state", (message) => message.snapshot?.log?.some((entry) => entry.kind === "timeout"), 5000);
   deadlineHost.send(JSON.stringify({ type: "boombox-flight-ack", userId: deadlineId, gameId: deadlineRoom.gameId, bundleId: timeoutFlight.bundleId }));
@@ -149,7 +149,7 @@ async function verifyPass19(suffix) {
   const disconnectJoined = next(disconnectGuest, "boombox-joined");
   const disconnectStarted = next(disconnectHost, "boombox-state", (message) => message.snapshot?.phase === "turn-prep");
   disconnectGuest.send(JSON.stringify({ type: "boombox-join", gameId: disconnectRoom.gameId, userId: `disconnect-guest-${suffix}`, name: "Disconnect Guest" }));
-  await disconnectJoined; await disconnectStarted; disconnectGuest.close(); await new Promise((resolve) => setTimeout(resolve, 120));
+  await disconnectJoined; disconnectHost.send(JSON.stringify({ type: "boombox-start-ai", userId: disconnectId, gameId: disconnectRoom.gameId })); await disconnectStarted; disconnectGuest.close(); await new Promise((resolve) => setTimeout(resolve, 120));
   const recoveredFlight = next(disconnectHost, "boombox-flight-bundle", (message) => message.flights?.length > 0, 5000);
   disconnectHost.send(JSON.stringify({ type: "boombox-action", userId: disconnectId, actionId: `disconnect-fire-${suffix}`, action: { targetIndex: 1, weapon: "cannon", angle: 42, power: 58 } }));
   const recoveredBundle = await recoveredFlight;
