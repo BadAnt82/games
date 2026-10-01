@@ -110,6 +110,7 @@ try {
   const multiGuestStartPromise = next(multiGuest, "boombox-state", (message) => message.snapshot?.phase === "turn-prep");
   send(multiGuest, { type: "boombox-join", gameId: multiCreated.gameId, userId: multiGuestId, name: "Multiplayer guest" });
   await multiJoinPromise;
+  send(multiHost, { type: "boombox-start-ai", userId: multiHostId, gameId: multiCreated.gameId });
   const multiInitial = await multiHostStartPromise;
   await multiGuestStartPromise;
 

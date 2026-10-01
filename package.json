@@ -14,6 +14,7 @@
     "test:boombox": "node --experimental-strip-types scripts/boombox-determinism-check.mjs",
     "test:boombox-network": "node scripts/boombox-network-check.mjs",
     "test:boombox-c-lobby": "node scripts/boombox-c-lobby-check.mjs",
+    "test:boombox-d-solo": "node scripts/boombox-d-solo-check.mjs",
     "test:boombox-ai": "node scripts/boombox-ai-strategy-check.mjs",
     "test:boombox-d-content": "node scripts/boombox-d-content-check.mjs",
     "test:boombox-terrain": "node scripts/boombox-terrain-check.mjs",
