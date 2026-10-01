@@ -2,6 +2,12 @@
 
 This is the handoff record for Boom Box only. Each entry records the product-facing result and the verification that accompanied it. Detailed pass reports remain in the linked `docs/BOOM_BOX_*.md` files.
 
+## 2026-10-01 — Ten-player solo setup (working tree)
+
+- Raise solo setup from three rivals to nine rivals so solo and multiplayer both support ten total commanders.
+- Add browser coverage that launches a human plus nine authoritative AI tanks and verifies all ten health/target entries render without horizontal page overflow.
+- Verification passed: production build, ten-player mobile solo browser check, authoritative contract, and 10-seat scale checks.
+
 ## 2026-10-01 — Multi-round competition, pacing, and legibility (working tree)
 
 - Keep authoritative matches on the battlefield after an elimination, let destroyed commanders spectate, and route every non-final round through a dedicated standings, shopping, and ready-up intermission.

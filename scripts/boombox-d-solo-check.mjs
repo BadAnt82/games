@@ -11,6 +11,7 @@ try {
   if (await page.locator("#record-dialog").isVisible().catch(() => false)) { await page.locator("#record-name").fill("D Solo Check"); await page.locator("#record-save").click(); }
   await page.locator("#select-boombox").click();
   await page.locator("#boombox-mode-single").click();
+  await page.locator("#boombox-opponents").selectOption("9");
   await page.locator("#boombox-solo-weapon").selectOption("split-shell");
   await page.locator("#boombox-solo-utility").selectOption("heavy-shield");
   await page.locator("#boombox-difficulty").selectOption("expert");
@@ -21,6 +22,8 @@ try {
   await page.locator("#boombox-canvas").waitFor({ state: "visible", timeout: 15000 });
   await page.waitForFunction(() => { const status = document.querySelector("#boombox-match-status")?.textContent || ""; return status.includes("Your turn") || status.includes("Loading") || status.includes("Waiting"); }, null, { timeout: 15000 });
   await page.waitForFunction(() => document.querySelector("#boombox-weapon")?.value === "split-shell" && document.querySelector("#boombox-match-utility")?.value === "heavy-shield", null, { timeout: 15000 }).catch(async () => { throw new Error(`Loadout did not settle: weapon=${await page.locator("#boombox-weapon").inputValue()} utility=${await page.locator("#boombox-match-utility").inputValue()} status=${await page.locator("#boombox-match-status").innerText()}`); });
+  const tenPlayerLayout = await page.evaluate(() => ({ opponents: document.querySelectorAll("#boombox-opponent-health-list .boombox-opponent-health").length, targets: document.querySelectorAll("#boombox-target option").length, viewport: innerWidth, scrollWidth: document.documentElement.scrollWidth }));
+  if (tenPlayerLayout.opponents !== 9 || tenPlayerLayout.targets !== 9 || tenPlayerLayout.scrollWidth > tenPlayerLayout.viewport + 2) throw new Error(`Ten-player solo layout failed: ${JSON.stringify(tenPlayerLayout)}`);
   if (await page.locator("#boombox-difficulty").inputValue() !== "expert") throw new Error("Expert difficulty selection was not retained.");
-  console.log("Boom Box Pass D solo check passed: starting weapon grant, utility purchase, expert selection, mobile flow, and catalog explanations.");
+  console.log("Boom Box Pass D solo check passed: ten-player authoritative launch, nine rival health/target entries, starting loadout, expert selection, mobile overflow, and catalog explanations.");
 } finally { await browser.close(); server.kill(); }

@@ -699,7 +699,7 @@ export function initBoomBox() {
     if (soloDesiredWeaponId !== "cannon" && Number(shopInventory[soloDesiredWeaponId]) < 1) shopInventory[soloDesiredWeaponId] = 1;
     networkMode = true;
     if (networkSocket) { try { networkSocket.close(); } catch {} networkSocket = undefined; }
-    const opponentCount = clamp(Number(opponentsInput.value) || 2, 1, 3);
+    const opponentCount = clamp(Number(opponentsInput.value) || 2, 1, 9);
     applyTheme(boomBoxThemeIdForTerrain(soloTerrainInput.value));
     const boundaries = Array.from(soloBoundariesInput.selectedOptions).map((option) => option.value); if (!boundaries.length) boundaries.push("stop");
     const config = { name: `Solo range for ${name}`, creator: name, seats: opponentCount + 1, aiSeats: Array.from({ length: opponentCount }, (_, index) => index + 1), aiFill: true, aiDifficulty: soloDifficultyInput.value, terrain: soloTerrainInput.value, roundCount: Number(soloRoundsInput.value), timerEnabled: soloTimerInput.checked, windMode: soloWindModeInput.value, boundary: boundaries[0], boundaries, boundaryMode: soloBoundaryModeInput.value, firingMode: "sequential", movement: false, startingMoney: 100, interestRate: clamp(Number(soloInterestInput.value) || 0, 0, 50), disabledWeapons: [], disabledUtilities: [], seed: clamp(Number(soloSeedInput.value) || 314159, 1, 999999) };
