@@ -219,7 +219,7 @@ try {
   const active = await open();
   const activeCreated = await createRoom(active, activeId, { name: `Active ${suffix}`, creator: "Active Host", seats: 2, aiFill: true, aiDifficulty: "expert", firingMode: "sequential", seed: 123456 });
   const activeState = await startAi(active, activeCreated.gameId, activeId);
-  if (activeState.snapshot.rules?.version !== 4 || activeState.snapshot.players.length !== 2) throw new Error("Started room did not expose versioned state");
+  if (activeState.snapshot.rules?.version !== 5 || activeState.snapshot.players.length !== 2) throw new Error("Started room did not expose versioned state");
   await waitForPersistedRoom(activeCreated.gameId, true);
   const persistedActive = JSON.parse(readFileSync(roomStore, "utf8")).find((room) => room.gameId === activeCreated.gameId);
   if (persistedActive?.schemaVersion !== 2 || !Number.isFinite(Number(persistedActive.turnDeadlineAt))) throw new Error("Active room persistence did not include the versioned turn deadline");
@@ -233,7 +233,7 @@ try {
   restored.send(JSON.stringify({ type: "boombox-join", gameId: activeCreated.gameId, userId: activeId, sessionId: activeSession, name: "Active Host" }));
   await restoredJoinPromise;
   const restoredState = await restoredStatePromise;
-  if (restoredState.snapshot.rules?.version !== 4 || restoredState.snapshot.players.length !== 2 || restoredState.snapshot.gameId !== activeCreated.gameId) throw new Error("Started room state did not survive restart");
+  if (restoredState.snapshot.rules?.version !== 5 || restoredState.snapshot.players.length !== 2 || restoredState.snapshot.gameId !== activeCreated.gameId) throw new Error("Started room state did not survive restart");
   close(restored);
 
   console.log("Boom Box Pass 20 release matrix passed: malformed payload rejection, setup restart recovery, started-match restart recovery, 2/4/6/10-seat rules, setup rules and event normalization, deterministic scenery markers, movement and fuel, turn deadlines, disconnect takeover, catalogue filtering, simultaneous deterministic release, versioned atomic persistence, and session continuity.");

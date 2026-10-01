@@ -31,12 +31,15 @@ async function createTwoSeatRoom(page, mode, roomName) {
   await page.locator("#boombox-seats").selectOption("2");
   await page.locator("#boombox-firing-mode").selectOption(mode);
   await page.locator("#boombox-create-next").click();
-  const seatControls = page.locator("#boombox-seat-plan select");
-  if (await seatControls.count() !== 2) throw new Error(`2-seat setup rendered ${await seatControls.count()} seat controls`);
-  await seatControls.nth(1).selectOption("human");
+  await page.locator("#boombox-human-count").selectOption("2");
+  await page.locator("#boombox-ai-count").selectOption("0");
+  const seatControls = page.locator("#boombox-seat-plan .boombox-seat-plan-item");
+  if (await seatControls.count() !== 2) throw new Error(`2-seat setup rendered ${await seatControls.count()} seat assignments`);
+  if ((await page.locator("#boombox-seat-plan").innerText()).match(/Human commander/g)?.length !== 2) throw new Error("2-seat setup did not assign both seats to human commanders");
   await page.locator("#boombox-create-next").click();
   const summary = await page.locator("#boombox-create-summary").innerText();
-  if (!summary.includes("S2 Human") || !summary.toLowerCase().includes(mode)) throw new Error(`2-seat review lost ${mode} configuration: ${summary}`);
+  const expectedMode = mode === "sequential" ? "turn order" : "simultaneous";
+  if (!summary.includes("2 human · 0 AI") || !summary.toLowerCase().includes(expectedMode)) throw new Error(`2-seat review lost ${mode} configuration: ${summary}`);
   await page.locator("#boombox-create-submit").click();
   await page.locator(`#boombox-created-list article:has-text("${storedRoomName}")`).waitFor({ state: "visible", timeout: 12000 });
   return page.locator(`#boombox-created-list article:has-text("${storedRoomName}")`).first();
@@ -65,6 +68,8 @@ try {
   await available.waitFor({ state: "visible", timeout: 12000 });
   if (!(await available.innerText()).includes(`Created by E Host`)) throw new Error("Available room omitted the creator name");
   await available.getByRole("button", { name: "Join room" }).click();
+  const hostReadyCard = host.locator("#boombox-created-list article", { hasText: roomName }).first();
+  await hostReadyCard.getByRole("button", { name: "Start match" }).click();
   for (const page of [host, guest]) {
     await page.locator("#boombox-canvas").waitFor({ state: "visible", timeout: 12000 });
     const status = await page.locator("#boombox-match-status").innerText();

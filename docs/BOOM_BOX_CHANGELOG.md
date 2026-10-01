@@ -2,6 +2,16 @@
 
 This is the handoff record for Boom Box only. Each entry records the product-facing result and the verification that accompanied it. Detailed pass reports remain in the linked `docs/BOOM_BOX_*.md` files.
 
+## 2026-10-01 — Multi-round competition, pacing, and legibility (working tree)
+
+- Keep authoritative matches on the battlefield after an elimination, let destroyed commanders spectate, and route every non-final round through a dedicated standings, shopping, and ready-up intermission.
+- Play every configured round and rank commanders by cumulative kills, cumulative survival points, current credits, and the combined category-rank score, including shared tie ranks and prior-round elimination order.
+- Add a setup interest rate; award round credits before shopping and apply interest to post-shopping unspent credits when the next round begins, with a source-separated economy ledger ready for a later kill-reward setting.
+- Slow player and AI projectile presentation with frame-rate-independent playback, hold impacts long enough to read, and add visible tank-destruction effects before spectating, intermission, or final results.
+- Let AI commanders spend starting credits before Round 1, continue shopping only between rounds, and choose personality-specific equipment so their visible turns are tactically distinct.
+- Raise Boom Box text and control contrast across setup, match, spectator, intermission, and results views, and add browser/protocol coverage for the complete three-round loop.
+- Verification passed: production build; authoritative three-round ranking, tie, shopping, interest, wall-rotation, AI, network, persistence, recovery, identity, terrain, weapon, outcome, and parity suites; plus desktop/phone intermission, general browser, 4/6/10-seat, visual, admin, and accessibility checks.
+
 ## 2026-09-30 — Match setup, battlefield scale, and turn clarity (working tree)
 
 - Expand the live battlefield on larger screens while preserving a compact, scrollable phone layout and readable 10-commander health/status information.

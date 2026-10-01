@@ -16,7 +16,7 @@ try {
   await page.locator("#boombox-difficulty").selectOption("expert");
   const weaponText = await page.locator("#boombox-solo-weapon option[value='split-shell']").textContent();
   const utilityText = await page.locator("#boombox-solo-utility option[value='heavy-shield']").textContent();
-  if (!weaponText?.includes("Splits into two") || !utilityText?.includes("Absorb 70")) throw new Error("Solo catalog options did not explain their effects.");
+  if (!weaponText?.includes("Splits into two") || !utilityText?.includes("70 shield points")) throw new Error("Solo catalog options did not explain their effects.");
   await page.locator("#boombox-solo-start").click();
   await page.locator("#boombox-canvas").waitFor({ state: "visible", timeout: 15000 });
   await page.waitForFunction(() => { const status = document.querySelector("#boombox-match-status")?.textContent || ""; return status.includes("Your turn") || status.includes("Loading") || status.includes("Waiting"); }, null, { timeout: 15000 });

@@ -49,7 +49,8 @@ try {
   const guestId = "device-guest";
   const created = await sendAndNext(host, { type: "boombox-create", userId: hostId, config: { name: "Identity room", creator: sameName, seats: 2, aiFill: false, seed: 1101 } }, "boombox-created");
   if (created.gameId === "BB-0001" || created.gameId.includes("legacy")) throw new Error(`New room reused a historical ID: ${created.gameId}`);
-  const joined = next(guest, "boombox-joined"); const hostStarted = next(host, "boombox-state", (message) => message.snapshot?.phase === "turn-prep"); guest.send(JSON.stringify({ type: "boombox-join", userId: guestId, gameId: created.gameId, name: sameName })); await joined; await hostStarted;
+  const joined = next(guest, "boombox-joined"); guest.send(JSON.stringify({ type: "boombox-join", userId: guestId, gameId: created.gameId, name: sameName })); await joined;
+  const hostStarted = next(host, "boombox-state", (message) => message.snapshot?.phase === "turn-prep"); host.send(JSON.stringify({ type: "boombox-start-ai", userId: hostId, gameId: created.gameId })); await hostStarted;
   const hijacker = await open();
   const hijackError = await errorMessage(hijacker, { type: "boombox-join", userId: hostId, gameId: created.gameId, sessionId: created.sessionId, name: sameName });
   if (!hijackError.includes("already connected")) throw new Error(`Connected-session takeover was not rejected: ${hijackError}`);

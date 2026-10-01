@@ -1,7 +1,7 @@
 // Shared Boom Box rules contract. The browser and authoritative server import
 // this module so catalogue ids, effects, inventory limits, and seeded terrain
 // cannot drift between execution paths.
-export const BOOM_BOX_RULES_VERSION = 4;
+export const BOOM_BOX_RULES_VERSION = 5;
 export const BOOM_BOX_CANVAS = { width: 960, height: 540 };
 
 // Theme and asset IDs are deliberately data, so artwork can be replaced later
@@ -82,6 +82,7 @@ export function boomBoxRulesFromConfig(config = {}) {
     boundaries: configuredBoundaries.length ? [...new Set(configuredBoundaries)] : [boundary],
     boundaryMode,
     startingMoney: Math.max(0, Math.min(10000, Number(config.startingMoney) || 100)),
+    interestRate: Math.max(0, Math.min(50, config.interestRate === undefined ? 10 : Number(config.interestRate) || 0)),
     turnPace: pace,
     aiDifficulty,
     events: { meteorShower: Boolean(config.events?.meteorShower), scenery: Boolean(config.events?.scenery) },
