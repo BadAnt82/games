@@ -1138,6 +1138,7 @@ body.fullscreen-fallback-active {
 .admin-panel > p { color: rgba(224, 239, 255, .76); text-align: center; }
 .admin-form { display: grid; width: min(100%, 370px); gap: 12px; text-align: left; }
 .admin-form label { display: grid; gap: 6px; color: rgba(224, 239, 255, .82); font-size: .82rem; font-weight: 700; }
+.admin-form [hidden] { display: none; }
 .admin-form input { width: 100%; min-height: 42px; box-sizing: border-box; border: 1px solid rgba(143, 204, 255, .28); border-radius: 9px; background: rgba(4, 14, 34, .76); color: #fff; padding: 9px 11px; }
 .admin-form input:focus { outline: 2px solid #78e8ff; outline-offset: 2px; }
 .admin-help, .admin-form-message, .admin-session-note { margin: 0; color: rgba(224, 239, 255, .7); font-size: .78rem; line-height: 1.45; }
