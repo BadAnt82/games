@@ -883,6 +883,7 @@ body.fullscreen-fallback-active {
 .boombox-empty-state { margin: 0; padding: 10px 0 2px; color: rgba(224, 239, 255, .6); font-size: .84rem; }
 .boombox-history-panel { width: min(100%, 760px); }
 .boombox-history-list { display: grid; width: 100%; gap: 9px; text-align: left; }
+.boombox-history-pagination { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; color: rgba(224, 239, 255, .66); font-size: .76rem; }
 .boombox-history-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 5px 12px; align-items: center; padding: 12px 14px; border: 1px solid rgba(137, 227, 255, .2); border-radius: 11px; background: rgba(16, 29, 62, .72); }
 .boombox-history-card strong { color: #fff; }
 .boombox-history-card small { grid-column: 1; color: rgba(224, 239, 255, .64); font-size: .74rem; line-height: 1.35; }
@@ -903,6 +904,13 @@ body.fullscreen-fallback-active {
 .boombox-replay-controls { display: flex; flex-wrap: wrap; gap: 6px; }
 .boombox-history-events { display: grid; gap: 4px; max-height: 132px; overflow: auto; padding: 7px 9px; border: 1px solid rgba(137, 227, 255, .16); border-radius: 8px; background: rgba(7, 13, 32, .42); color: rgba(224, 239, 255, .72); font-size: .72rem; }
 .boombox-history-events span { display: block; }
+.overlay.is-boombox { --boombox-accent: var(--boombox-ridge, #ffb36e); }
+.overlay.is-boombox .boombox-kicker { color: var(--boombox-accent); }
+.overlay.is-boombox .boombox-history-card,
+.overlay.is-boombox .boombox-room-card { border-color: color-mix(in srgb, var(--boombox-accent) 24%, rgba(137, 227, 255, .2)); }
+[data-reduced-motion="true"] .overlay.is-boombox *,
+[data-reduced-motion="true"] .overlay.is-boombox *::before,
+[data-reduced-motion="true"] .overlay.is-boombox *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
 .boombox-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 .boombox-field-heading { display: block; margin-top: 3px; color: #fff; font-size: .82rem; }
 .boombox-seat-plan { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 8px; margin-top: 8px; }

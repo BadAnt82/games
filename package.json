@@ -17,6 +17,7 @@
     "test:boombox-d-solo": "node scripts/boombox-d-solo-check.mjs",
     "test:boombox-e-balance": "node scripts/boombox-e-balance-check.mjs",
     "test:boombox-f-recovery": "node scripts/boombox-f-recovery-check.mjs",
+    "test:boombox-g-reskin": "npx -p playwright node scripts/boombox-g-reskin-check.mjs",
     "test:boombox-ai": "node scripts/boombox-ai-strategy-check.mjs",
     "test:boombox-d-content": "node scripts/boombox-d-content-check.mjs",
     "test:boombox-terrain": "node scripts/boombox-terrain-check.mjs",

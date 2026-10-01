@@ -4,6 +4,18 @@
 export const BOOM_BOX_RULES_VERSION = 3;
 export const BOOM_BOX_CANVAS = { width: 960, height: 540 };
 
+// Theme and asset IDs are deliberately data, so artwork can be replaced later
+// without changing the authoritative simulation or the UI drawing code.
+export const BOOM_BOX_THEME_CATALOG = {
+  "ember-range": { label: "Ember Range", terrain: "sunset-range", assets: { background: "procedural:ember-sky", terrain: "vector:ember-ground", tank: "vector:tank", projectile: "vector:projectile" }, colors: { skyTop: "#101b41", skyBottom: "#261436", groundTop: "#d7734a", groundBottom: "#532844", ridge: "#ffb36e", star: "rgba(146, 229, 255, .23)" } },
+  "ice-shelf": { label: "Ice Shelf", terrain: "ice-shelf", assets: { background: "procedural:ice-sky", terrain: "vector:ice-ground", tank: "vector:tank", projectile: "vector:projectile" }, colors: { skyTop: "#13294a", skyBottom: "#173c58", groundTop: "#8dd8df", groundBottom: "#315f78", ridge: "#c7fbff", star: "rgba(207, 245, 255, .28)" } },
+  "lunar-crater": { label: "Lunar Crater", terrain: "lunar-crater", assets: { background: "procedural:lunar-sky", terrain: "vector:lunar-ground", tank: "vector:tank", projectile: "vector:projectile" }, colors: { skyTop: "#1b1b3c", skyBottom: "#30224b", groundTop: "#9b83b5", groundBottom: "#443958", ridge: "#d9c8f5", star: "rgba(229, 218, 255, .25)" } },
+};
+
+export function boomBoxThemeIdForTerrain(profile = "sunset-range") {
+  return profile === "ice-shelf" ? "ice-shelf" : profile === "lunar-crater" ? "lunar-crater" : "ember-range";
+}
+
 export const BOOM_BOX_WEAPON_CATALOG = {
   cannon: { label: "Cannon", cost: 0, inventory: 99, starter: 99, damage: 70, directDamage: 70, splashDamage: 48, radius: 58, depth: 24, mode: "single", speed: 1, description: "Reliable free shell." },
   "heavy-cannon": { label: "Heavy cannon", cost: 45, inventory: 2, damage: 82, directDamage: 82, splashDamage: 56, radius: 72, depth: 36, mode: "single", speed: .86, description: "Harder impact with a slower arc." },
@@ -54,6 +66,7 @@ export function boomBoxRulesFromConfig(config = {}) {
   const aiDifficulty = ["recruit", "veteran", "ace", "expert"].includes(String(config.aiDifficulty)) ? String(config.aiDifficulty) : "veteran";
   return {
     version: BOOM_BOX_RULES_VERSION,
+    themeId: BOOM_BOX_THEME_CATALOG[config.themeId] ? String(config.themeId) : boomBoxThemeIdForTerrain(config.terrain),
     seats: Math.max(2, Math.min(10, Number(config.seats) || 2)),
     firingMode: firingModes.has(String(config.firingMode)) ? String(config.firingMode) : "sequential",
     movement: Boolean(config.movement) && String(config.firingMode || "sequential") === "sequential",
