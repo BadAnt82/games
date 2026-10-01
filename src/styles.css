@@ -908,6 +908,7 @@ body.fullscreen-fallback-active {
 .boombox-seat-plan { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 8px; margin-top: 8px; }
 .boombox-seat-plan label { display: grid; gap: 5px; color: rgba(224, 239, 255, .8); font-size: .76rem; }
 .boombox-seat-plan select { width: 100%; }
+.boombox-seat-plan-item { display: block; padding: 9px 10px; border: 1px solid rgba(143, 204, 255, .18); border-radius: 8px; background: rgba(4, 14, 34, .42); color: rgba(224, 239, 255, .8); font-size: .76rem; }
 
 .boombox-create-panel { width: min(100%, 700px); }
 .boombox-stepper { display: flex; width: 100%; justify-content: center; gap: 8px; }
@@ -1150,6 +1151,11 @@ body.fullscreen-fallback-active {
 .admin-help, .admin-form-message, .admin-session-note { margin: 0; color: rgba(224, 239, 255, .7); font-size: .78rem; line-height: 1.45; }
 .admin-form-message { min-height: 1.25rem; color: #ffd28a; }
 .admin-session-note { color: #9dffcf; text-align: center; }
+.admin-game-selector-wrap { display: grid; justify-items: start; gap: 6px; width: min(100%, 860px); margin: 8px 0 0; text-align: left; }
+.admin-game-selector-wrap label { color: rgba(224, 239, 255, .82); font-size: .76rem; font-weight: 800; }
+.admin-game-selector-wrap select { min-width: 220px; min-height: 38px; border: 1px solid rgba(143, 204, 255, .28); border-radius: 8px; background: rgba(4, 14, 34, .76); color: #fff; padding: 7px 10px; }
+.admin-game-selector-wrap select:focus { outline: 2px solid #78e8ff; outline-offset: 2px; }
+.admin-game-placeholder { width: min(100%, 860px); margin: 14px 0 0 !important; padding: 14px; border: 1px dashed rgba(143, 204, 255, .25); border-radius: 10px; color: rgba(224, 239, 255, .7) !important; font-size: .78rem !important; line-height: 1.45; text-align: left !important; }
 .admin-dashboard { display: grid; width: min(100%, 860px); gap: 14px; margin-top: 8px; padding-top: 22px; border-top: 1px solid rgba(143, 204, 255, .2); text-align: left; }
 .admin-dashboard[hidden] { display: none; }
 .admin-dashboard-heading { display: flex; align-items: center; justify-content: space-between; gap: 14px; }

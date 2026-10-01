@@ -503,6 +503,9 @@ const adminSubmitButton = requireElement<HTMLButtonElement>("#admin-submit");
 const adminLogoutButton = requireElement<HTMLButtonElement>("#admin-logout");
 const adminBackButton = requireElement<HTMLButtonElement>("#admin-back");
 const adminSessionNote = requireElement<HTMLElement>("#admin-session-note");
+const adminGameSelectorWrap = requireElement<HTMLElement>("#admin-game-selector-wrap");
+const adminGameSelect = requireElement<HTMLSelectElement>("#admin-game-select");
+const adminGamePlaceholder = requireElement<HTMLElement>("#admin-game-placeholder");
 const adminDashboard = requireElement<HTMLElement>("#admin-dashboard");
 const adminConfigVersion = requireElement<HTMLElement>("#admin-config-version");
 const adminConfigTabs = requireElement<HTMLElement>("#admin-config-tabs");
@@ -5874,6 +5877,14 @@ function setGamesAdminMessage(message: string, error = false) {
   adminFormMessage.style.color = error ? "#ffb5b5" : "";
 }
 
+function updateAdminGameView() {
+  const boomBoxSelected = adminGameSelect.value === "boombox";
+  adminGameSelectorWrap.hidden = !adminSessionNote.hidden;
+  adminDashboard.hidden = adminSessionNote.hidden || !boomBoxSelected;
+  adminGamePlaceholder.hidden = adminSessionNote.hidden || boomBoxSelected;
+  if (boomBoxSelected && !adminSessionNote.hidden && adminConfigDraft === undefined) void loadAdminConfig();
+}
+
 function renderGamesAdmin(status: GamesAdminStatus) {
   const authenticated = status.authenticated === true;
   gamesAdminMode = status.configured === true ? "login" : "setup";
@@ -5888,13 +5899,16 @@ function renderGamesAdmin(status: GamesAdminStatus) {
   adminSubmitButton.hidden = authenticated;
   adminLogoutButton.hidden = !authenticated;
   adminSessionNote.hidden = !authenticated;
-  adminDashboard.hidden = !authenticated;
+  adminGameSelect.value = adminGameSelect.value || "boombox";
+  adminGameSelectorWrap.hidden = !authenticated;
+  adminDashboard.hidden = !authenticated || adminGameSelect.value !== "boombox";
+  adminGamePlaceholder.hidden = !authenticated || adminGameSelect.value === "boombox";
   adminSessionNote.textContent = authenticated ? `Signed in as ${status.email || "Games admin"}. Global balance controls are below.` : "";
   adminIntro.textContent = authenticated ? "Your Games admin session is active." : gamesAdminMode === "setup" ? "Create the isolated Games admin password to continue." : "Sign in to manage the Games platform.";
   adminSubmitButton.textContent = gamesAdminMode === "setup" ? "Create admin password" : "Sign in";
   adminPasswordInput.autocomplete = gamesAdminMode === "setup" ? "new-password" : "current-password";
   setGamesAdminMessage("");
-  if (authenticated) void loadAdminConfig();
+  if (authenticated && adminGameSelect.value === "boombox") void loadAdminConfig();
 }
 
 async function loadGamesAdminPanel() {
@@ -7425,6 +7439,10 @@ adminConfigTabs.addEventListener("click", (event) => {
 });
 adminConfigSaveButton.addEventListener("click", () => void saveAdminConfig());
 adminConfigReloadButton.addEventListener("click", () => void loadAdminConfig());
+adminGameSelect.addEventListener("change", () => {
+  updateAdminGameView();
+  if (adminGameSelect.value === "boombox" && !adminSessionNote.hidden) void loadAdminConfig();
+});
 snakeOptionsButton.addEventListener("click", showSnakeOptions);
 snakeMenuBackButton.addEventListener("click", () => reset("platform"));
 snakeOptionsBackButton.addEventListener("click", showSnakeMenu);

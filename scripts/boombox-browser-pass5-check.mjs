@@ -27,11 +27,10 @@ async function createHumanRoom(page) {
   await page.locator("#boombox-seats").selectOption("4");
   await page.locator("#boombox-create-next").click();
   await page.locator("#boombox-seat-plan").waitFor({ state: "visible" });
-  const seats = page.locator("#boombox-seat-plan select");
-  if (await seats.count() !== 4) throw new Error(`Pass 5 room rendered ${await seats.count()} seat controls`);
-  for (let index = 1; index < 4; index += 1) await seats.nth(index).selectOption("human");
+  await page.locator("#boombox-human-count").selectOption("4");
+  await page.locator("#boombox-ai-count").selectOption("0");
   await page.locator("#boombox-create-next").click();
-  if (!(await page.locator("#boombox-create-summary").innerText()).includes("S4 Human")) throw new Error("Pass 5 review did not preserve four human seats");
+  if (!(await page.locator("#boombox-create-summary").innerText()).includes("4 human")) throw new Error("Pass 5 review did not preserve four human seats");
   await page.locator("#boombox-create-submit").click();
   await page.locator(`#boombox-created-list article:has-text("${roomName}")`).waitFor({ state: "visible", timeout: 12000 });
 }
@@ -61,6 +60,7 @@ try {
   await openLobby(host);
   await createHumanRoom(host);
   for (const page of [guestOne, guestTwo, guestThree]) await joinRoom(page);
+  await host.locator(`#boombox-created-list article:has-text("${roomName}")`).getByRole("button", { name: "Start match" }).click();
   for (const page of [host, guestOne, guestTwo, guestThree]) await page.locator("#boombox-canvas").waitFor({ state: "visible", timeout: 15000 });
 
   // Three complete four-seat rounds exercise turn cycling and long-running synchronization.

@@ -20,6 +20,12 @@ try {
   await page.locator("#admin-confirm-password").fill("Strong1!");
   await page.locator("#admin-submit").click();
   await page.locator("#admin-dashboard").waitFor({ state: "visible", timeout: 5000 });
+  const gameOptions = await page.locator("#admin-game-select option").allTextContents();
+  if (gameOptions.length < 7 || !gameOptions.includes("Boom Box") || !gameOptions.includes("Digital Cribbage")) throw new Error("Admin game selector did not include the Games catalog.");
+  await page.locator("#admin-game-select").selectOption("digital-cribbage");
+  if (!(await page.locator("#admin-game-placeholder").isVisible()) || await page.locator("#admin-dashboard").isVisible()) throw new Error("Non-Boom Box game selector did not show its placeholder page.");
+  await page.locator("#admin-game-select").selectOption("boombox");
+  await page.locator("#admin-dashboard").waitFor({ state: "visible" });
   await page.waitForFunction(() => !document.querySelector("#admin-config-status")?.textContent?.includes("Loading"), null, { timeout: 5000 });
   if (!(await page.locator("#admin-config-fields").innerText()).includes("Default starting credits")) throw new Error("Economy dashboard did not render.");
   await page.locator("button[data-admin-tab='weapons']").click();

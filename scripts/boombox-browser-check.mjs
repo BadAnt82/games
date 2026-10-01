@@ -25,9 +25,8 @@ try {
   await host.locator("#boombox-seats").selectOption("2");
   await host.locator("#boombox-create-next").click();
   await host.locator("#boombox-seat-plan").waitFor({ state: "visible" });
-  await host.locator("#boombox-seat-plan select").nth(1).selectOption("human");
   await host.locator("#boombox-create-next").click();
-  if (!(await host.locator("#boombox-create-summary").innerText()).includes("S2 Human")) throw new Error("Seat control was not included in the review step");
+  if (!(await host.locator("#boombox-create-summary").innerText()).includes("2 human")) throw new Error("Seat control was not included in the review step");
   await host.locator("#boombox-create-submit").click();
   await host.locator(`#boombox-created-list article:has-text("${roomName}")`).waitFor({ state: "visible", timeout: 8000 });
 
@@ -35,6 +34,7 @@ try {
   const availableRoom = guest.locator("#boombox-available-list article", { hasText: roomName }).first();
   await availableRoom.waitFor({ state: "visible", timeout: 8000 });
   await availableRoom.getByRole("button", { name: "Join room" }).click();
+  await host.locator(`#boombox-created-list article:has-text("${roomName}")`).getByRole("button", { name: "Start match" }).click();
   await host.locator("#boombox-canvas").waitFor({ state: "visible", timeout: 10000 });
   await guest.locator("#boombox-canvas").waitFor({ state: "visible", timeout: 10000 });
   if (!(await host.locator("#boombox-match-status").innerText()).includes("Your turn")) throw new Error("Host did not receive the first turn");
