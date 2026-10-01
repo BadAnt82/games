@@ -5753,7 +5753,7 @@ function addScore(points: number) {
 
 type GamesAdminStatus = { configured?: boolean; authenticated?: boolean; email?: string };
 type GamesAdminConfig = { version: number; economy: Record<string, number>; tank: Record<string, number>; terrain: Record<string, number>; ai: Record<string, number>; timing: Record<string, number>; weapons: Record<string, Record<string, number>>; utilities: Record<string, Record<string, number>> };
-type GamesAdminCatalog = Record<string, { label: string; description?: string; mode?: string; effect?: string }>;
+type GamesAdminCatalog = Record<string, { label: string; description?: string; mode?: string; material?: string; effect?: string; amountUnit?: string; hasAmount?: boolean }>;
 type GamesAdminConfigPayload = { version: number; config: GamesAdminConfig; catalogs: { weapons: GamesAdminCatalog; utilities: GamesAdminCatalog } };
 let gamesAdminMode: "login" | "setup" = "login";
 let adminConfigDraft: GamesAdminConfig | null = null;
@@ -5820,6 +5820,37 @@ function adminConfigInput(path: string, label: string, value: number, step: stri
   return `<label class="admin-config-field"><span>${escapeAdminHtml(label)}</span><input data-admin-path="${escapeAdminHtml(path)}" type="number" step="${step}" value="${Number.isFinite(value) ? value : 0}" /><small>${escapeAdminHtml(help)}</small></label>`;
 }
 
+type AdminCatalogField = [string, string, string, string];
+function adminWeaponFields(metadata: GamesAdminCatalog[string]): AdminCatalogField[] {
+  const fields: AdminCatalogField[] = [
+    ["cost", "Credit cost", "1", "Credits charged for one purchase."],
+    ["inventory", "Maximum capacity", "1", "Maximum unused copies one seat can hold."],
+    ["damage", "Base damage", "1", "Fallback damage used when a more specific damage value is not set."],
+    ["directDamage", "Direct damage", "1", "Damage dealt to a tank at the impact point."],
+    ["splashDamage", "Splash damage", "1", "Damage dealt to other tanks inside the blast radius."],
+    ["radius", "Explosion radius", "1", "Blast radius in battlefield units."],
+    ["depth", "Terrain change", "1", "Positive values dig terrain; negative values raise terrain."],
+    ["speed", "Flight speed multiplier", "0.01", "1 is normal speed; higher values travel faster."],
+  ];
+  if (metadata.mode === "bounce") fields.push(["bounces", "Maximum bounces", "1", "Number of wall or terrain bounces before the shot ends."]);
+  if (metadata.mode === "spread") { fields.push(["count", "Projectiles per shot", "1", "Number of separate projectiles created by one trigger pull."]); fields.push(["spread", "Spread angle", "1", "Angle between projectiles in a spread shot."]); }
+  if (metadata.mode === "napalm") { fields.push(["burningTurns", "Burning duration (rounds)", "1", "Rounds the target continues taking burn damage."]); fields.push(["burnDamage", "Burn damage per round", "1", "Damage dealt at the end of each burning round."]); }
+  if (metadata.mode === "smoke") { fields.push(["smokeTurns", "Smoke duration (rounds)", "1", "Rounds the smoke cover remains active."]); fields.push(["smokeDamageMultiplier", "Smoke damage multiplier", "0.01", "Incoming damage multiplier while smoke-covered; 0.7 means 70% damage."]); }
+  if (metadata.material === "reinforced") fields.push(["reinforcedDamageMultiplier", "Reinforced cover damage multiplier", "0.01", "Incoming damage multiplier against this reinforced material; 0.75 means 75% damage."]);
+  return fields;
+}
+
+function adminUtilityFields(metadata: GamesAdminCatalog[string]): AdminCatalogField[] {
+  const fields: AdminCatalogField[] = [
+    ["cost", "Credit cost", "1", "Credits charged for one purchase."],
+    ["purchaseAmount", "Amount per purchase", "1", "How many copies are added when the player buys this utility once."],
+    ["inventory", "Maximum capacity", "1", "Maximum unused copies one seat can hold."],
+    ["durationRounds", "Expiration (rounds)", "1", "How many rounds an active effect lasts. 0 means it never expires. Immediate effects are consumed when used."],
+  ];
+  if (metadata.hasAmount) fields.push(["amount", `Effect amount (${metadata.amountUnit || "units"})`, "1", `The ${metadata.amountUnit || "unit"} applied when this utility is used.`]);
+  return fields;
+}
+
 function renderAdminConfigFields() {
   if (!adminConfigDraft) { adminConfigFields.innerHTML = "<p>Configuration is unavailable.</p>"; return; }
   if (adminConfigDefinitions[adminConfigTab]) {
@@ -5831,10 +5862,7 @@ function renderAdminConfigFields() {
   const isWeapon = adminConfigTab === "weapons";
   const values = isWeapon ? adminConfigDraft.weapons : adminConfigDraft.utilities;
   const catalog = isWeapon ? adminConfigCatalogs.weapons : adminConfigCatalogs.utilities;
-  const fields = isWeapon ? [
-    ["cost", "Credit cost", "1", "Credits charged when purchased."], ["inventory", "Capacity", "1", "Maximum copies a seat can hold."], ["damage", "Base damage", "1", "Fallback damage value."], ["directDamage", "Direct damage", "1", "Damage at the impact point."], ["splashDamage", "Splash damage", "1", "Damage around the impact."], ["radius", "Explosion radius", "1", "Blast radius in battlefield units."], ["depth", "Terrain depth", "1", "Terrain removed or added by the impact."], ["speed", "Flight speed", "0.01", "Projectile speed multiplier."], ["bounces", "Bounces", "1", "Maximum bounce count."], ["count", "Projectile count", "1", "Number of projectiles created by one shot."], ["spread", "Spread", "1", "Angle between projectiles in a spread shot."], ["burningTurns", "Burning turns", "1", "Turns of damage after a napalm hit."], ["burnDamage", "Burn damage", "1", "Damage dealt at each burning turn."], ["smokeTurns", "Smoke turns", "1", "Turns of cover created by a smoke shell."], ["smokeDamageMultiplier", "Smoke damage multiplier", "0.01", "Incoming damage multiplier while covered."], ["reinforcedDamageMultiplier", "Reinforced cover multiplier", "0.01", "Damage multiplier against reinforced cover."]
-  ] : [["cost", "Credit cost", "1", "Credits charged when purchased."], ["inventory", "Capacity", "1", "Maximum copies a seat can hold."], ["amount", "Effect amount", "1", "Primary numeric effect amount."]];
-  adminConfigFields.innerHTML = `<section class="admin-config-section"><h3>${isWeapon ? "Weapon" : "Utility"} catalog</h3><p>Each card keeps the label and description visible while you adjust its balance values.</p><div class="admin-catalog-list">${Object.entries(values).map(([id, item]) => { const metadata = catalog[id] || { label: id, description: "" }; return `<article class="admin-catalog-card"><header><strong>${escapeAdminHtml(metadata.label)}</strong><small>${escapeAdminHtml(id)}</small></header><p>${escapeAdminHtml(metadata.description || "")}</p><div class="admin-config-grid">${fields.map(([field, label, step, help]) => adminConfigInput(`${isWeapon ? "weapons" : "utilities"}.${id}.${field}`, label, item[field] ?? 0, step, help)).join("")}</div></article>`; }).join("")}</div></section>`;
+  adminConfigFields.innerHTML = `<section class="admin-config-section"><h3>${isWeapon ? "Weapon" : "Utility"} catalog</h3><p>${isWeapon ? "Only settings that apply to each weapon are shown. A cannon creates one projectile automatically; spread weapons expose their separate projectile count." : "Each purchase has a cost, adds a defined number of copies, respects the maximum capacity, and can optionally expire after a number of rounds."}</p><div class="admin-catalog-list">${Object.entries(values).map(([id, item]) => { const metadata = catalog[id] || { label: id, description: "" }; const fields = isWeapon ? adminWeaponFields(metadata) : adminUtilityFields(metadata); return `<article class="admin-catalog-card"><header><strong>${escapeAdminHtml(metadata.label)}</strong><small>${escapeAdminHtml(id)}</small></header><p>${escapeAdminHtml(metadata.description || "")}</p><div class="admin-config-grid">${fields.map(([field, label, step, help]) => adminConfigInput(`${isWeapon ? "weapons" : "utilities"}.${id}.${field}`, label, item[field] ?? 0, step, help)).join("")}</div></article>`; }).join("")}</div></section>`;
 }
 
 async function loadAdminConfig() {

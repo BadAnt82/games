@@ -29,7 +29,12 @@ try {
   await page.waitForFunction(() => !document.querySelector("#admin-config-status")?.textContent?.includes("Loading"), null, { timeout: 5000 });
   if (!(await page.locator("#admin-config-fields").innerText()).includes("Default starting credits")) throw new Error("Economy dashboard did not render.");
   await page.locator("button[data-admin-tab='weapons']").click();
-  if (!(await page.locator("#admin-config-fields").innerText()).includes("Cannon")) throw new Error("Weapon catalog tab did not render.");
+  const weaponText = await page.locator("#admin-config-fields").innerText();
+  const cannonText = await page.locator(".admin-catalog-card").evaluateAll((cards) => cards.find((card) => card.querySelector("header strong")?.textContent === "Cannon")?.textContent || "");
+  if (!weaponText.includes("Cannon") || cannonText.includes("Projectiles per shot")) throw new Error("Weapon catalog tab did not hide non-applicable projectile settings.");
+  await page.locator("button[data-admin-tab='utilities']").click();
+  const utilityText = await page.locator("#admin-config-fields").innerText();
+  if (!utilityText.includes("Amount per purchase") || !utilityText.includes("Expiration (rounds)") || !utilityText.includes("Effect amount (health points)") || utilityText.includes("Effect amount (units)")) throw new Error("Utility catalog tab did not render clear purchase, capacity, duration, and applicable effect fields.");
   await page.locator("#overlay").evaluate((element) => { element.scrollTop = 0; });
   await page.locator("button[data-admin-tab='economy']").click();
   await page.locator("input[data-admin-path='economy.startingCredits']").fill("275");

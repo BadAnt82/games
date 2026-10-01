@@ -21,3 +21,7 @@ Boom Box detects `prefers-reduced-motion`, publishes `data-reduced-motion` on th
 - `npm run test:boombox-contract`
 - `npm run test:boombox-persistence`
 - `npm run test:boombox-f-recovery`
+
+## Follow-up balance clarity hardening
+
+Utility catalog entries now expose `cost`, `purchaseAmount`, `inventory` capacity, and `durationRounds` (`0` means never expires). Effect amounts are labeled with their units and are omitted for utilities with no numeric effect. Active shield, parachute, and guidance effects honor a positive duration. Weapon cards only show fields that apply to their mode; spread weapons show projectiles per shot, while the single projectile behavior of the cannon is explicit in the card explanation.

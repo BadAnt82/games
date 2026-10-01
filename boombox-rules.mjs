@@ -39,14 +39,14 @@ export const BOOM_BOX_WEAPON_CATALOG = {
 };
 
 export const BOOM_BOX_UTILITY_CATALOG = {
-  "repair-kit": { label: "Repair kit", cost: 20, inventory: 2, starter: 1, effect: "repair", amount: 30, economy: "Reliable recovery after a direct hit.", description: "Restore 30 health." },
-  shield: { label: "Light shield", cost: 25, inventory: 2, starter: 1, effect: "shield", amount: 35, description: "Absorb 35 damage." },
-  "heavy-shield": { label: "Heavy shield", cost: 45, inventory: 1, effect: "shield", amount: 70, description: "Absorb 70 damage." },
-  "shield-recharge": { label: "Shield recharge", cost: 30, inventory: 2, effect: "shield-recharge", amount: 25, description: "Restore 25 shield." },
-  "terrain-lift": { label: "Terrain lift", cost: 15, inventory: 2, starter: 1, effect: "terrain-lift", description: "Raise reinforced cover." },
-  parachute: { label: "Parachute", cost: 15, inventory: 2, starter: 1, effect: "parachute", description: "Protect the next terrain fall." },
-  "fuel-canister": { label: "Fuel canister", cost: 15, inventory: 2, effect: "fuel", amount: 50, economy: "Keeps movement available in long matches.", description: "Restore 50 movement fuel." },
-  "guidance-kit": { label: "Guidance kit", cost: 30, inventory: 1, effect: "guidance", description: "Adds steering to later shots." },
+  "repair-kit": { label: "Repair kit", cost: 20, purchaseAmount: 1, inventory: 2, durationRounds: 0, starter: 1, effect: "repair", amount: 30, amountUnit: "health points", economy: "Reliable recovery after a direct hit.", description: "Restore 30 health immediately when used." },
+  shield: { label: "Light shield", cost: 25, purchaseAmount: 1, inventory: 2, durationRounds: 0, starter: 1, effect: "shield", amount: 35, amountUnit: "shield points", description: "Add 35 shield points; the shield absorbs incoming damage." },
+  "heavy-shield": { label: "Heavy shield", cost: 45, purchaseAmount: 1, inventory: 1, durationRounds: 0, effect: "shield", amount: 70, amountUnit: "shield points", description: "Add 70 shield points; the shield absorbs incoming damage." },
+  "shield-recharge": { label: "Shield recharge", cost: 30, purchaseAmount: 1, inventory: 2, durationRounds: 0, effect: "shield-recharge", amount: 25, amountUnit: "shield points", description: "Restore 25 shield points immediately; it does not create a new shield." },
+  "terrain-lift": { label: "Terrain lift", cost: 15, purchaseAmount: 1, inventory: 2, durationRounds: 0, starter: 1, effect: "terrain-lift", description: "Raise reinforced cover immediately at your tank." },
+  parachute: { label: "Parachute", cost: 15, purchaseAmount: 1, inventory: 2, durationRounds: 0, starter: 1, effect: "parachute", description: "Arm one parachute to protect the next terrain fall." },
+  "fuel-canister": { label: "Fuel canister", cost: 15, purchaseAmount: 1, inventory: 2, durationRounds: 0, effect: "fuel", amount: 50, amountUnit: "fuel units", economy: "Keeps movement available in long matches.", description: "Restore 50 movement fuel immediately." },
+  "guidance-kit": { label: "Guidance kit", cost: 30, purchaseAmount: 1, inventory: 1, durationRounds: 0, effect: "guidance", description: "Arm guidance for later shots." },
 };
 
 export function boomBoxTerrain(seed, profile = "sunset-range") {

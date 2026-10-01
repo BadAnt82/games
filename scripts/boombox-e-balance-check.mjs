@@ -13,7 +13,7 @@ writeFileSync(configPath, JSON.stringify({
   terrain: { gravity: 190, windLimit: .4, collapseThreshold: 8, smokeTurns: 5 },
   timing: { turnTimeoutSeconds: 12, projectileStepMs: 33, aiThinkDelayMs: 100, fastForwardMultiplier: 4 },
   weapons: { cannon: { damage: 33, directDamage: 33, splashDamage: 11 }, "laser-line": { cost: 20, directDamage: 30, splashDamage: 0 } },
-  utilities: { shield: { amount: 90 } },
+  utilities: { shield: { amount: 90, durationRounds: 1 }, "fuel-canister": { purchaseAmount: 2 } },
 }, null, 2));
 
 const server = spawn(process.execPath, ["server.mjs"], { env: { ...process.env, PORT: String(port), GAMES_ADMIN_CONFIG_STORE_PATH: configPath, GAMES_ADMIN_STORE_PATH: join(storeDir, "admin.json") }, stdio: ["ignore", "pipe", "pipe"] });
@@ -33,7 +33,7 @@ try {
   if (rules.startingMoney !== 321 || rules.gravity !== 190 || rules.windLimit !== .4) throw new Error("Admin economy or terrain defaults were not applied to new rooms.");
   if (rules.balance?.tank?.maxHealth !== 180 || rules.balance?.economy?.movementFuel !== 64) throw new Error("Admin balance was not included in the authoritative rules snapshot.");
   if (state.snapshot.players[0].maxHealth !== 180 || state.snapshot.players[0].fuel !== 64) throw new Error("Admin tank defaults did not initialize player state.");
-  if (rules.weaponCatalog.cannon.directDamage !== 33 || rules.weaponCatalog["laser-line"].cost !== 20 || rules.utilityCatalog.shield.amount !== 90) throw new Error("Admin catalog overrides did not reach the room rules.");
+  if (rules.weaponCatalog.cannon.directDamage !== 33 || rules.weaponCatalog["laser-line"].cost !== 20 || rules.utilityCatalog.shield.amount !== 90 || rules.utilityCatalog.shield.durationRounds !== 1 || rules.utilityCatalog["fuel-canister"].purchaseAmount !== 2) throw new Error("Admin catalog overrides did not reach the room rules.");
   const purchasePromise = next(socket, "boombox-purchase-result"); send(socket, { type: "boombox-purchase", userId, gameId: created.gameId, purchaseId: "e-laser", category: "weapon", item: "laser-line", quantity: 1 }); await purchasePromise;
   const firePromise = next(socket, "boombox-state", (message) => message.snapshot?.log?.some((entry) => entry.kind === "fire" && entry.actionId === "e-laser-fire")); send(socket, { type: "boombox-action", userId, gameId: created.gameId, actionId: "e-laser-fire", action: { targetIndex: 1, weapon: "laser-line", angle: 42, power: 58 } }); const fired = await firePromise; const fire = fired.snapshot.log.find((entry) => entry.actionId === "e-laser-fire"); if (fire?.childImpacts?.[0]?.damage !== 23) throw new Error(`Armor/direct damage plumbing was not applied: ${JSON.stringify(fire)}`);
   socket.close();
@@ -41,6 +41,7 @@ try {
   const utilitySocket = await open();
   const utilityUserId = `e-utility-${Date.now()}`;
   const utilityRoom = await start(utilitySocket, utilityUserId, "E Utility");
-  const utilityPromise = next(utilitySocket, "boombox-state", (message) => message.snapshot?.log?.some((entry) => entry.kind === "utility" && entry.utility === "shield")); send(utilitySocket, { type: "boombox-action", userId: utilityUserId, gameId: utilityRoom.created.gameId, actionId: "e-shield", action: { kind: "utility", utility: "shield" } }); const utilityState = await utilityPromise; if (utilityState.snapshot.players[0].shield !== 50) throw new Error("Shield effect ignored the configured maximum shield."); utilitySocket.close();
+  const utilityPromise = next(utilitySocket, "boombox-state", (message) => message.snapshot?.log?.some((entry) => entry.kind === "utility" && entry.utility === "shield")); send(utilitySocket, { type: "boombox-action", userId: utilityUserId, gameId: utilityRoom.created.gameId, actionId: "e-shield", action: { kind: "utility", utility: "shield" } }); const utilityState = await utilityPromise; if (utilityState.snapshot.players[0].shield !== 50 || utilityState.snapshot.players[0].activeUtilities?.shield !== 1) throw new Error("Shield effect ignored the configured maximum or expiration duration.");
+  const fuelPurchase = next(utilitySocket, "boombox-purchase-result"); send(utilitySocket, { type: "boombox-purchase", userId: utilityUserId, gameId: utilityRoom.created.gameId, purchaseId: "e-fuel", category: "utility", item: "fuel-canister", quantity: 1 }); const fuelResult = await fuelPurchase; if (fuelResult.loadout.utilities["fuel-canister"] !== 2) throw new Error("Utility purchase amount was not applied to the authoritative loadout."); utilitySocket.close();
   console.log("Boom Box Pass E balance check passed: admin defaults, catalog overrides, armor, direct damage, shield limits, and player initialization are authoritative.");
 } finally { server.kill(); rmSync(storeDir, { recursive: true, force: true }); }
