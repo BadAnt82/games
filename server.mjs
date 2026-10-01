@@ -19,6 +19,7 @@ const bridgeJackpotStorePath =
 const boomBoxHistoryPath = process.env.BOOM_BOX_HISTORY_STORE_PATH || resolve(__dirname, "data", "boombox-match-history.json");
 const boomBoxRoomStorePath = process.env.BOOM_BOX_ROOM_STORE_PATH || resolve(__dirname, "data", "boombox-active-rooms.json");
 const gamesAdminStorePath = process.env.GAMES_ADMIN_STORE_PATH || resolve(__dirname, "data", "games-admin.json");
+const gamesAdminConfigPath = process.env.GAMES_ADMIN_CONFIG_STORE_PATH || resolve(__dirname, "data", "games-admin-config.json");
 const gamesAdminEmail = "ant1982@gmail.com";
 const gamesAdminSessionTtlMs = 8 * 60 * 60 * 1000;
 const gamesAdminSessions = new Map();
@@ -188,6 +189,59 @@ const contentTypes = {
   ".png": "image/png",
   ".svg": "image/svg+xml",
 };
+
+const gamesAdminConfigVersion = 1;
+const adminWeaponFields = ["cost", "inventory", "damage", "directDamage", "splashDamage", "radius", "depth", "speed", "bounces"];
+const adminUtilityFields = ["cost", "inventory", "amount"];
+const adminNumberRanges = {
+  startingCredits: [0, 10000], movementFuel: [0, 500], movementFuelCost: [0, 100],
+  maxHealth: [1, 1000], maxShield: [0, 1000], armorDamageReduction: [0, 1], fallDamageThreshold: [0, 500], fallDamageMultiplier: [0, 5], fallDamageBase: [0, 100],
+  gravity: [60, 260], windLimit: [0, 2], collapseThreshold: [0, 50], smokeTurns: [0, 20],
+  recruitAccuracy: [0, 1], veteranAccuracy: [0, 1], aceAccuracy: [0, 1], expertAccuracy: [0, 1],
+  turnTimeoutSeconds: [5, 300], projectileStepMs: [16, 100], aiThinkDelayMs: [100, 10000], fastForwardMultiplier: [1, 8],
+};
+function adminNumber(value, fallback, range, integer = false) {
+  const parsed = Number(value);
+  const safe = Number.isFinite(parsed) ? parsed : fallback;
+  const bounded = Math.max(range[0], Math.min(range[1], safe));
+  return integer ? Math.round(bounded) : Number(bounded.toFixed(3));
+}
+function defaultGamesAdminConfig() {
+  return {
+    version: gamesAdminConfigVersion,
+    economy: { startingCredits: 100, movementFuel: 100, movementFuelCost: 10 },
+    tank: { maxHealth: 100, maxShield: 100, armorDamageReduction: 0, fallDamageThreshold: 8, fallDamageMultiplier: 0.35, fallDamageBase: 8 },
+    terrain: { gravity: 150, windLimit: 1.2, collapseThreshold: 8, smokeTurns: 3 },
+    ai: { recruitAccuracy: 0.55, veteranAccuracy: 0.7, aceAccuracy: 0.82, expertAccuracy: 0.92 },
+    timing: { turnTimeoutSeconds: 45, projectileStepMs: 33, aiThinkDelayMs: 1200, fastForwardMultiplier: 4 },
+    weapons: Object.fromEntries(Object.entries(BOOMBOX_WEAPON_CATALOG).map(([id, item]) => [id, Object.fromEntries(adminWeaponFields.filter((field) => field in item).map((field) => [field, Number(item[field]) || 0]))])),
+    utilities: Object.fromEntries(Object.entries(BOOMBOX_UTILITY_CATALOG).map(([id, item]) => [id, Object.fromEntries(adminUtilityFields.filter((field) => field in item).map((field) => [field, Number(item[field]) || 0]))])),
+  };
+}
+function normalizeGamesAdminConfig(input = {}) {
+  const defaults = defaultGamesAdminConfig();
+  const output = structuredClone(defaults);
+  for (const [section, fields] of Object.entries({ economy: Object.keys(defaults.economy), tank: Object.keys(defaults.tank), terrain: Object.keys(defaults.terrain), ai: Object.keys(defaults.ai), timing: Object.keys(defaults.timing) })) {
+    for (const field of fields) {
+      const range = adminNumberRanges[field] || [0, Number.MAX_SAFE_INTEGER];
+      const fallback = defaults[section][field];
+      output[section][field] = adminNumber(input?.[section]?.[field], fallback, range, Number.isInteger(fallback));
+    }
+  }
+  for (const [id, fields] of Object.entries(defaults.weapons)) for (const field of Object.keys(fields)) output.weapons[id][field] = adminNumber(input?.weapons?.[id]?.[field], fields[field], field === "speed" ? [0.1, 3] : [0, 10000], field !== "speed");
+  for (const [id, fields] of Object.entries(defaults.utilities)) for (const field of Object.keys(fields)) output.utilities[id][field] = adminNumber(input?.utilities?.[id]?.[field], fields[field], [0, 10000], true);
+  return output;
+}
+function readGamesAdminConfig() {
+  try { return normalizeGamesAdminConfig(JSON.parse(readFileSync(gamesAdminConfigPath, "utf8"))); } catch { return defaultGamesAdminConfig(); }
+}
+function writeGamesAdminConfig(config) {
+  mkdirSync(resolve(gamesAdminConfigPath, ".."), { recursive: true });
+  const temporaryPath = `${gamesAdminConfigPath}.tmp`;
+  writeFileSync(temporaryPath, JSON.stringify(config, null, 2));
+  renameSync(temporaryPath, gamesAdminConfigPath);
+}
+let gamesAdminConfig = readGamesAdminConfig();
 
 function randomGridCoordinate(limit) {
   const cells = Math.floor(limit / snakeBoard.cellSize) - 4;
@@ -1624,6 +1678,39 @@ async function handleApi(request, response) {
   if (url.pathname === "/api/admin/session" && request.method === "GET") {
     const session = gamesAdminSession(request);
     sendJson(response, 200, session ? { authenticated: true, email: session.email } : { authenticated: false });
+    return true;
+  }
+  if (url.pathname === "/api/admin/config" && request.method === "GET") {
+    const session = gamesAdminSession(request);
+    if (!session || !readGamesAdminAccount()) {
+      sendJson(response, 401, { code: "admin_auth_required", error: "Sign in as Games admin to view configuration." });
+      return true;
+    }
+    sendJson(response, 200, {
+      version: gamesAdminConfigVersion,
+      config: gamesAdminConfig,
+      catalogs: {
+        weapons: Object.fromEntries(Object.entries(BOOMBOX_WEAPON_CATALOG).map(([id, item]) => [id, { label: item.label, description: item.description, mode: item.mode }])),
+        utilities: Object.fromEntries(Object.entries(BOOMBOX_UTILITY_CATALOG).map(([id, item]) => [id, { label: item.label, description: item.description, effect: item.effect }])),
+      },
+    });
+    return true;
+  }
+  if (url.pathname === "/api/admin/config" && request.method === "PUT") {
+    const session = gamesAdminSession(request);
+    if (!session || !readGamesAdminAccount()) {
+      sendJson(response, 401, { code: "admin_auth_required", error: "Sign in as Games admin to save configuration." });
+      return true;
+    }
+    try {
+      const body = JSON.parse(await readRequestBody(request));
+      const candidate = body?.config && typeof body.config === "object" ? body.config : body;
+      gamesAdminConfig = normalizeGamesAdminConfig(candidate);
+      writeGamesAdminConfig(gamesAdminConfig);
+      sendJson(response, 200, { version: gamesAdminConfigVersion, config: gamesAdminConfig, savedAt: new Date().toISOString() });
+    } catch {
+      sendJson(response, 400, { code: "invalid_config", error: "The configuration payload could not be saved." });
+    }
     return true;
   }
   if (url.pathname === "/api/admin/bootstrap" && request.method === "POST") {

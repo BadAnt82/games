@@ -503,6 +503,13 @@ const adminSubmitButton = requireElement<HTMLButtonElement>("#admin-submit");
 const adminLogoutButton = requireElement<HTMLButtonElement>("#admin-logout");
 const adminBackButton = requireElement<HTMLButtonElement>("#admin-back");
 const adminSessionNote = requireElement<HTMLElement>("#admin-session-note");
+const adminDashboard = requireElement<HTMLElement>("#admin-dashboard");
+const adminConfigVersion = requireElement<HTMLElement>("#admin-config-version");
+const adminConfigTabs = requireElement<HTMLElement>("#admin-config-tabs");
+const adminConfigFields = requireElement<HTMLElement>("#admin-config-fields");
+const adminConfigStatus = requireElement<HTMLElement>("#admin-config-status");
+const adminConfigSaveButton = requireElement<HTMLButtonElement>("#admin-config-save");
+const adminConfigReloadButton = requireElement<HTMLButtonElement>("#admin-config-reload");
 const reportPanel = requireElement<HTMLElement>("#report-panel");
 const issueForm = requireElement<HTMLFormElement>("#issue-form");
 const issueText = requireElement<HTMLTextAreaElement>("#issue-text");
@@ -5742,7 +5749,125 @@ function addScore(points: number) {
 }
 
 type GamesAdminStatus = { configured?: boolean; authenticated?: boolean; email?: string };
+type GamesAdminConfig = { version: number; economy: Record<string, number>; tank: Record<string, number>; terrain: Record<string, number>; ai: Record<string, number>; timing: Record<string, number>; weapons: Record<string, Record<string, number>>; utilities: Record<string, Record<string, number>> };
+type GamesAdminCatalog = Record<string, { label: string; description?: string; mode?: string; effect?: string }>;
+type GamesAdminConfigPayload = { version: number; config: GamesAdminConfig; catalogs: { weapons: GamesAdminCatalog; utilities: GamesAdminCatalog } };
 let gamesAdminMode: "login" | "setup" = "login";
+let adminConfigDraft: GamesAdminConfig | null = null;
+let adminConfigCatalogs: GamesAdminConfigPayload["catalogs"] = { weapons: {}, utilities: {} };
+let adminConfigTab = "economy";
+
+const adminConfigDefinitions: Record<string, Array<{ path: string; label: string; step: string; help: string }>> = {
+  economy: [
+    { path: "economy.startingCredits", label: "Default starting credits", step: "1", help: "Credits each new Boom Box seat receives." },
+    { path: "economy.movementFuel", label: "Default movement fuel", step: "1", help: "Fuel available when movement is enabled." },
+    { path: "economy.movementFuelCost", label: "Movement fuel cost", step: "1", help: "Fuel consumed by one standard movement action." },
+  ],
+  tank: [
+    { path: "tank.maxHealth", label: "Maximum tank health", step: "1", help: "Health a tank starts with and cannot exceed." },
+    { path: "tank.maxShield", label: "Maximum shield", step: "1", help: "Upper limit for shield absorption." },
+    { path: "tank.armorDamageReduction", label: "Armor damage reduction", step: "0.01", help: "Fraction of incoming damage armor removes, from 0 to 1." },
+    { path: "tank.fallDamageThreshold", label: "Fall damage threshold", step: "1", help: "Terrain drop distance before fall damage applies." },
+    { path: "tank.fallDamageMultiplier", label: "Fall damage multiplier", step: "0.01", help: "Damage multiplier applied to excess fall distance." },
+    { path: "tank.fallDamageBase", label: "Fall damage base", step: "1", help: "Flat amount subtracted before fall damage is dealt." },
+  ],
+  terrain: [
+    { path: "terrain.gravity", label: "Gravity", step: "1", help: "Projectile acceleration during flight." },
+    { path: "terrain.windLimit", label: "Wind limit", step: "0.1", help: "Maximum variable wind magnitude." },
+    { path: "terrain.collapseThreshold", label: "Collapse threshold", step: "1", help: "Terrain change distance that triggers support recalculation." },
+    { path: "terrain.smokeTurns", label: "Smoke duration", step: "1", help: "Turns a smoke impact remains active." },
+  ],
+  ai: [
+    { path: "ai.recruitAccuracy", label: "Recruit accuracy", step: "0.01", help: "Aim reliability from 0 to 1." },
+    { path: "ai.veteranAccuracy", label: "Veteran accuracy", step: "0.01", help: "Aim reliability from 0 to 1." },
+    { path: "ai.aceAccuracy", label: "Ace accuracy", step: "0.01", help: "Aim reliability from 0 to 1." },
+    { path: "ai.expertAccuracy", label: "Expert accuracy", step: "0.01", help: "Aim reliability from 0 to 1." },
+  ],
+  timing: [
+    { path: "timing.turnTimeoutSeconds", label: "Turn timeout", step: "1", help: "Seconds before an inactive turn is advanced." },
+    { path: "timing.projectileStepMs", label: "Projectile step", step: "1", help: "Simulation milliseconds per projectile step." },
+    { path: "timing.aiThinkDelayMs", label: "AI think delay", step: "50", help: "Delay before the AI acts, for readable playback." },
+    { path: "timing.fastForwardMultiplier", label: "Fast-forward multiplier", step: "1", help: "Maximum playback acceleration available to players." },
+  ],
+};
+
+function escapeAdminHtml(value: string) {
+  return value.replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character] || character);
+}
+
+function adminConfigValue(path: string) {
+  return path.split(".").reduce<unknown>((value, key) => (value && typeof value === "object" ? (value as Record<string, unknown>)[key] : undefined), adminConfigDraft) as number;
+}
+
+function setAdminConfigValue(path: string, value: number) {
+  if (!adminConfigDraft) return;
+  const parts = path.split(".");
+  const field = parts.pop();
+  if (!field) return;
+  let target: Record<string, unknown> = adminConfigDraft as unknown as Record<string, unknown>;
+  for (const part of parts) target = target[part] as Record<string, unknown>;
+  target[field] = Number.isFinite(value) ? value : 0;
+}
+
+function captureAdminConfigFields() {
+  adminConfigFields.querySelectorAll<HTMLInputElement>("input[data-admin-path]").forEach((input) => setAdminConfigValue(input.dataset.adminPath || "", Number(input.value)));
+}
+
+function adminConfigInput(path: string, label: string, value: number, step: string, help: string) {
+  return `<label class="admin-config-field"><span>${escapeAdminHtml(label)}</span><input data-admin-path="${escapeAdminHtml(path)}" type="number" step="${step}" value="${Number.isFinite(value) ? value : 0}" /><small>${escapeAdminHtml(help)}</small></label>`;
+}
+
+function renderAdminConfigFields() {
+  if (!adminConfigDraft) { adminConfigFields.innerHTML = "<p>Configuration is unavailable.</p>"; return; }
+  if (adminConfigDefinitions[adminConfigTab]) {
+    const definitions = adminConfigDefinitions[adminConfigTab];
+    const title = adminConfigTab[0].toUpperCase() + adminConfigTab.slice(1);
+    adminConfigFields.innerHTML = `<section class="admin-config-section"><h3>${title} defaults</h3><p>These values are stored globally and will be wired into the authoritative simulation in the gameplay balance pass.</p><div class="admin-config-grid">${definitions.map((definition) => adminConfigInput(definition.path, definition.label, adminConfigValue(definition.path), definition.step, definition.help)).join("")}</div></section>`;
+    return;
+  }
+  const isWeapon = adminConfigTab === "weapons";
+  const values = isWeapon ? adminConfigDraft.weapons : adminConfigDraft.utilities;
+  const catalog = isWeapon ? adminConfigCatalogs.weapons : adminConfigCatalogs.utilities;
+  const fields = isWeapon ? [
+    ["cost", "Credit cost", "1", "Credits charged when purchased."], ["inventory", "Capacity", "1", "Maximum copies a seat can hold."], ["damage", "Base damage", "1", "Primary damage value."], ["directDamage", "Direct damage", "1", "Damage at the impact point."], ["splashDamage", "Splash damage", "1", "Damage around the impact."], ["radius", "Explosion radius", "1", "Blast radius in battlefield units."], ["depth", "Terrain depth", "1", "Terrain removed or added by the impact."], ["speed", "Flight speed", "0.01", "Projectile speed multiplier."], ["bounces", "Bounces", "1", "Maximum bounce count."]
+  ] : [["cost", "Credit cost", "1", "Credits charged when purchased."], ["inventory", "Capacity", "1", "Maximum copies a seat can hold."], ["amount", "Effect amount", "1", "Primary numeric effect amount."]];
+  adminConfigFields.innerHTML = `<section class="admin-config-section"><h3>${isWeapon ? "Weapon" : "Utility"} catalog</h3><p>Each card keeps the label and description visible while you adjust its balance values.</p><div class="admin-catalog-list">${Object.entries(values).map(([id, item]) => { const metadata = catalog[id] || { label: id, description: "" }; return `<article class="admin-catalog-card"><header><strong>${escapeAdminHtml(metadata.label)}</strong><small>${escapeAdminHtml(id)}</small></header><p>${escapeAdminHtml(metadata.description || "")}</p><div class="admin-config-grid">${fields.map(([field, label, step, help]) => adminConfigInput(`${isWeapon ? "weapons" : "utilities"}.${id}.${field}`, label, item[field] ?? 0, step, help)).join("")}</div></article>`; }).join("")}</div></section>`;
+}
+
+async function loadAdminConfig() {
+  adminConfigStatus.textContent = "Loading saved values...";
+  try {
+    const response = await fetch("/api/admin/config", { cache: "no-store" });
+    const body = (await response.json()) as GamesAdminConfigPayload & { error?: string; savedAt?: string };
+    if (!response.ok || !body.config) throw new Error(body.error || "Configuration could not be loaded.");
+    adminConfigDraft = body.config;
+    adminConfigCatalogs = body.catalogs || adminConfigCatalogs;
+    adminConfigVersion.textContent = `Version ${body.version}`;
+    adminConfigStatus.textContent = "Saved values loaded.";
+    renderAdminConfigFields();
+  } catch (error) {
+    adminConfigStatus.textContent = error instanceof Error ? error.message : "Configuration could not be loaded.";
+  }
+}
+
+async function saveAdminConfig() {
+  if (!adminConfigDraft) return;
+  captureAdminConfigFields();
+  adminConfigSaveButton.disabled = true;
+  adminConfigStatus.textContent = "Saving changes...";
+  try {
+    const response = await fetch("/api/admin/config", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ config: adminConfigDraft }) });
+    const body = (await response.json()) as GamesAdminConfigPayload & { error?: string; savedAt?: string };
+    if (!response.ok || !body.config) throw new Error(body.error || "Configuration could not be saved.");
+    adminConfigDraft = body.config;
+    adminConfigStatus.textContent = `Saved ${new Date(body.savedAt || Date.now()).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}.`;
+    renderAdminConfigFields();
+  } catch (error) {
+    adminConfigStatus.textContent = error instanceof Error ? error.message : "Configuration could not be saved.";
+  } finally {
+    adminConfigSaveButton.disabled = false;
+  }
+}
 
 function setGamesAdminMessage(message: string, error = false) {
   adminFormMessage.textContent = message;
@@ -5763,11 +5888,13 @@ function renderGamesAdmin(status: GamesAdminStatus) {
   adminSubmitButton.hidden = authenticated;
   adminLogoutButton.hidden = !authenticated;
   adminSessionNote.hidden = !authenticated;
-  adminSessionNote.textContent = authenticated ? `Signed in as ${status.email || "Games admin"}. The balance dashboard will be added in the next pass.` : "";
+  adminDashboard.hidden = !authenticated;
+  adminSessionNote.textContent = authenticated ? `Signed in as ${status.email || "Games admin"}. Global balance controls are below.` : "";
   adminIntro.textContent = authenticated ? "Your Games admin session is active." : gamesAdminMode === "setup" ? "Create the isolated Games admin password to continue." : "Sign in to manage the Games platform.";
   adminSubmitButton.textContent = gamesAdminMode === "setup" ? "Create admin password" : "Sign in";
   adminPasswordInput.autocomplete = gamesAdminMode === "setup" ? "new-password" : "current-password";
   setGamesAdminMessage("");
+  if (authenticated) void loadAdminConfig();
 }
 
 async function loadGamesAdminPanel() {
@@ -5878,6 +6005,7 @@ function reset(nextState: GameState) {
   pixelMenuPanel.hidden = true;
   pixelOptionsPanel.hidden = true;
   adminPanel.hidden = true;
+  adminDashboard.hidden = true;
   reportPanel.hidden = true;
   snakeDeadPanel.hidden = true;
   snakeControls.hidden = true;
@@ -7287,6 +7415,16 @@ adminLogoutButton.addEventListener("click", async () => {
     void loadGamesAdminPanel();
   }
 });
+adminConfigTabs.addEventListener("click", (event) => {
+  const target = (event.target as HTMLElement).closest<HTMLButtonElement>("button[data-admin-tab]");
+  if (!target) return;
+  captureAdminConfigFields();
+  adminConfigTab = target.dataset.adminTab || "economy";
+  adminConfigTabs.querySelectorAll<HTMLButtonElement>("button[data-admin-tab]").forEach((button) => button.setAttribute("aria-selected", `${button === target}`));
+  renderAdminConfigFields();
+});
+adminConfigSaveButton.addEventListener("click", () => void saveAdminConfig());
+adminConfigReloadButton.addEventListener("click", () => void loadAdminConfig());
 snakeOptionsButton.addEventListener("click", showSnakeOptions);
 snakeMenuBackButton.addEventListener("click", () => reset("platform"));
 snakeOptionsBackButton.addEventListener("click", showSnakeMenu);
