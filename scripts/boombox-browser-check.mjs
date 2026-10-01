@@ -51,9 +51,9 @@ try {
   await host.locator("#boombox-angle").fill("30");
   await host.locator("#boombox-power").fill("62");
   await host.locator("#boombox-fire").click();
-  await host.locator("#boombox-result-panel").waitFor({ state: "visible", timeout: 10000 });
-  if (!(await host.locator("#boombox-result-title").innerText()).length) throw new Error("The result panel did not report an outcome");
-  console.log(`Boom Box browser acceptance passed: ${roomName}, two human seats, review summary, join flow, synchronized turns, and result panel.`);
+  await guest.waitForFunction(() => document.querySelector("#boombox-match-status")?.textContent?.includes("Your turn") || !document.querySelector("#boombox-result-panel")?.hasAttribute("hidden"), null, { timeout: 10000 });
+  if (!(await host.locator("#boombox-shot-log").innerText()).includes("Server log")) throw new Error("The third authoritative shot did not update the match log");
+  console.log(`Boom Box browser acceptance passed: ${roomName}, two human seats, review summary, join flow, synchronized turns, and repeated authoritative shots.`);
 } catch (error) {
   console.error("Boom Box browser acceptance failed", error);
   console.error("Host status:", await host.locator("#boombox-lobby-status").textContent().catch(() => "unavailable"), "Guest status:", await guest.locator("#boombox-lobby-status").textContent().catch(() => "unavailable"));

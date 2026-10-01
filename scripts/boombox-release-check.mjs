@@ -144,7 +144,7 @@ async function verifyPass19(suffix) {
   const disconnectHost = await open();
   disconnectHost.on("message", (data) => { try { const message = JSON.parse(data.toString()); if (message.type === "boombox-flight-bundle" && message.bundleId) disconnectHost.send(JSON.stringify({ type: "boombox-flight-ack", bundleId: message.bundleId })); } catch {} });
   const disconnectId = `disconnect-${suffix}`;
-  const disconnectRoom = await createRoom(disconnectHost, disconnectId, { name: `Disconnect ${suffix}`, creator: "Disconnect Host", seats: 2, firingMode: "synchronous", aiFill: false, seed: 4403 });
+  const disconnectRoom = await createRoom(disconnectHost, disconnectId, { name: `Disconnect ${suffix}`, creator: "Disconnect Host", seats: 2, firingMode: "simultaneous", aiFill: false, seed: 4403 });
   const disconnectGuest = await open();
   const disconnectJoined = next(disconnectGuest, "boombox-joined");
   const disconnectStarted = next(disconnectHost, "boombox-state", (message) => message.snapshot?.phase === "turn-prep");
@@ -195,7 +195,7 @@ try {
   close(resumed);
 
   // Exercise the supported seat matrix and every configured firing mode.
-  for (const [seats, firingMode] of [[2, "sequential"], [4, "synchronous"], [6, "simultaneous"], [10, "sequential"]]) {
+  for (const [seats, firingMode] of [[2, "sequential"], [4, "simultaneous"], [6, "simultaneous"], [10, "sequential"]]) {
     const userId = `matrix-${seats}-${firingMode}-${suffix}`;
     const socket = await open();
     const createdMatrix = await createRoom(socket, userId, { name: `Matrix ${seats} ${firingMode}`, creator: `Matrix ${seats}`, seats, firingMode, aiFill: true, seed: 4000 + seats });
@@ -211,7 +211,6 @@ try {
   const configuredRules = configuredState.snapshot.rules;
   if (configuredRules?.seats !== 10 || configuredRules.firingMode !== "simultaneous" || configuredRules.gravity !== 210 || configuredRules.windMode !== "fixed" || configuredRules.windLimit !== 1.7 || configuredRules.boundary !== "bounce" || configuredRules.events?.meteorShower !== true || configuredRules.events?.scenery !== true || configuredRules.startingMoney !== 500 || configuredRules.weaponCatalog?.["mini-nuke"] || configuredRules.utilityCatalog?.["fuel-canister"] || !configuredState.snapshot.log.some((entry) => entry.kind === "scenery")) throw new Error("Pass 20 setup events or Pass 18 rules were not preserved or filtered");
   close(configured);
-  await verifyPreparedMode("synchronous", suffix);
   await verifyPreparedMode("simultaneous", suffix);
   await verifyPass19(suffix);
 
@@ -220,7 +219,7 @@ try {
   const active = await open();
   const activeCreated = await createRoom(active, activeId, { name: `Active ${suffix}`, creator: "Active Host", seats: 2, aiFill: true, aiDifficulty: "expert", firingMode: "sequential", seed: 123456 });
   const activeState = await startAi(active, activeCreated.gameId, activeId);
-  if (activeState.snapshot.rules?.version !== 3 || activeState.snapshot.players.length !== 2) throw new Error("Started room did not expose versioned state");
+  if (activeState.snapshot.rules?.version !== 4 || activeState.snapshot.players.length !== 2) throw new Error("Started room did not expose versioned state");
   await waitForPersistedRoom(activeCreated.gameId, true);
   const persistedActive = JSON.parse(readFileSync(roomStore, "utf8")).find((room) => room.gameId === activeCreated.gameId);
   if (persistedActive?.schemaVersion !== 2 || !Number.isFinite(Number(persistedActive.turnDeadlineAt))) throw new Error("Active room persistence did not include the versioned turn deadline");
@@ -234,10 +233,10 @@ try {
   restored.send(JSON.stringify({ type: "boombox-join", gameId: activeCreated.gameId, userId: activeId, sessionId: activeSession, name: "Active Host" }));
   await restoredJoinPromise;
   const restoredState = await restoredStatePromise;
-  if (restoredState.snapshot.rules?.version !== 3 || restoredState.snapshot.players.length !== 2 || restoredState.snapshot.gameId !== activeCreated.gameId) throw new Error("Started room state did not survive restart");
+  if (restoredState.snapshot.rules?.version !== 4 || restoredState.snapshot.players.length !== 2 || restoredState.snapshot.gameId !== activeCreated.gameId) throw new Error("Started room state did not survive restart");
   close(restored);
 
-  console.log("Boom Box Pass 20 release matrix passed: malformed payload rejection, setup restart recovery, started-match restart recovery, 2/4/6/10-seat rules, setup rules and event normalization, deterministic scenery markers, movement and fuel, turn deadlines, disconnect takeover, catalogue filtering, synchronous prepare/release, simultaneous deterministic release, versioned atomic persistence, and session continuity.");
+  console.log("Boom Box Pass 20 release matrix passed: malformed payload rejection, setup restart recovery, started-match restart recovery, 2/4/6/10-seat rules, setup rules and event normalization, deterministic scenery markers, movement and fuel, turn deadlines, disconnect takeover, catalogue filtering, simultaneous deterministic release, versioned atomic persistence, and session continuity.");
 } finally {
   if (server && !server.killed) server.kill();
   try { rmSync(storeDir, { recursive: true, force: true }); } catch {}

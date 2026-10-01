@@ -2,6 +2,15 @@
 
 This is the handoff record for Boom Box only. Each entry records the product-facing result and the verification that accompanied it. Detailed pass reports remain in the linked `docs/BOOM_BOX_*.md` files.
 
+## 2026-09-30 — Match setup, battlefield scale, and turn clarity (working tree)
+
+- Expand the live battlefield on larger screens while preserving a compact, scrollable phone layout and readable 10-commander health/status information.
+- Add explicit round count, optional turn timer, per-turn or per-round wind, and fixed/random/rotating wall behavior to setup and authoritative rules snapshots.
+- Reduce play types to the two player-facing choices: turn order and simultaneous fire.
+- Make the cannon barrel follow the selected aim, surface exact angle/power and directional wind in the battlefield HUD, and keep projectile physics authoritative to those values.
+- Show only owned weapons/utilities during a round, restrict purchases to pre-round/inter-round shop windows, and keep AI actions visible while using the same validated action path.
+- Verification passed: `npm run build`, `npm run test:admin`, `npm run test:admin-browser`, `npm run test:boombox-contract`, `npm run test:boombox-e-balance`, `npm run test:boombox-outcomes`, `npm run test:boombox-network`, `npm run test:boombox-ai`, `npm run test:boombox-match-options`, `npm run test:boombox-g-scale`, `npm run test:boombox-release`, plus local browser, 4/6/10-seat matrix, mobile visual, and desktop 10-seat layout checks.
+
 ## 2026-09-30 — Admin defaults and overrides (`0f5a19e`)
 
 - Hid the admin login form after authentication.

@@ -764,6 +764,12 @@ body.fullscreen-fallback-active {
   pointer-events: none;
 }
 
+@media (min-width: 900px) {
+  .game-frame:has(.overlay.is-boombox:not([hidden])) {
+    width: min(100vw, 2400px, calc(var(--app-height, 100dvh) * 16 / 9));
+  }
+}
+
 .boombox-panel {
   width: min(100%, 980px);
   gap: 16px;
@@ -992,7 +998,7 @@ body.fullscreen-fallback-active {
 .boombox-help summary { cursor: pointer; font-weight: 900; }
 .boombox-help p { margin: 8px 0 0; color: rgba(224, 239, 255, .68); font-size: .82rem; line-height: 1.4; }
 
-.boombox-match-panel { width: min(100%, 1040px); min-width: 0; gap: 12px; }
+.overlay-panel.boombox-match-panel { width: min(100%, 2300px); min-width: 0; gap: 12px; }
 .boombox-match-header { display: flex; width: 100%; align-items: end; justify-content: space-between; gap: 16px; text-align: left; }
 .boombox-match-header h1 { margin: 2px 0 4px; font-size: clamp(1.8rem, 5vw, 3.25rem); }
 .boombox-match-header p { margin: 0; color: rgba(224, 239, 255, .78); font-size: .88rem; }
@@ -1001,7 +1007,7 @@ body.fullscreen-fallback-active {
 .boombox-battle-wrap { width: 100%; overflow: hidden; border: 1px solid rgba(119, 225, 255, .4); border-radius: 14px; background: #0d1731; box-shadow: 0 12px 30px rgba(2, 5, 20, .35); }
 .boombox-match-help { width: 100%; margin: 0; color: rgba(224, 239, 255, .68); font-size: .78rem; line-height: 1.4; text-align: left; }
 #boombox-canvas { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; touch-action: none; }
-.boombox-match-controls { display: grid; width: 100%; grid-template-columns: minmax(150px, 1fr) minmax(150px, 1fr) auto minmax(140px, auto); align-items: end; gap: 12px; padding: 12px; border: 1px solid rgba(143, 204, 255, .2); border-radius: 12px; background: rgba(10, 22, 48, .68); text-align: left; }
+.boombox-match-controls { display: grid; width: 100%; grid-template-columns: repeat(6, minmax(110px, 1fr)); align-items: end; gap: 10px; padding: 12px; border: 1px solid rgba(143, 204, 255, .2); border-radius: 12px; background: rgba(10, 22, 48, .68); text-align: left; }
 .boombox-match-controls label { display: grid; min-width: 0; gap: 5px; color: #dcecff; font-size: .74rem; font-weight: 900; letter-spacing: .05em; text-transform: uppercase; }
 .boombox-match-controls output { justify-self: end; color: #ffcb86; font-size: .84rem; letter-spacing: 0; }
 .boombox-match-controls input[type="range"] { width: 100%; accent-color: #ff9b5d; }
@@ -1018,8 +1024,9 @@ body.fullscreen-fallback-active {
 .boombox-replay-result { width: min(100%, 480px); margin: 0; padding: 8px 10px; border: 1px solid rgba(255, 179, 110, .24); border-radius: 8px; color: #ffe0a8; background: rgba(20, 25, 54, .5); font-size: .76rem; }
 .boombox-fire-button { min-height: 44px; }
 .boombox-utility-button { min-height: 44px; }
-.boombox-health-row { display: grid; width: 100%; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-.boombox-health-row > div { display: grid; grid-template-columns: auto minmax(80px, 1fr) auto; align-items: center; gap: 8px; color: #dcecff; font-size: .72rem; font-weight: 900; text-align: left; }
+.boombox-health-row { display: grid; width: 100%; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 7px; }
+.boombox-health-row > div:not(.boombox-opponent-health-list), .boombox-opponent-health { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 5px 8px; padding: 7px 9px; border: 1px solid rgba(143, 204, 255, .16); border-radius: 8px; background: rgba(7, 17, 40, .46); color: #dcecff; font-size: .7rem; font-weight: 900; text-align: left; }
+.boombox-health-row .boombox-health-track { grid-column: 1 / -1; grid-row: 2; }
 .boombox-health-row strong { color: #fff; font-size: .74rem; white-space: nowrap; }
 .boombox-teaching-panel { display: grid; gap: 7px; width: 100%; padding: 12px 14px; border: 1px solid rgba(255, 179, 110, .22); border-radius: 12px; background: rgba(20, 25, 54, .62); color: rgba(224, 239, 255, .76); text-align: left; }
 .boombox-teaching-panel > strong { color: #ffcb86; font-size: .75rem; letter-spacing: .08em; text-transform: uppercase; }
@@ -1029,14 +1036,28 @@ body.fullscreen-fallback-active {
 .boombox-health-track { display: block; height: 8px; overflow: hidden; border-radius: 99px; background: rgba(4, 9, 25, .8); }
 .boombox-health-track i { display: block; width: 100%; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #59e8ff, #75ffb2); transition: width .18s ease; }
 .boombox-health-row > div:last-child .boombox-health-track i { background: linear-gradient(90deg, #ffb05d, #ff6b7d); }
-.boombox-opponent-health-list { display: grid; gap: 6px; }
+.boombox-opponent-health-list { display: contents; }
 .boombox-opponent-health-list,
 .boombox-opponent-health,
 .boombox-health-row > div { min-width: 0; }
-.boombox-opponent-health { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px; color: #dcecff; font-size: .72rem; font-weight: 900; text-align: left; }
 .boombox-opponent-health strong { color: #fff; font-size: .74rem; white-space: nowrap; }
 .boombox-match-footer { display: flex; width: 100%; min-width: 0; align-items: center; justify-content: space-between; gap: 12px; color: rgba(224, 239, 255, .65); font-size: .75rem; text-align: left; }
 .boombox-match-footer > * { min-width: 0; overflow-wrap: anywhere; }
+
+@media (min-width: 1200px) {
+  .overlay-panel.boombox-match-panel { grid-template-columns: minmax(0, 2fr) minmax(380px, .8fr); align-items: start; }
+  .boombox-match-header,
+  .boombox-match-help,
+  .boombox-health-row,
+  .boombox-teaching-panel,
+  .boombox-announcement,
+  .boombox-match-footer { grid-column: 1 / -1; }
+  .boombox-battle-wrap { grid-column: 1; grid-row: 3; }
+  .boombox-match-controls { grid-column: 2; grid-row: 3; grid-template-columns: repeat(2, minmax(0, 1fr)); align-content: start; }
+  .boombox-match-controls .boombox-movement-controls,
+  .boombox-match-controls .boombox-playback,
+  .boombox-match-controls .boombox-presentation-controls { grid-column: 1 / -1; }
+}
 .boombox-result-panel { width: min(100%, 700px); }
 .boombox-result-panel h1 { margin: 0; font-size: clamp(2rem, 6vw, 4rem); }
 .boombox-result-panel > p { max-width: 38rem; }

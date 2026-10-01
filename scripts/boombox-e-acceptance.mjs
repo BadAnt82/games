@@ -48,12 +48,12 @@ try {
   const guest = await commander(`E Guest ${suffix}`);
   await openMode(host, "multi");
   const rooms = [];
-  for (const mode of ["sequential", "synchronous", "simultaneous"]) {
+  for (const mode of ["sequential", "simultaneous"]) {
     const card = await createTwoSeatRoom(host, mode, `E-${mode}-${suffix}`);
     const cardText = await card.innerText();
     if (!cardText.toLowerCase().includes(`${mode} fire`)) throw new Error(`Lobby card omitted ${mode} firing mode`);
     rooms.push(card);
-    if (mode !== "simultaneous") {
+    if (mode === "sequential") {
       await card.getByRole("button", { name: "Cancel room" }).click();
       await card.waitFor({ state: "detached", timeout: 10000 });
     }
@@ -94,7 +94,7 @@ try {
     if (focusId !== "boombox-room-name") throw new Error(`${label} setup focus order did not enter the room name`);
   }
 
-  console.log(`Boom Box Package E acceptance passed: 2-seat all-human setup, sequential/synchronous/simultaneous UI, creator visibility, live launch, portrait/landscape overflow, scrolling, and focus (${suffix}).`);
+  console.log(`Boom Box Package E acceptance passed: 2-seat all-human setup, turn-order/simultaneous UI, creator visibility, live launch, portrait/landscape overflow, scrolling, and focus (${suffix}).`);
 } catch (error) {
   const details = [];
   for (const context of contexts) {

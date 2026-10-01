@@ -1,7 +1,7 @@
 // Shared Boom Box rules contract. The browser and authoritative server import
 // this module so catalogue ids, effects, inventory limits, and seeded terrain
 // cannot drift between execution paths.
-export const BOOM_BOX_RULES_VERSION = 3;
+export const BOOM_BOX_RULES_VERSION = 4;
 export const BOOM_BOX_CANVAS = { width: 960, height: 540 };
 
 // Theme and asset IDs are deliberately data, so artwork can be replaced later
@@ -60,20 +60,27 @@ export function boomBoxTerrain(seed, profile = "sunset-range") {
 }
 
 export function boomBoxRulesFromConfig(config = {}) {
-  const firingModes = new Set(["sequential", "synchronous", "simultaneous"]);
+  const firingModes = new Set(["sequential", "simultaneous"]);
   const boundaries = new Set(["stop", "bounce", "wrap"]);
+  const configuredBoundaries = Array.isArray(config.boundaries) ? config.boundaries.filter((value) => boundaries.has(String(value))).map(String) : [];
+  const boundary = boundaries.has(String(config.boundary)) ? String(config.boundary) : configuredBoundaries[0] || "stop";
+  const boundaryMode = ["fixed", "random", "rotate"].includes(String(config.boundaryMode)) ? String(config.boundaryMode) : "fixed";
   const pace = ["relaxed", "standard", "blitz"].includes(String(config.pace)) ? String(config.pace) : "standard";
   const aiDifficulty = ["recruit", "veteran", "ace", "expert"].includes(String(config.aiDifficulty)) ? String(config.aiDifficulty) : "veteran";
   return {
     version: BOOM_BOX_RULES_VERSION,
     themeId: BOOM_BOX_THEME_CATALOG[config.themeId] ? String(config.themeId) : boomBoxThemeIdForTerrain(config.terrain),
     seats: Math.max(2, Math.min(10, Number(config.seats) || 2)),
-    firingMode: firingModes.has(String(config.firingMode)) ? String(config.firingMode) : "sequential",
+    firingMode: String(config.firingMode) === "synchronous" ? "simultaneous" : firingModes.has(String(config.firingMode)) ? String(config.firingMode) : "sequential",
     movement: Boolean(config.movement) && String(config.firingMode || "sequential") === "sequential",
+    roundCount: Math.max(1, Math.min(20, Math.round(Number(config.roundCount) || 1))),
+    timerEnabled: config.timerEnabled !== false,
     gravity: Math.max(60, Math.min(260, Number(config.gravity) || 150)),
     windMode: config.windMode === "fixed" ? "fixed" : "variable",
     windLimit: Math.max(0, Math.min(2, Number(config.windLimit) || 1.2)),
-    boundary: boundaries.has(String(config.boundary)) ? String(config.boundary) : "stop",
+    boundary,
+    boundaries: configuredBoundaries.length ? [...new Set(configuredBoundaries)] : [boundary],
+    boundaryMode,
     startingMoney: Math.max(0, Math.min(10000, Number(config.startingMoney) || 100)),
     turnPace: pace,
     aiDifficulty,

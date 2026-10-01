@@ -16,7 +16,7 @@ const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const next = (socket, type, predicate = () => true, timeout = 15000) => new Promise((resolve, reject) => {
   const queued = (socket.messages || []).find((message) => message.type === type && predicate(message));
   if (queued) { socket.messages.splice(socket.messages.indexOf(queued), 1); resolve(queued); return; }
-  const timer = setTimeout(() => { socket.off("message", onMessage); reject(new Error(`Timed out waiting for ${type}`)); }, timeout);
+  const timer = setTimeout(() => { socket.off("message", onMessage); const latest = socket.messages.filter((message) => message.type === "boombox-state").at(-1); reject(new Error(`Timed out waiting for ${type}; latest=${JSON.stringify({ phase: latest?.snapshot?.phase, turn: latest?.snapshot?.turn, turnSeat: latest?.snapshot?.turnSeat, prepared: latest?.snapshot?.preparedSeats, log: latest?.snapshot?.log?.slice(-5) })}`)); }, timeout);
   const onMessage = (data) => { let message; try { message = JSON.parse(data.toString()); } catch { return; } if (message.type !== type || !predicate(message)) return; clearTimeout(timer); socket.off("message", onMessage); resolve(message); };
   socket.on("message", onMessage);
 });
@@ -80,7 +80,9 @@ try {
   const archiveJoinedPromise = next(archiveGuest, "boombox-joined");
   send(archiveGuest, { type: "boombox-join", userId: `g-archive-guest-${suffix}`, gameId: archiveCreated.gameId, name: "Archive Guest" });
   await archiveJoinedPromise;
-  await next(archiveHost, "boombox-state");
+  const archiveStateStart = next(archiveHost, "boombox-state");
+  send(archiveHost, { type: "boombox-start-ai", userId: archiveOwner, gameId: archiveCreated.gameId });
+  await archiveStateStart;
   const archiveFirst = next(archiveHost, "boombox-state", (message) => message.snapshot?.turn >= 2);
   send(archiveHost, { type: "boombox-action", userId: archiveOwner, gameId: archiveCreated.gameId, actionId: "g-archive-first", action: { targetIndex: 1, weapon: "cannon", angle: 42, power: 58 } });
   await archiveFirst;

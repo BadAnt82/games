@@ -35,6 +35,7 @@
     "test:boombox-weapons": "node scripts/boombox-weapon-matrix-check.mjs",
     "test:boombox-outcomes": "node scripts/boombox-outcome-check.mjs",
     "test:boombox-contract": "node --experimental-strip-types scripts/boombox-contract-check.mjs",
+    "test:boombox-match-options": "node scripts/boombox-match-options-check.mjs",
     "test:boombox-persistence": "node scripts/boombox-persistence-check.mjs",
     "test:boombox-storage-failure": "node scripts/boombox-storage-failure-check.mjs",
     "test:admin": "node scripts/games-admin-check.mjs",
