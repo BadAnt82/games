@@ -23,13 +23,10 @@ try {
   await page.locator("#boombox-opponents").selectOption("1");
   await page.locator("#boombox-solo-rounds").selectOption("3");
   await page.locator("#boombox-solo-interest").fill("10");
-  await page.locator("#boombox-loadout-open").click();
-  const nuke = page.locator("#boombox-shop-list article", { hasText: "Mini nuke" });
-  await nuke.getByRole("button", { name: /Buy for/ }).click();
-  await page.locator("#boombox-loadout-start").click();
+  if (await page.locator("#boombox-loadout-open").isVisible()) throw new Error("The Round 1 loadout store is still visible");
+  await page.locator("#boombox-solo-start").click();
   await page.locator("#boombox-match-panel").waitFor({ state: "visible", timeout: 15000 });
-  await page.waitForFunction(() => Array.from(document.querySelectorAll("#boombox-weapon option")).some((option) => option.textContent?.includes("Mini nuke")), null, { timeout: 15000 });
-  await page.locator("#boombox-weapon").selectOption("mini-nuke");
+  await page.waitForFunction(() => document.querySelectorAll("#boombox-weapon option").length === 1 && document.querySelector("#boombox-weapon option")?.getAttribute("value") === "cannon", null, { timeout: 15000 });
   await page.locator("#boombox-fire").click();
   await page.waitForTimeout(500);
   let destructionSeen = false;
@@ -51,6 +48,7 @@ try {
     }
   }
   if (!(await page.locator("#boombox-intermission-panel").isVisible())) { const diagnostic = await page.evaluate(() => ({ status: document.querySelector("#boombox-match-status")?.textContent, round: document.querySelector("#boombox-match-round")?.textContent, player: document.querySelector("#boombox-player-health-value")?.textContent, opponents: document.querySelector("#boombox-opponent-health-list")?.textContent, resultVisible: !document.querySelector("#boombox-result-panel")?.hasAttribute("hidden"), fireDisabled: document.querySelector("#boombox-fire")?.disabled })); throw new Error(`Round did not reach intermission: ${JSON.stringify(diagnostic)}`); }
+  const visibleFlights = await page.locator("#boombox-canvas").evaluate((canvas) => ({ count: Number(canvas.getAttribute("data-flight-count")) || 0, seats: String(canvas.getAttribute("data-flight-seats") || "").split(",") })); if (visibleFlights.count < 2 || !visibleFlights.seats.includes("0") || !visibleFlights.seats.includes("1")) throw new Error(`Player and AI shots were not both presented: ${JSON.stringify(visibleFlights)}`);
   if (!destructionSeen) throw new Error("The destroyed tank did not enter the visible explosion/removal state before intermission");
   if (await page.locator("#boombox-result-panel").isVisible()) throw new Error("A non-final elimination opened the final result panel");
   if ((await page.locator("#boombox-standings .boombox-standings-row").count()) !== 3) throw new Error("The two-player intermission standings were not rendered");

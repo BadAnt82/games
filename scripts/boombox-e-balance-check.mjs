@@ -22,7 +22,16 @@ const open = () => new Promise((resolve, reject) => { const socket = new WebSock
 const take = (socket, type, predicate = () => true) => { const index = socket.messages.findIndex((message) => message.type === type && predicate(message)); return index < 0 ? null : socket.messages.splice(index, 1)[0]; };
 const next = (socket, type, predicate = () => true, timeout = 10000) => new Promise((resolve, reject) => { const queued = take(socket, type, predicate); if (queued) return resolve(queued); const timer = setTimeout(() => { socket.off("message", onMessage); reject(new Error(`Timed out waiting for ${type}`)); }, timeout); const onMessage = (data) => { let message; try { message = JSON.parse(data.toString()); } catch { return; } if (message.type !== type || !predicate(message)) return; clearTimeout(timer); socket.off("message", onMessage); resolve(message); }; socket.on("message", onMessage); });
 const send = (socket, message) => socket.send(JSON.stringify(message));
-const start = async (socket, userId, name) => { const createdPromise = next(socket, "boombox-created"); send(socket, { type: "boombox-create", userId, config: { name, creator: name, seats: 2, aiCount: 1, humanCount: 1, movement: true, pace: "blitz", seed: 424242 } }); const created = await createdPromise; const statePromise = next(socket, "boombox-state", (message) => message.snapshot?.phase === "turn-prep"); send(socket, { type: "boombox-start-ai", userId, gameId: created.gameId }); return { created, state: await statePromise }; };
+const start = async (socket, userId, name) => { const createdPromise = next(socket, "boombox-created"); send(socket, { type: "boombox-create", userId, config: { name, creator: name, seats: 2, aiCount: 1, humanCount: 1, movement: true, pace: "blitz", seed: 424242, roundCount: 2, timerEnabled: false, fullCatalogue: true } }); const created = await createdPromise; const statePromise = next(socket, "boombox-state", (message) => message.snapshot?.phase === "turn-prep"); send(socket, { type: "boombox-start-ai", userId, gameId: created.gameId }); return { created, state: await statePromise }; };
+const reachIntermission = async (socket, userId, gameId, prefix) => {
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    const actionId = `${prefix}-round-one-${attempt}`; send(socket, { type: "boombox-action", userId, gameId, actionId, action: { targetIndex: 1, weapon: "cannon", angle: 42, power: 58 } });
+    const state = await next(socket, "boombox-state", (message) => message.snapshot?.phase === "intermission" || (message.snapshot?.turnSeat === 0 && message.snapshot?.log?.some((entry) => entry.actionId === actionId)), 15000);
+    if (state.snapshot.phase === "intermission") return state;
+  }
+  throw new Error("Round 1 did not reach its between-round shop.");
+};
+const startRoundTwo = async (socket, userId, gameId) => { const statePromise = next(socket, "boombox-state", (message) => message.snapshot?.round === 2 && message.snapshot?.phase === "turn-prep"); send(socket, { type: "boombox-next-round", userId, gameId }); return statePromise; };
 
 try {
   await wait(500);
@@ -34,14 +43,19 @@ try {
   if (rules.balance?.tank?.maxHealth !== 180 || rules.balance?.economy?.movementFuel !== 64) throw new Error("Admin balance was not included in the authoritative rules snapshot.");
   if (state.snapshot.players[0].maxHealth !== 180 || state.snapshot.players[0].fuel !== 64) throw new Error("Admin tank defaults did not initialize player state.");
   if (rules.weaponCatalog.cannon.directDamage !== 33 || rules.weaponCatalog["laser-line"].cost !== 20 || rules.utilityCatalog.shield.amount !== 90 || rules.utilityCatalog.shield.durationRounds !== 1 || rules.utilityCatalog["fuel-canister"].purchaseAmount !== 2) throw new Error("Admin catalog overrides did not reach the room rules.");
+  await reachIntermission(socket, userId, created.gameId, "e-laser");
   const purchasePromise = next(socket, "boombox-purchase-result"); send(socket, { type: "boombox-purchase", userId, gameId: created.gameId, purchaseId: "e-laser", category: "weapon", item: "laser-line", quantity: 1 }); await purchasePromise;
+  await startRoundTwo(socket, userId, created.gameId);
   const firePromise = next(socket, "boombox-state", (message) => message.snapshot?.log?.some((entry) => entry.kind === "fire" && entry.actionId === "e-laser-fire")); send(socket, { type: "boombox-action", userId, gameId: created.gameId, actionId: "e-laser-fire", action: { targetIndex: 1, weapon: "laser-line", angle: 42, power: 58 } }); const fired = await firePromise; const fire = fired.snapshot.log.find((entry) => entry.actionId === "e-laser-fire"); if (fire?.childImpacts?.[0]?.damage !== 23) throw new Error(`Armor/direct damage plumbing was not applied: ${JSON.stringify(fire)}`);
   socket.close();
 
   const utilitySocket = await open();
   const utilityUserId = `e-utility-${Date.now()}`;
   const utilityRoom = await start(utilitySocket, utilityUserId, "E Utility");
-  const utilityPromise = next(utilitySocket, "boombox-state", (message) => message.snapshot?.log?.some((entry) => entry.kind === "utility" && entry.utility === "shield")); send(utilitySocket, { type: "boombox-action", userId: utilityUserId, gameId: utilityRoom.created.gameId, actionId: "e-shield", action: { kind: "utility", utility: "shield" } }); const utilityState = await utilityPromise; if (utilityState.snapshot.players[0].shield !== 50 || utilityState.snapshot.players[0].activeUtilities?.shield !== 1) throw new Error("Shield effect ignored the configured maximum or expiration duration.");
-  const fuelPurchase = next(utilitySocket, "boombox-purchase-result"); send(utilitySocket, { type: "boombox-purchase", userId: utilityUserId, gameId: utilityRoom.created.gameId, purchaseId: "e-fuel", category: "utility", item: "fuel-canister", quantity: 1 }); const fuelResult = await fuelPurchase; if (fuelResult.loadout.utilities["fuel-canister"] !== 2) throw new Error("Utility purchase amount was not applied to the authoritative loadout."); utilitySocket.close();
+  await reachIntermission(utilitySocket, utilityUserId, utilityRoom.created.gameId, "e-utility");
+  const shieldPurchase = next(utilitySocket, "boombox-purchase-result", (message) => message.entry?.item === "shield"); send(utilitySocket, { type: "boombox-purchase", userId: utilityUserId, gameId: utilityRoom.created.gameId, purchaseId: "e-shield", category: "utility", item: "shield", quantity: 1 }); await shieldPurchase;
+  const fuelPurchase = next(utilitySocket, "boombox-purchase-result", (message) => message.entry?.item === "fuel-canister"); send(utilitySocket, { type: "boombox-purchase", userId: utilityUserId, gameId: utilityRoom.created.gameId, purchaseId: "e-fuel", category: "utility", item: "fuel-canister", quantity: 1 }); const fuelResult = await fuelPurchase; if (fuelResult.loadout.utilities["fuel-canister"] !== 2) throw new Error(`Utility purchase amount was not applied to the authoritative loadout: ${JSON.stringify(fuelResult.loadout.utilities)}`);
+  send(utilitySocket, { type: "boombox-round-utility", userId: utilityUserId, gameId: utilityRoom.created.gameId, utility: "shield" }); await next(utilitySocket, "boombox-state", (message) => message.snapshot?.players?.[0]?.roundUtility === "shield");
+  const utilityState = await startRoundTwo(utilitySocket, utilityUserId, utilityRoom.created.gameId); if (utilityState.snapshot.players[0].shield !== 50 || utilityState.snapshot.players[0].utilities.shield !== 0) throw new Error("Round shield ignored the configured maximum or was not consumed at round start."); utilitySocket.close();
   console.log("Boom Box Pass E balance check passed: admin defaults, catalog overrides, armor, direct damage, shield limits, and player initialization are authoritative.");
 } finally { server.kill(); rmSync(storeDir, { recursive: true, force: true }); }

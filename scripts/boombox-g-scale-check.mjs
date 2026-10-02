@@ -50,14 +50,11 @@ try {
   const snapshotBytes = Buffer.byteLength(JSON.stringify(initial.snapshot));
   if (initial.snapshot.players.length !== 10 || initial.snapshot.rules?.seats !== 10 || initial.snapshot.rules?.firingMode !== "simultaneous") throw new Error("10-seat authoritative setup did not preserve the configured room");
 
-  const purchasePromise = next(host, "boombox-purchase-result");
-  send(host, { type: "boombox-purchase", userId: owner, gameId: created.gameId, purchaseId: "g-mirv", category: "weapon", item: "mirv", quantity: 1 });
-  await purchasePromise;
-  const mirvStatePromise = next(host, "boombox-state", (message) => message.snapshot?.log?.some((entry) => entry.kind === "fire" && entry.weapon === "mirv"), 20000);
-  send(host, { type: "boombox-action", userId: owner, gameId: created.gameId, actionId: "g-mirv-fire", action: { targetIndex: 1, weapon: "mirv", angle: 42, power: 58 } });
-  const mirvState = await mirvStatePromise;
-  const mirvEvent = mirvState.snapshot.log.find((entry) => entry.kind === "fire" && entry.weapon === "mirv");
-  if (!mirvEvent || mirvEvent.children !== 3 || mirvEvent.childImpacts?.length !== 3 || mirvEvent.childPaths?.length !== 3) throw new Error("Large child-projectile resolution was not retained in the authoritative log");
+  const cannonStatePromise = next(host, "boombox-state", (message) => message.snapshot?.log?.some((entry) => entry.kind === "fire" && entry.actionId === "g-cannon-fire"), 20000);
+  send(host, { type: "boombox-action", userId: owner, gameId: created.gameId, actionId: "g-cannon-fire", action: { targetIndex: 1, weapon: "cannon", angle: 42, power: 58 } });
+  const cannonState = await cannonStatePromise;
+  const cannonEvent = cannonState.snapshot.log.find((entry) => entry.kind === "fire" && entry.actionId === "g-cannon-fire");
+  if (!cannonEvent || cannonEvent.children !== 1 || cannonEvent.childImpacts?.length !== 1 || cannonEvent.childPaths?.length !== 1) throw new Error("Round 1 cannon resolution was not retained in the 10-seat authoritative log");
 
   const watcher = await open();
   const watchingPromise = next(watcher, "boombox-watching");
@@ -101,7 +98,7 @@ try {
   archiveHost.close(); archiveGuest.close();
   const archiveAfter = await (await fetch(`http://localhost:${port}/api/boombox-health`)).json();
   if (archiveAfter.completedMatches > 100) throw new Error(`Archive grew beyond the 100-record bound: ${archiveAfter.completedMatches}`);
-  console.log(`Boom Box Package G scale check passed: archive read ${archiveMs.toFixed(1)}ms (100 persisted / 50 API page), 10-seat snapshot ${snapshotBytes} bytes, child impacts ${mirvEvent.childImpacts.length}, AI continuation after disconnect, and match setup/resolution ${matchMs.toFixed(1)}ms.`);
+  console.log(`Boom Box Package G scale check passed: archive read ${archiveMs.toFixed(1)}ms (100 persisted / 50 API page), 10-seat snapshot ${snapshotBytes} bytes, cannon-only opening, AI continuation after disconnect, and match setup/resolution ${matchMs.toFixed(1)}ms.`);
 } finally {
   server.kill();
   await wait(250);

@@ -1,0 +1,42 @@
+import { spawn } from "node:child_process";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { WebSocket } from "ws";
+
+const port = 4372;
+const storeDir = mkdtempSync(join(tmpdir(), "boombox-team-flow-"));
+const server = spawn(process.execPath, ["server.mjs"], { env: { ...process.env, PORT: String(port), BOOM_BOX_ROOM_STORE_PATH: join(storeDir, "rooms.json"), BOOMBOX_AI_DELAY_MS: "100" }, stdio: ["ignore", "pipe", "pipe"] });
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const open = () => new Promise((resolve, reject) => { const socket = new WebSocket(`ws://127.0.0.1:${port}/boombox`); socket.queue = []; socket.on("message", (data) => { const message = JSON.parse(data.toString()); socket.queue.push(message); if (message.type === "boombox-flight-bundle") socket.send(JSON.stringify({ type: "boombox-flight-ack", bundleId: message.bundleId })); }); socket.once("open", () => resolve(socket)); socket.once("error", reject); });
+const next = (socket, type, predicate = () => true, timeout = 12000) => new Promise((resolve, reject) => { const take = () => { const index = socket.queue.findIndex((message) => message.type === type && predicate(message)); return index < 0 ? null : socket.queue.splice(index, 1)[0]; }; const queued = take(); if (queued) return resolve(queued); const poll = setInterval(() => { const message = take(); if (!message) return; clearInterval(poll); clearTimeout(limit); resolve(message); }, 10); const limit = setTimeout(() => { clearInterval(poll); reject(new Error(`Timed out waiting for ${type}`)); }, timeout); });
+
+try {
+  await wait(600);
+  const freeForAll = await open(); const freeForAllId = `ffa-host-${Date.now()}`;
+  freeForAll.send(JSON.stringify({ type: "boombox-create", userId: freeForAllId, config: { creator: "FFA Host", humanCount: 1, aiCount: 4, seats: 5, aiSeats: [1, 2, 3, 4], teamMode: "free-for-all", timerEnabled: false, seed: 314159 } }));
+  const freeForAllCreated = await next(freeForAll, "boombox-created"); freeForAll.send(JSON.stringify({ type: "boombox-start-ai", userId: freeForAllId, gameId: freeForAllCreated.gameId })); await next(freeForAll, "boombox-state", (message) => message.snapshot?.phase === "turn-prep");
+  freeForAll.send(JSON.stringify({ type: "boombox-action", userId: freeForAllId, actionId: "ffa-opening-shot", action: { targetIndex: 1, weapon: "cannon", angle: 8, power: 25 } }));
+  const freeForAllCycle = await next(freeForAll, "boombox-state", (message) => message.snapshot?.turn === 2 && message.snapshot?.turnSeat === 0, 20000); const aiTargets = freeForAllCycle.snapshot.log.filter((entry) => entry.kind === "fire" && entry.seat > 0).map((entry) => entry.target); if (aiTargets.length < 4 || new Set(aiTargets).size < 2 || aiTargets.every((target) => target === 0)) throw new Error(`Free-for-all AI commanders dogpiled the human instead of fighting each other: ${aiTargets.join(",")}`); freeForAll.close();
+  const host = await open(); const userId = `team-host-${Date.now()}`;
+  host.send(JSON.stringify({ type: "boombox-create", userId, config: { creator: "Team Host", humanCount: 1, aiCount: 2, seats: 3, aiSeats: [1, 2], teamMode: "paired", teamAssignments: [0, 0, 1], roundCount: 2, timerEnabled: false, seed: 314159 } }));
+  const created = await next(host, "boombox-created"); host.send(JSON.stringify({ type: "boombox-start-ai", userId, gameId: created.gameId })); const start = await next(host, "boombox-state", (message) => message.snapshot?.phase === "turn-prep");
+  if (start.snapshot.rules.teamMode !== "paired" || start.snapshot.players.map((player) => player.teamId).join(",") !== "0,0,1") throw new Error("Paired team assignments were not authoritative");
+  if (start.snapshot.players.some((player) => Object.values(player.utilities || {}).some(Number)) || start.snapshot.players.some((player) => Object.entries(player.inventory || {}).some(([id, count]) => id !== "cannon" && Number(count) > 0))) throw new Error("A team commander received Round 1 store equipment");
+  host.send(JSON.stringify({ type: "boombox-action", userId, actionId: "friendly-target", action: { targetIndex: 1, weapon: "cannon", angle: 42, power: 58 } })); const friendlyRejected = await next(host, "boombox-error"); if (!friendlyRejected.message.includes("outside your team")) throw new Error("A teammate could be selected as a hostile target");
+  let state = start;
+  for (let attempt = 0; attempt < 5 && state.snapshot.phase !== "intermission"; attempt += 1) {
+    host.send(JSON.stringify({ type: "boombox-action", userId, actionId: `team-shot-${attempt}`, action: { targetIndex: 2, weapon: "cannon", angle: 42, power: 58 } }));
+    state = await next(host, "boombox-state", (message) => message.snapshot?.phase === "intermission" || (message.snapshot?.turnSeat === 0 && message.snapshot?.log?.some((entry) => entry.actionId === `team-shot-${attempt}`)), 15000);
+  }
+  if (state.snapshot.phase !== "intermission") state = await next(host, "boombox-state", (message) => message.snapshot?.phase === "intermission", 15000);
+  const allyFire = state.snapshot.log.find((entry) => entry.kind === "fire" && entry.seat === 1); if (!allyFire || allyFire.target !== 2) throw new Error(`The AI teammate did not target the hostile team: ${JSON.stringify(allyFire)}`);
+  const enemyFire = state.snapshot.log.find((entry) => entry.kind === "fire" && entry.seat === 2); if (enemyFire && [0, 1].includes(enemyFire.target) === false) throw new Error("The opposing AI targeted its own team");
+  const hostStanding = state.snapshot.standings.find((entry) => entry.seat === 0); const allyStanding = state.snapshot.standings.find((entry) => entry.seat === 1); if (!hostStanding || !allyStanding || hostStanding.teamId !== allyStanding.teamId || hostStanding.overallRank !== allyStanding.overallRank || hostStanding.credits !== allyStanding.credits) throw new Error("Teammates did not share standings and currency");
+  host.send(JSON.stringify({ type: "boombox-purchase", userId, purchaseId: "team-repair", category: "utility", item: "repair-kit" })); const repair = await next(host, "boombox-purchase-result"); if (repair.loadout.money !== 115) throw new Error(`Shared team purchase charged the wrong balance: ${repair.loadout.money}`); const afterRepair = await next(host, "boombox-state", (message) => message.snapshot?.players?.[0]?.utilities?.["repair-kit"] === 1); if (afterRepair.snapshot.players[1].utilities["repair-kit"] !== 1 || afterRepair.snapshot.players[1].money !== 115) throw new Error("The human purchase was not mirrored to the AI teammate");
+  host.send(JSON.stringify({ type: "boombox-purchase", userId, purchaseId: "team-shield", category: "utility", item: "shield" })); await next(host, "boombox-purchase-result"); await next(host, "boombox-state", (message) => message.snapshot?.players?.[0]?.utilities?.shield === 1);
+  host.send(JSON.stringify({ type: "boombox-round-utility", userId, utility: "shield" })); const selected = await next(host, "boombox-state", (message) => message.snapshot?.players?.[0]?.roundUtility === "shield"); if (selected.snapshot.players[1].roundUtility !== "shield") throw new Error("The next-round defensive loadout was not shared with the AI teammate");
+  host.send(JSON.stringify({ type: "boombox-next-round", userId, gameId: created.gameId })); const roundTwo = await next(host, "boombox-state", (message) => message.snapshot?.round === 2 && message.snapshot?.phase === "turn-prep");
+  if (roundTwo.snapshot.players[0].money !== 99 || roundTwo.snapshot.players[1].money !== 99 || roundTwo.snapshot.players[0].shield !== 35 || roundTwo.snapshot.players[1].shield !== 35 || roundTwo.snapshot.players[0].utilities.shield !== 0 || roundTwo.snapshot.players[1].utilities.shield !== 0) throw new Error(`Shared credits, interest, or round shield activation failed: ${JSON.stringify(roundTwo.snapshot.players.map((player) => ({ money: player.money, shield: player.shield, utilities: player.utilities })))}`);
+  host.close(); console.log("Boom Box team flow passed: cannon-only Round 1, distributed free-for-all AI targeting, hostile-only team targeting, shared ranking/currency/purchases, AI teammate control, and next-round defense activation.");
+} finally { server.kill(); await wait(100); rmSync(storeDir, { recursive: true, force: true }); }

@@ -36,6 +36,7 @@
     "test:boombox-outcomes": "node scripts/boombox-outcome-check.mjs",
     "test:boombox-contract": "node --experimental-strip-types scripts/boombox-contract-check.mjs",
     "test:boombox-match-options": "node scripts/boombox-match-options-check.mjs",
+    "test:boombox-team-flow": "node scripts/boombox-team-flow-check.mjs",
     "test:boombox-round-flow-browser": "npx -p playwright node scripts/boombox-round-flow-browser-check.mjs",
     "test:boombox-persistence": "node scripts/boombox-persistence-check.mjs",
     "test:boombox-storage-failure": "node scripts/boombox-storage-failure-check.mjs",

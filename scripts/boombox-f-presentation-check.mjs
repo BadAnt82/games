@@ -11,8 +11,7 @@ try {
   await page.goto(base, { waitUntil: "domcontentloaded", timeout: 20000 });
   await page.locator("#select-boombox").click();
   await page.locator("#boombox-mode-single").click();
-  await page.locator("#boombox-loadout-open").click();
-  await page.locator("#boombox-loadout-start").click();
+  await page.locator("#boombox-solo-start").click();
   await page.locator("#boombox-canvas").waitFor({ state: "visible", timeout: 12000 });
   for (const id of ["boombox-sound-toggle", "boombox-effects-toggle", "boombox-announcement"]) await page.locator(`#${id}`).waitFor({ state: "visible", timeout: 5000 });
   const sound = page.locator("#boombox-sound-toggle");

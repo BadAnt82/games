@@ -9,6 +9,15 @@ const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const open = () => new Promise((resolve, reject) => { const socket = new WebSocket(`ws://localhost:${port}/boombox`); socket._messages = []; socket.on("message", (data) => { try { const message = JSON.parse(data.toString()); socket._messages.push(message); if (message.type === "boombox-flight-bundle" && message.bundleId) socket.send(JSON.stringify({ type: "boombox-flight-ack", bundleId: message.bundleId })); } catch {} }); socket.once("open", () => resolve(socket)); socket.once("error", reject); });
 const take = (socket, type, predicate = () => true) => { const index = socket._messages.findIndex((message) => message.type === type && predicate(message)); return index >= 0 ? socket._messages.splice(index, 1)[0] : null; };
 const next = (socket, type, predicate = () => true, timeout = 5000) => new Promise((resolve, reject) => { const queued = take(socket, type, predicate); if (queued) return resolve(queued); const timer = setTimeout(() => { socket.off("message", onMessage); reject(new Error(`Timed out waiting for ${type}: ${stderr}`)); }, timeout); const onMessage = (data) => { let message; try { message = JSON.parse(data.toString()); } catch { return; } if (message.type !== type || !predicate(message)) return; clearTimeout(timer); socket.off("message", onMessage); resolve(message); }; socket.on("message", onMessage); });
+const reachIntermission = async (socket, userId, gameId, prefix) => {
+  const firstId = `${prefix}-round-one-1`; socket.send(JSON.stringify({ type: "boombox-action", userId, gameId, actionId: firstId, action: { targetIndex: 1, weapon: "cannon", angle: 42, power: 58 } }));
+  let state = await next(socket, "boombox-state", (message) => message.snapshot?.phase === "intermission" || (message.snapshot?.turnSeat === 0 && message.snapshot?.log?.some((entry) => entry.actionId === firstId)), 10000);
+  if (state.snapshot.phase !== "intermission") {
+    const secondId = `${prefix}-round-one-2`; socket.send(JSON.stringify({ type: "boombox-action", userId, gameId, actionId: secondId, action: { targetIndex: 1, weapon: "cannon", angle: 42, power: 58 } }));
+    state = await next(socket, "boombox-state", (message) => message.snapshot?.phase === "intermission", 10000);
+  }
+  return state;
+};
 
 await wait(700);
 try {
@@ -18,12 +27,14 @@ try {
     const userId = `matrix-${suffix}-${weaponId}`; const socket = await open();
     try {
       const createdPromise = next(socket, "boombox-created");
-      socket.send(JSON.stringify({ type: "boombox-create", userId, config: { name: `Weapon ${weaponId}`, creator: "Matrix", seats: 2, aiFill: true, startingMoney: 10000, fullCatalogue: true, seed: 271828 } }));
+      socket.send(JSON.stringify({ type: "boombox-create", userId, config: { name: `Weapon ${weaponId}`, creator: "Matrix", seats: 2, aiFill: true, startingMoney: 10000, fullCatalogue: true, seed: 271828, roundCount: 2, timerEnabled: false } }));
       const created = await createdPromise; const statePromise = next(socket, "boombox-state"); socket.send(JSON.stringify({ type: "boombox-start-ai", userId, gameId: created.gameId }));
       const initial = await statePromise; if (initial.snapshot.rules.version !== BOOM_BOX_RULES_VERSION) throw new Error(`${weaponId}: rules version drifted`);
       if (weaponId !== "cannon") {
+        const intermission = await reachIntermission(socket, userId, created.gameId, weaponId); const beforePurchase = intermission.snapshot.players[0].money;
         const purchasePromise = next(socket, "boombox-purchase-result"); socket.send(JSON.stringify({ type: "boombox-purchase", userId, gameId: created.gameId, purchaseId: `purchase-${weaponId}`, category: "weapon", item: weaponId, quantity: 1 }));
-        const purchase = await purchasePromise; if (purchase.loadout.inventory[weaponId] !== 1 || purchase.loadout.money !== 10000 - item.cost) throw new Error(`${weaponId}: purchase economy mismatch`);
+        const purchase = await purchasePromise; if (purchase.loadout.inventory[weaponId] !== 1 || purchase.loadout.money !== beforePurchase - item.cost) throw new Error(`${weaponId}: purchase economy mismatch`);
+        const roundTwoPromise = next(socket, "boombox-state", (message) => message.snapshot?.round === 2 && message.snapshot?.phase === "turn-prep", 10000); socket.send(JSON.stringify({ type: "boombox-next-round", userId, gameId: created.gameId })); await roundTwoPromise;
       }
       const flightPromise = next(socket, "boombox-flight-bundle", (message) => message.flights?.some((flight) => flight.weapon === weaponId)); const fireState = next(socket, "boombox-state", (message) => (message.snapshot?.log || []).some((entry) => entry.kind === "fire" && entry.weapon === weaponId));
       socket.send(JSON.stringify({ type: "boombox-action", userId, gameId: created.gameId, actionId: `fire-${weaponId}`, action: { targetIndex: 1, weapon: weaponId, angle: 42, power: 58 } }));

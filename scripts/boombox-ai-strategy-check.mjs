@@ -22,13 +22,13 @@ try {
     try {
       const { room, state } = await created(socket, userId, difficulty, false); console.log(`${difficulty}: started turn=${state.snapshot.turnSeat}`);
       const result = await nextAiAction(socket, userId, room.gameId, `${difficulty}-1`);
-      if (result.event.kind !== "utility" || result.event.utility !== "shield") throw new Error(`${difficulty}: expected owned starter shield; saw ${JSON.stringify(result.event)}`);
+      if (result.event.kind !== "fire" || result.event.weapon !== "cannon") throw new Error(`${difficulty}: expected a visible cannon shot in Round 1; saw ${JSON.stringify(result.event)}`);
       if (!result.intent?.text) throw new Error(`${difficulty}: AI intent was not visible in the authoritative snapshot.`);
-      console.log(`Boom Box AI ${difficulty} strategy passed: visible intent and owned ${result.event.utility} action.`);
+      console.log(`Boom Box AI ${difficulty} strategy passed: visible intent and cannon-only Round 1 shot.`);
     } finally { socket.close(); }
   }
   const movementUser = `ai-strategy-movement-${Date.now()}`; const movementSocket = await open();
   try {
-    const { room } = await created(movementSocket, movementUser, "expert", true); const first = await nextAiAction(movementSocket, movementUser, room.gameId, "movement-1"); if (first.event.utility !== "shield") throw new Error(`movement: utility priority was bypassed by ${first.event.utility}`); console.log("Boom Box AI movement strategy passed: owned utility protection resolves before repositioning.");
+    const { room } = await created(movementSocket, movementUser, "expert", true); const first = await nextAiAction(movementSocket, movementUser, room.gameId, "movement-1"); if (first.event.kind !== "fire" || first.event.weapon !== "cannon") throw new Error(`movement: the AI did not finish repositioning with a shot: ${JSON.stringify(first.event)}`); console.log("Boom Box AI movement strategy passed: repositioning preserves the cannon shot.");
   } finally { movementSocket.close(); }
 } finally { server.kill(); await wait(150); rmSync(storeDir, { recursive: true, force: true }); }

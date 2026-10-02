@@ -10,17 +10,14 @@ try {
   await page.goto(base, { waitUntil: "networkidle" });
   await page.locator("#select-boombox").click();
   await page.locator("#boombox-mode-single").click();
-  await page.locator("#boombox-solo-weapon").selectOption("split-shell");
-  await page.locator("#boombox-loadout-open").click();
-  const split = page.locator("#boombox-shop-list article", { hasText: "Split shell" }).first();
-  await split.getByRole("button", { name: /Buy for/ }).click();
-  await page.locator("#boombox-loadout-start").click();
+  if (await page.locator("#boombox-loadout-open").isVisible()) throw new Error("Round 1 loadout store should be hidden");
+  await page.locator("#boombox-solo-start").click();
   await page.locator("#boombox-canvas").waitFor({ state: "visible", timeout: 12000 });
   await page.waitForFunction(() => { const text = document.querySelector("#boombox-match-status")?.textContent || ""; return text.includes("Your turn") || text.includes("Waiting for") || text.includes("Spectating"); }, null, { timeout: 12000 });
-  if (await page.locator("#boombox-weapon").inputValue() !== "split-shell") throw new Error("Solo loadout did not synchronize the selected weapon");
+  if (await page.locator("#boombox-weapon").inputValue() !== "cannon" || await page.locator("#boombox-weapon option").count() !== 1) throw new Error("Solo Round 1 was not cannon-only");
   await page.locator("#boombox-fire").click();
   await page.waitForFunction(() => { const text = document.querySelector("#boombox-match-status")?.textContent || ""; return text.includes("Your turn") || text.includes("Waiting for") || text.includes("out of the fight") || text.includes("complete"); }, null, { timeout: 12000 });
-  console.log(`Boom Box solo browser check passed: authoritative AI room, synchronized loadout, mobile match, and one resolved turn (${suffix}).`);
+  console.log(`Boom Box solo browser check passed: authoritative AI room, cannon-only Round 1, mobile match, and one visibly resolved turn (${suffix}).`);
 } finally {
   await context.close();
   await browser.close();

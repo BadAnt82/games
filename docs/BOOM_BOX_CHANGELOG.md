@@ -2,6 +2,16 @@
 
 This is the handoff record for Boom Box only. Each entry records the product-facing result and the verification that accompanied it. Detailed pass reports remain in the linked `docs/BOOM_BOX_*.md` files.
 
+## 2026-10-02 — Shot-first turns, round loadouts, and teams (working tree)
+
+- Make firing the only action that ends a commander's turn; movement and consumable repair, fuel, recharge, terrain, and guidance utilities resolve between shots without forfeiting the shot.
+- Start Round 1 as a level playing field with cannon-only inventories, no starter utilities, no AI shopping, and no pre-round store or loadout bay.
+- Move shields and parachutes into an explicit between-round defensive loadout that activates for the next round and lasts until depleted, triggered, or the round ends.
+- Keep free-for-all AI target selection distributed across every hostile tank instead of dogpiling the weakest commander.
+- Add optional two-seat teams, including human/AI pairings, hostile-only targeting, shared team rankings and credits, and mirrored teammate purchases controlled by a human teammate.
+- Harden projectile presentation and action acknowledgement so every accepted player or AI shot is visibly resolved before the next action begins.
+- Verification passed: production build; rules, network, three-round, AI, team/free-for-all, utility, weapon, terrain, balance, persistence, recovery, identity, scale, and parity suites; ten-player mobile solo; and full browser shot/explosion/intermission flow.
+
 ## 2026-10-01 — Turn-cycle and destruction presentation (working tree)
 
 - Define one displayed turn as one complete cycle in which every living commander acts once; sequential matches advance on seat-order wrap and simultaneous matches advance once per resolved volley.
