@@ -2,6 +2,15 @@
 
 This is the handoff record for Boom Box only. Each entry records the product-facing result and the verification that accompanied it. Detailed pass reports remain in the linked `docs/BOOM_BOX_*.md` files.
 
+## 2026-10-03 — Product-aligned setup and real match flow
+
+- Removed every starting weapon, starting utility, and pre-Round-1 store choice from the rendered setup; Round 1 now visibly and authoritatively starts with the regular cannon only.
+- Rebuilt solo and multiplayer setup around the actual match decisions: commander mix up to ten total tanks, free-for-all or two-seat teams, turn-by-turn or simultaneous volleys, rounds, optional timer, wind cadence, walls, terrain, AI, interest, and between-round catalogue rules.
+- Removed the conflicting multiplayer seat total, made human plus AI counts the single source of truth, and made three rounds the default so the standings/shop loop is part of the normal experience.
+- Replaced the single-column setup crawl with compact grouped layouts, clear high-contrast copy, collapsed advanced rules, and a primary desktop flow whose Start button remains in view.
+- Wired the solo play-type choice into the authoritative room configuration and verified complete three-seat simultaneous rounds rather than only exposing the setting.
+- Verification passed: production build; authoritative rules, network, outcomes, teams, rankings/economy, persistence, recovery, parity, AI, and ten-seat scale suites; desktop and phone visual inspection; and browser acceptance through visible destruction, standings/shop, a purchase, interest, Round 2, and a complete three-seat simultaneous round.
+
 ## 2026-10-02 — Shot-first turns, round loadouts, and teams (working tree)
 
 - Make firing the only action that ends a commander's turn; movement and consumable repair, fuel, recharge, terrain, and guidance utilities resolve between shots without forfeiting the shot.

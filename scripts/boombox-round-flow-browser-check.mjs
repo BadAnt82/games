@@ -20,9 +20,12 @@ try {
   if (await page.locator("#record-dialog").isVisible()) { await page.locator("#record-name").fill("Round Flow Test"); await page.locator("#record-save").click(); }
   await page.locator("#select-boombox").click();
   await page.locator("#boombox-mode-single").click();
+  if (await page.locator("#boombox-single-panel label", { hasText: "Starting weapon" }).count() || await page.locator("#boombox-single-panel label", { hasText: "Utility" }).count()) throw new Error("A starting equipment choice is still rendered in setup");
+  if (!(await page.locator("#boombox-solo-firing-mode").isVisible())) throw new Error("Solo setup does not expose the play type");
+  const setupPresentation = await page.evaluate(() => { const panel = document.querySelector("#boombox-single-panel")?.getBoundingClientRect(); return { width: panel?.width || 0, height: panel?.height || 0, viewportWidth: innerWidth, viewportHeight: innerHeight }; });
+  if (setupPresentation.width > setupPresentation.viewportWidth + 2 || setupPresentation.height > setupPresentation.viewportHeight * 1.15) throw new Error(`Solo setup is not compact on desktop: ${JSON.stringify(setupPresentation)}`);
   await page.locator("#boombox-opponents").selectOption("1");
   await page.locator("#boombox-solo-rounds").selectOption("3");
-  await page.locator("#boombox-solo-interest").fill("10");
   if (await page.locator("#boombox-loadout-open").isVisible()) throw new Error("The Round 1 loadout store is still visible");
   await page.locator("#boombox-solo-start").click();
   await page.locator("#boombox-match-panel").waitFor({ state: "visible", timeout: 15000 });
@@ -78,7 +81,45 @@ try {
   if ((await page.locator("#boombox-match-round").textContent())?.trim() !== "Round 2 / 3") throw new Error(`Ready-up did not begin Round 2: ${await page.locator("#boombox-match-round").textContent()}`);
   const roundTwoCredits = Number(await page.locator("#boombox-credits").innerText());
   if (roundTwoCredits !== postShopCredits + Math.floor(postShopCredits * .1)) throw new Error(`Round-start interest was incorrect: ${roundTwoCredits}`);
-  console.log(`Boom Box round-flow browser check passed${externalBase ? " live" : ""}: full-turn counting stayed authoritative, the destroyed tank exploded and left the board, intermission rankings/shop rendered without overflow, and Round 2 began with post-shop interest.`);
+
+  await page.goto(base, { waitUntil: "domcontentloaded" });
+  if (await page.locator("#record-dialog").isVisible()) { await page.locator("#record-name").fill("Volley Test"); await page.locator("#record-save").click(); }
+  await page.locator("#select-boombox").click();
+  await page.locator("#boombox-mode-single").click();
+  await page.locator("#boombox-opponents").selectOption("2");
+  await page.locator("#boombox-solo-firing-mode").selectOption("simultaneous");
+  await page.locator("#boombox-solo-start").click();
+  await page.locator("#boombox-match-panel").waitFor({ state: "visible", timeout: 15000 });
+  if ((await page.locator("#boombox-fire").innerText()).trim() !== "Lock shot") throw new Error("Simultaneous mode did not present a lock-shot action");
+  const initialTurn = Number(await page.locator("#boombox-turn").innerText());
+  await page.locator("#boombox-fire").click();
+  await page.waitForFunction(() => {
+    const seats = String(document.querySelector("#boombox-canvas")?.getAttribute("data-flight-seats") || "").split(",");
+    return seats.includes("0") && seats.includes("1") && seats.includes("2");
+  }, null, { timeout: 30000 });
+  await page.waitForFunction((turn) => {
+    const fire = document.querySelector("#boombox-fire");
+    return Number(document.querySelector("#boombox-turn")?.textContent) === turn + 1 && fire instanceof HTMLButtonElement && !fire.disabled;
+  }, initialTurn, { timeout: 30000 });
+  const volleyFlights = await page.locator("#boombox-canvas").evaluate((canvas) => ({ count: Number(canvas.getAttribute("data-flight-count")) || 0, seats: String(canvas.getAttribute("data-flight-seats") || "").split(",") }));
+  if (volleyFlights.count < 3) throw new Error(`The simultaneous volley did not visibly present all three shots: ${JSON.stringify(volleyFlights)}`);
+  await page.locator("#boombox-speed-4").click();
+  let spectatorSeen = false;
+  for (let volley = 0; volley < 16 && !(await page.locator("#boombox-intermission-panel").isVisible()); volley += 1) {
+    spectatorSeen ||= (await page.locator("#boombox-match-status").innerText()).includes("destroyed");
+    if (await page.locator("#boombox-fire").isEnabled()) await page.locator("#boombox-fire").click();
+    await page.waitForFunction(() => {
+      const fire = document.querySelector("#boombox-fire");
+      return !document.querySelector("#boombox-intermission-panel")?.hasAttribute("hidden")
+        || (fire instanceof HTMLButtonElement && !fire.disabled)
+        || (document.querySelector("#boombox-match-status")?.textContent || "").includes("destroyed");
+    }, null, { timeout: 30000 });
+    if (!spectatorSeen && (await page.locator("#boombox-match-status").innerText()).includes("destroyed")) spectatorSeen = true;
+    if (spectatorSeen && !(await page.locator("#boombox-intermission-panel").isVisible())) await page.locator("#boombox-intermission-panel").waitFor({ state: "visible", timeout: 30000 });
+  }
+  if (!(await page.locator("#boombox-intermission-panel").isVisible())) throw new Error("The three-seat simultaneous round did not reach the between-round standings");
+  if ((await page.locator("#boombox-standings .boombox-standings-row").count()) !== 4) throw new Error("The three-seat intermission standings were not rendered");
+  console.log(`Boom Box round-flow browser check passed${externalBase ? " live" : ""}: cannon-only setup, full-turn counting, visible destruction, intermission rankings/shop, Round 2 with interest, and a complete three-seat simultaneous round all completed${spectatorSeen ? " including post-elimination spectating" : ""}.`);
 } finally {
   await browser?.close();
   server?.kill();

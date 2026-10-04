@@ -104,6 +104,7 @@ export function initBoomBox() {
   const soloTerrainInput = required<HTMLSelectElement>("#boombox-solo-terrain");
   const soloSeedInput = required<HTMLInputElement>("#boombox-solo-seed");
   const soloRoundsInput = required<HTMLSelectElement>("#boombox-solo-rounds");
+  const soloFiringModeInput = required<HTMLSelectElement>("#boombox-solo-firing-mode");
   const soloInterestInput = required<HTMLInputElement>("#boombox-solo-interest");
   const soloWindModeInput = required<HTMLSelectElement>("#boombox-solo-wind-mode");
   const soloBoundaryModeInput = required<HTMLSelectElement>("#boombox-solo-boundary-mode");
@@ -313,11 +314,6 @@ export function initBoomBox() {
   let networkImpactBursts: Array<{ center: number; damage: number; startedAt: number; color: string }> = [];
   let networkTankExplosions: Array<{ seat: number; name: string; x: number; y: number; color: string; startedAt: number }> = [];
   let latestNetworkSnapshot: any;
-
-  soloWeaponInput.closest("label")?.setAttribute("hidden", "");
-  soloUtilityInput.closest("label")?.setAttribute("hidden", "");
-  const soloCreditNote = singlePanel.querySelector<HTMLElement>(".boombox-credit-note");
-  if (soloCreditNote) soloCreditNote.innerHTML = "<strong>Round 1: cannon only</strong><span>The equipment shop opens after Round 1. Credits carry forward.</span>";
 
   try {
     const saved = JSON.parse(localStorage.getItem(presentationKey) || "{}");
@@ -723,7 +719,7 @@ export function initBoomBox() {
     let opponentCount = clamp(Number(opponentsInput.value) || 2, 1, 9); if (soloTeamModeInput.value === "paired" && opponentCount < 2) { opponentCount = 2; opponentsInput.value = "2"; }
     applyTheme(boomBoxThemeIdForTerrain(soloTerrainInput.value));
     const boundaries = Array.from(soloBoundariesInput.selectedOptions).map((option) => option.value); if (!boundaries.length) boundaries.push("stop");
-    const config = { name: `Solo range for ${name}`, creator: name, seats: opponentCount + 1, aiSeats: Array.from({ length: opponentCount }, (_, index) => index + 1), aiFill: true, aiDifficulty: soloDifficultyInput.value, terrain: soloTerrainInput.value, roundCount: Number(soloRoundsInput.value), timerEnabled: soloTimerInput.checked, windMode: soloWindModeInput.value, boundary: boundaries[0], boundaries, boundaryMode: soloBoundaryModeInput.value, firingMode: "sequential", movement: false, startingMoney: 100, interestRate: clamp(Number(soloInterestInput.value) || 0, 0, 50), disabledWeapons: [], disabledUtilities: [], seed: clamp(Number(soloSeedInput.value) || 314159, 1, 999999) };
+    const config = { name: `Solo range for ${name}`, creator: name, seats: opponentCount + 1, aiSeats: Array.from({ length: opponentCount }, (_, index) => index + 1), aiFill: true, aiDifficulty: soloDifficultyInput.value, terrain: soloTerrainInput.value, roundCount: Number(soloRoundsInput.value), timerEnabled: soloTimerInput.checked, windMode: soloWindModeInput.value, boundary: boundaries[0], boundaries, boundaryMode: soloBoundaryModeInput.value, firingMode: soloFiringModeInput.value, movement: false, startingMoney: 100, interestRate: clamp(Number(soloInterestInput.value) || 0, 0, 50), disabledWeapons: [], disabledUtilities: [], seed: clamp(Number(soloSeedInput.value) || 314159, 1, 999999) };
     connectNetwork();
     sendNetwork({ type: "boombox-create", config });
     lobbyStatus.textContent = "Starting your authoritative solo match...";

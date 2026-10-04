@@ -924,14 +924,14 @@ body.fullscreen-fallback-active {
 .boombox-seat-plan select { width: 100%; }
 .boombox-seat-plan-item { display: block; padding: 9px 10px; border: 1px solid rgba(143, 204, 255, .18); border-radius: 8px; background: rgba(4, 14, 34, .42); color: rgba(224, 239, 255, .8); font-size: .76rem; }
 
-.boombox-create-panel { width: min(100%, 700px); }
+.overlay-panel.boombox-create-panel { width: min(100%, 920px); }
 .boombox-stepper { display: flex; width: 100%; justify-content: center; gap: 8px; }
 .boombox-stepper span { padding: 7px 10px; border: 1px solid rgba(143, 204, 255, .2); border-radius: 999px; color: rgba(224, 239, 255, .46); font-size: .72rem; font-weight: 900; }
 .boombox-stepper span.is-active { border-color: #65e6ff; color: #e6fbff; background: rgba(34, 135, 169, .3); }
 .boombox-stepper span.is-complete { border-color: rgba(255, 174, 105, .5); color: #ffce9b; }
-.boombox-create-step { display: grid; width: min(100%, 560px); gap: 12px; padding: 20px; border: 1px solid rgba(143, 204, 255, .2); border-radius: 14px; background: rgba(10, 22, 48, .58); text-align: left; }
-.boombox-create-step h2 { margin: 0; color: #fff; font-size: 1.2rem; }
-.boombox-create-step p { margin: 0 0 4px; color: rgba(224, 239, 255, .65); font-size: .86rem; }
+.boombox-create-step { display: grid; width: min(100%, 860px); grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; padding: 20px; border: 1px solid rgba(143, 204, 255, .28); border-radius: 14px; background: rgba(10, 22, 48, .78); text-align: left; }
+.boombox-create-step h2 { grid-column: 1 / -1; margin: 0; color: #fff; font-size: 1.2rem; }
+.boombox-create-step > p { grid-column: 1 / -1; margin: 0 0 4px; color: #d8e7ff; font-size: .86rem; }
 .boombox-create-step label { display: grid; gap: 6px; color: #dcecff; font-size: .76rem; font-weight: 900; letter-spacing: .05em; text-transform: uppercase; }
 .boombox-create-step input:not([type="checkbox"]),
 .boombox-create-step select { width: 100%; min-height: 44px; padding: 0 12px; border: 1px solid rgba(143, 204, 255, .4); border-radius: 8px; color: #f4fbff; background: rgba(5, 13, 34, .8); font: inherit; letter-spacing: 0; text-transform: none; }
@@ -945,10 +945,18 @@ body.fullscreen-fallback-active {
 
 .boombox-solo-form {
   display: grid;
-  width: min(100%, 620px);
-  gap: 12px;
+  width: min(100%, 900px);
+  gap: 14px;
   text-align: left;
 }
+.overlay-panel.boombox-single-panel { width: min(100%, 980px); gap: 10px; }
+.boombox-single-panel h1,
+.boombox-create-panel h1 { margin: 0; font-size: clamp(2.2rem, 4.5vw, 3.3rem); }
+.boombox-single-panel > p,
+.boombox-create-panel > p { max-width: 720px; margin: 2px 0 8px; }
+.boombox-setup-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 11px; }
+.boombox-advanced-settings .boombox-setup-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.boombox-grid-wide { grid-column: 1 / -1; }
 .boombox-shop-readout { display:flex; justify-content:space-between; align-items:center; padding:.8rem 1rem; border:1px solid rgba(142,224,255,.22); border-radius:14px; background:rgba(13,24,52,.7); margin:1rem 0; }
 .boombox-shop-list { display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:.75rem; }
 .boombox-shop-card { display:grid; gap:.45rem; padding:.9rem; border:1px solid rgba(255,255,255,.12); border-radius:14px; background:rgba(255,255,255,.04); }
@@ -979,6 +987,32 @@ body.fullscreen-fallback-active {
   letter-spacing: 0;
   text-transform: none;
 }
+
+.boombox-check-card {
+  display: flex !important;
+  min-height: 58px;
+  align-items: center;
+  gap: 11px !important;
+  padding: 9px 12px;
+  border: 1px solid rgba(143, 204, 255, .34);
+  border-radius: 9px;
+  color: #f4fbff !important;
+  background: rgba(5, 13, 34, .68);
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+}
+.boombox-check-card input { flex: 0 0 auto; width: 19px !important; height: 19px; accent-color: #ff9c5a; }
+.boombox-check-card span { display: grid; gap: 2px; }
+.boombox-check-card strong { font-size: .82rem; }
+.boombox-check-card small { color: #bed0ed; font-size: .72rem; font-weight: 600; }
+.boombox-round-one-callout { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 2px 14px; padding: 13px 15px; border: 1px solid rgba(255, 190, 105, .52); border-radius: 10px; color: #fff; background: linear-gradient(105deg, rgba(126, 67, 31, .62), rgba(31, 42, 78, .72)); }
+.boombox-round-one-callout span { grid-row: 1 / 3; color: #ffca89; font-size: .68rem; font-weight: 950; letter-spacing: .09em; }
+.boombox-round-one-callout strong { color: #fff8ea; font-size: 1rem; }
+.boombox-round-one-callout small { color: #f4ddbd; font-size: .76rem; line-height: 1.35; }
+.boombox-advanced-settings { padding: 0; border: 1px solid rgba(143, 204, 255, .28); border-radius: 10px; background: rgba(8, 20, 45, .62); }
+.boombox-advanced-settings summary { cursor: pointer; padding: 12px 14px; color: #eaf6ff; font-size: .82rem; font-weight: 900; }
+.boombox-advanced-settings[open] summary { border-bottom: 1px solid rgba(143, 204, 255, .18); }
+.boombox-advanced-settings > .boombox-setup-grid { padding: 14px; }
 
 .boombox-setup-note {
   display: grid;
@@ -1066,6 +1100,7 @@ body.fullscreen-fallback-active {
 .boombox-result-stats strong { color: #fff; }
 
 .overlay.is-boombox { color: #f7faff; }
+.overlay.is-boombox [hidden] { display: none !important; }
 .overlay.is-boombox .boombox-panel > p,
 .overlay.is-boombox .boombox-panel-header p,
 .overlay.is-boombox .boombox-create-step p,
@@ -2137,7 +2172,14 @@ body.fullscreen-fallback-active {
   .boombox-room-details span + span::before { display: none; }
   .boombox-stepper { justify-content: stretch; gap: 4px; }
   .boombox-stepper span { flex: 1; padding: 6px 4px; text-align: center; font-size: .64rem; }
-  .boombox-create-step { padding: 15px; }
+  .boombox-create-step { grid-template-columns: 1fr; padding: 15px; }
+  .boombox-create-step h2,
+  .boombox-create-step > p,
+  .boombox-grid-wide { grid-column: 1; }
+  .boombox-setup-grid,
+  .boombox-advanced-settings .boombox-setup-grid { grid-template-columns: 1fr; }
+  .boombox-round-one-callout { grid-template-columns: 1fr; gap: 4px; }
+  .boombox-round-one-callout span { grid-row: auto; }
   .boombox-match-header { align-items: start; flex-direction: column; gap: 6px; }
   .boombox-match-meta { justify-content: start; }
   .boombox-match-panel,
