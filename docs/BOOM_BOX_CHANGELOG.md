@@ -2,6 +2,14 @@
 
 This is the handoff record for Boom Box only. Each entry records the product-facing result and the verification that accompanied it. Detailed pass reports remain in the linked `docs/BOOM_BOX_*.md` files.
 
+## 2026-10-03 — Configurable combat economy and destruction effects (working tree)
+
+- Award configurable end-of-round credits for confirmed enemy destructions and for each hostile commander outlasted, defaulting to 25 and 10 credits respectively, while preserving shared team wallets.
+- Show the base, destruction, and survival portions of each round payout in the between-round shop and retain each source in the authoritative credit ledger.
+- Add admin controls for both economy rewards plus tank-destruction blast radius/damage and shrapnel count/size/damage; active matches continue using their immutable starting balance snapshot.
+- Resolve tank-destruction blast and shrapnel damage authoritatively, include the configured effect data in flight playback, and scale the visible explosion and fragments to those same controls.
+- Raise intermission text/control contrast and spacing so rankings, earnings, interest, and next-round defense remain legible on the dark panel.
+
 ## 2026-10-03 — Product-aligned setup and real match flow
 
 - Removed every starting weapon, starting utility, and pre-Round-1 store choice from the rendered setup; Round 1 now visibly and authoritatively starts with the regular cannon only.

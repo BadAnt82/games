@@ -8,8 +8,8 @@ const storeDir = join(process.cwd(), ".tmp-pass-e");
 const configPath = join(storeDir, "admin-config.json");
 mkdirSync(storeDir, { recursive: true });
 writeFileSync(configPath, JSON.stringify({
-  economy: { startingCredits: 321, movementFuel: 64, movementFuelCost: 7 },
-  tank: { maxHealth: 180, maxShield: 50, armorDamageReduction: .25, fallDamageThreshold: 12, fallDamageMultiplier: .5, fallDamageBase: 4 },
+  economy: { startingCredits: 321, movementFuel: 64, movementFuelCost: 7, killReward: 40, survivalRewardPerOpponent: 15 },
+  tank: { maxHealth: 180, maxShield: 50, armorDamageReduction: .25, fallDamageThreshold: 12, fallDamageMultiplier: .5, fallDamageBase: 4, destructionExplosionRadius: 900, destructionExplosionDamage: 24, destructionShrapnelCount: 8, destructionShrapnelSize: 5, destructionShrapnelDamage: 7 },
   terrain: { gravity: 190, windLimit: .4, collapseThreshold: 8, smokeTurns: 5 },
   timing: { turnTimeoutSeconds: 12, projectileStepMs: 33, aiThinkDelayMs: 100, fastForwardMultiplier: 4 },
   weapons: { cannon: { damage: 33, directDamage: 33, splashDamage: 11 }, "laser-line": { cost: 20, directDamage: 30, splashDamage: 0 } },
@@ -40,10 +40,13 @@ try {
   const { created, state } = await start(socket, userId, "E Balance");
   const rules = state.snapshot.rules;
   if (rules.startingMoney !== 321 || rules.gravity !== 190 || rules.windLimit !== .4) throw new Error("Admin economy or terrain defaults were not applied to new rooms.");
-  if (rules.balance?.tank?.maxHealth !== 180 || rules.balance?.economy?.movementFuel !== 64) throw new Error("Admin balance was not included in the authoritative rules snapshot.");
+  if (rules.balance?.tank?.maxHealth !== 180 || rules.balance?.economy?.movementFuel !== 64 || rules.balance?.economy?.killReward !== 40 || rules.balance?.economy?.survivalRewardPerOpponent !== 15 || rules.balance?.tank?.destructionExplosionRadius !== 900 || rules.balance?.tank?.destructionShrapnelCount !== 8 || rules.balance?.tank?.destructionShrapnelSize !== 5 || rules.balance?.tank?.destructionShrapnelDamage !== 7) throw new Error("Admin economy or destruction balance was not included in the authoritative rules snapshot.");
   if (state.snapshot.players[0].maxHealth !== 180 || state.snapshot.players[0].fuel !== 64) throw new Error("Admin tank defaults did not initialize player state.");
   if (rules.weaponCatalog.cannon.directDamage !== 33 || rules.weaponCatalog["laser-line"].cost !== 20 || rules.utilityCatalog.shield.amount !== 90 || rules.utilityCatalog.shield.durationRounds !== 1 || rules.utilityCatalog["fuel-canister"].purchaseAmount !== 2) throw new Error("Admin catalog overrides did not reach the room rules.");
-  await reachIntermission(socket, userId, created.gameId, "e-laser");
+  const economyIntermission = await reachIntermission(socket, userId, created.gameId, "e-laser");
+  const winningAward = economyIntermission.snapshot.roundResults[0].awards.find((entry) => entry.seat === economyIntermission.snapshot.roundWinner); const destructionEvent = economyIntermission.snapshot.log.findLast((entry) => entry.kind === "tank-explosion");
+  if (winningAward?.kills !== 1 || winningAward?.killCredits !== 40 || winningAward?.outlasted !== 1 || winningAward?.survivalCredits !== 15 || winningAward?.amount !== 90) throw new Error(`Configured kill and survival rewards were not settled: ${JSON.stringify(winningAward)}`);
+  if (destructionEvent?.explosionRadius !== 900 || destructionEvent?.explosionDamage !== 24 || destructionEvent?.shrapnelCount !== 8 || destructionEvent?.shrapnelSize !== 5 || destructionEvent?.shrapnelDamage !== 7 || destructionEvent?.shrapnelAngles?.length !== 8 || !destructionEvent?.explosionImpacts?.some((impact) => impact.damage > 0)) throw new Error(`Configured tank blast and shrapnel were not resolved authoritatively: ${JSON.stringify(destructionEvent)}`);
   const purchasePromise = next(socket, "boombox-purchase-result"); send(socket, { type: "boombox-purchase", userId, gameId: created.gameId, purchaseId: "e-laser", category: "weapon", item: "laser-line", quantity: 1 }); await purchasePromise;
   await startRoundTwo(socket, userId, created.gameId);
   const firePromise = next(socket, "boombox-state", (message) => message.snapshot?.log?.some((entry) => entry.kind === "fire" && entry.actionId === "e-laser-fire")); send(socket, { type: "boombox-action", userId, gameId: created.gameId, actionId: "e-laser-fire", action: { targetIndex: 1, weapon: "laser-line", angle: 42, power: 58 } }); const fired = await firePromise; const fire = fired.snapshot.log.find((entry) => entry.actionId === "e-laser-fire"); if (fire?.childImpacts?.[0]?.damage !== 23) throw new Error(`Armor/direct damage plumbing was not applied: ${JSON.stringify(fire)}`);

@@ -28,7 +28,11 @@ try {
   await page.locator("#admin-game-select").selectOption("boombox");
   await page.locator("#admin-dashboard").waitFor({ state: "visible" });
   await page.waitForFunction(() => !document.querySelector("#admin-config-status")?.textContent?.includes("Loading"), null, { timeout: 5000 });
-  if (!(await page.locator("#admin-config-fields").innerText()).includes("Default starting credits") || await page.locator("input[data-admin-default-path='economy.startingCredits']").count() !== 1 || await page.locator("input[data-admin-custom-path='economy.startingCredits']").count() !== 1) throw new Error("Economy dashboard did not render split default/custom fields.");
+  const economyText = await page.locator("#admin-config-fields").innerText();
+  if (!economyText.includes("Default starting credits") || !economyText.includes("Enemy destruction reward") || !economyText.includes("Outlast reward per opponent") || await page.locator("input[data-admin-default-path='economy.startingCredits']").count() !== 1 || await page.locator("input[data-admin-custom-path='economy.killReward']").count() !== 1 || await page.locator("input[data-admin-custom-path='economy.survivalRewardPerOpponent']").count() !== 1) throw new Error("Economy dashboard did not render split default/custom reward fields.");
+  await page.locator("button[data-admin-tab='tank']").click();
+  const tankText = await page.locator("#admin-config-fields").innerText();
+  if (!tankText.includes("Destruction explosion size") || !tankText.includes("Destruction explosion damage") || !tankText.includes("Destruction shrapnel count") || !tankText.includes("Destruction shrapnel size") || !tankText.includes("Destruction shrapnel damage") || await page.locator("input[data-admin-custom-path='tank.destructionExplosionRadius']").count() !== 1 || await page.locator("input[data-admin-custom-path='tank.destructionShrapnelDamage']").count() !== 1) throw new Error("Tank dashboard did not render destruction blast and shrapnel controls.");
   await page.locator("button[data-admin-tab='weapons']").click();
   const weaponText = await page.locator("#admin-config-fields").innerText();
   const cannonText = await page.locator(".admin-catalog-card").evaluateAll((cards) => cards.find((card) => card.querySelector("header strong")?.textContent === "Cannon")?.textContent || "");

@@ -32,7 +32,7 @@ try {
   await page.waitForFunction(() => document.querySelectorAll("#boombox-weapon option").length === 1 && document.querySelector("#boombox-weapon option")?.getAttribute("value") === "cannon", null, { timeout: 15000 });
   await page.locator("#boombox-fire").click();
   await page.waitForTimeout(500);
-  let destructionSeen = false;
+  let destructionSeen = false; let destructionPresentation = null;
   for (let attempt = 0; attempt < 5 && !(await page.locator("#boombox-intermission-panel").isVisible()); attempt += 1) {
     await page.waitForFunction(() => {
       const fire = document.querySelector("#boombox-fire");
@@ -40,7 +40,7 @@ try {
         || !document.querySelector("#boombox-intermission-panel")?.hasAttribute("hidden")
         || (fire instanceof HTMLElement && fire.offsetParent !== null && !fire.hasAttribute("disabled"));
     }, null, { timeout: 30000 });
-    if (await page.locator("#boombox-canvas").getAttribute("data-destruction-effect") === "active") { destructionSeen = true; await page.waitForFunction(() => document.querySelector("#boombox-canvas")?.getAttribute("data-destruction-effect") !== "active", null, { timeout: 8000 }); }
+    if (await page.locator("#boombox-canvas").getAttribute("data-destruction-effect") === "active") { destructionSeen = true; destructionPresentation = await page.locator("#boombox-canvas").evaluate((canvas) => ({ radius: Number(canvas.getAttribute("data-destruction-radius")), shrapnelCount: Number(canvas.getAttribute("data-shrapnel-count")) })); await page.waitForFunction(() => document.querySelector("#boombox-canvas")?.getAttribute("data-destruction-effect") !== "active", null, { timeout: 8000 }); }
     if (!(await page.locator("#boombox-intermission-panel").isVisible())) {
       await page.waitForFunction(() => {
         const fire = document.querySelector("#boombox-fire");
@@ -53,19 +53,20 @@ try {
   if (!(await page.locator("#boombox-intermission-panel").isVisible())) { const diagnostic = await page.evaluate(() => ({ status: document.querySelector("#boombox-match-status")?.textContent, round: document.querySelector("#boombox-match-round")?.textContent, player: document.querySelector("#boombox-player-health-value")?.textContent, opponents: document.querySelector("#boombox-opponent-health-list")?.textContent, resultVisible: !document.querySelector("#boombox-result-panel")?.hasAttribute("hidden"), fireDisabled: document.querySelector("#boombox-fire")?.disabled })); throw new Error(`Round did not reach intermission: ${JSON.stringify(diagnostic)}`); }
   const visibleFlights = await page.locator("#boombox-canvas").evaluate((canvas) => ({ count: Number(canvas.getAttribute("data-flight-count")) || 0, seats: String(canvas.getAttribute("data-flight-seats") || "").split(",") })); if (visibleFlights.count < 2 || !visibleFlights.seats.includes("0") || !visibleFlights.seats.includes("1")) throw new Error(`Player and AI shots were not both presented: ${JSON.stringify(visibleFlights)}`);
   if (!destructionSeen) throw new Error("The destroyed tank did not enter the visible explosion/removal state before intermission");
+  if (destructionPresentation?.radius !== 75 || destructionPresentation?.shrapnelCount !== 12) throw new Error(`The visible destruction effect ignored the configured size or shrapnel count: ${JSON.stringify(destructionPresentation)}`);
   if (await page.locator("#boombox-result-panel").isVisible()) throw new Error("A non-final elimination opened the final result panel");
   if ((await page.locator("#boombox-standings .boombox-standings-row").count()) !== 3) throw new Error("The two-player intermission standings were not rendered");
   const standingsText = await page.locator("#boombox-standings").innerText();
   if (!standingsText.toLowerCase().includes("total kills") || !standingsText.toLowerCase().includes("total survival") || !standingsText.toLowerCase().includes("overall")) throw new Error(`Intermission rankings are incomplete: ${standingsText}`);
+  const creditBreakdownText = await page.locator("#boombox-credit-breakdown").innerText();
+  if (!creditBreakdownText.includes("Round earnings:") || !creditBreakdownText.includes("base") || !creditBreakdownText.includes("destruction") || !creditBreakdownText.includes("outlasted") || !creditBreakdownText.includes("credits")) throw new Error(`Intermission earnings were not itemized: ${creditBreakdownText}`);
   const desktopPresentation = await page.evaluate(() => {
-    const status = document.querySelector("#boombox-intermission-status");
-    const color = status ? getComputedStyle(status).color : "";
-    const values = color.match(/[\d.]+/g)?.slice(0, 3).map(Number) || [0, 0, 0];
-    const luminance = values.reduce((total, value, index) => total + (value / 255) * [0.2126, 0.7152, 0.0722][index], 0);
-    return { viewport: innerWidth, scrollWidth: document.documentElement.scrollWidth, color, luminance };
+    const selectors = ["#boombox-intermission-status", "#boombox-round-order", "#boombox-credit-breakdown", "#boombox-interest-preview", ".boombox-round-defense-label"];
+    const colors = selectors.map((selector) => { const element = document.querySelector(selector); const color = element ? getComputedStyle(element).color : ""; const values = color.match(/[\d.]+/g)?.slice(0, 3).map(Number) || [0, 0, 0]; const luminance = values.reduce((total, value, index) => total + (value / 255) * [0.2126, 0.7152, 0.0722][index], 0); return { selector, color, luminance }; });
+    return { viewport: innerWidth, scrollWidth: document.documentElement.scrollWidth, colors };
   });
   if (desktopPresentation.scrollWidth > desktopPresentation.viewport + 2) throw new Error(`Intermission overflows the desktop viewport: ${JSON.stringify(desktopPresentation)}`);
-  if (desktopPresentation.luminance < .7) throw new Error(`Intermission supporting text is too dark: ${JSON.stringify(desktopPresentation)}`);
+  if (desktopPresentation.colors.some((entry) => entry.luminance < .7)) throw new Error(`Intermission supporting text is too dark: ${JSON.stringify(desktopPresentation)}`);
   await page.setViewportSize({ width: 390, height: 844 });
   const mobilePresentation = await page.evaluate(() => ({ viewport: innerWidth, scrollWidth: document.documentElement.scrollWidth, panelWidth: document.querySelector("#boombox-intermission-panel")?.getBoundingClientRect().width || 0, shopColumns: getComputedStyle(document.querySelector(".boombox-intermission-shop")).gridTemplateColumns }));
   if (mobilePresentation.scrollWidth > mobilePresentation.viewport + 2 || mobilePresentation.panelWidth > mobilePresentation.viewport + 2) throw new Error(`Intermission overflows a small phone: ${JSON.stringify(mobilePresentation)}`);

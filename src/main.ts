@@ -5770,6 +5770,8 @@ const adminConfigDefinitions: Record<string, Array<{ path: string; label: string
     { path: "economy.startingCredits", label: "Default starting credits", step: "1", help: "Credits each new Boom Box seat receives." },
     { path: "economy.movementFuel", label: "Default movement fuel", step: "1", help: "Fuel available when movement is enabled." },
     { path: "economy.movementFuelCost", label: "Movement fuel cost", step: "1", help: "Fuel consumed by one standard movement action." },
+    { path: "economy.killReward", label: "Enemy destruction reward", step: "1", help: "Additional credits banked at round end for each confirmed enemy tank destroyed." },
+    { path: "economy.survivalRewardPerOpponent", label: "Outlast reward per opponent", step: "1", help: "Additional credits banked at round end for each hostile commander outlasted." },
   ],
   tank: [
     { path: "tank.maxHealth", label: "Maximum tank health", step: "1", help: "Health a tank starts with and cannot exceed." },
@@ -5778,6 +5780,11 @@ const adminConfigDefinitions: Record<string, Array<{ path: string; label: string
     { path: "tank.fallDamageThreshold", label: "Fall damage threshold", step: "1", help: "Terrain drop distance before fall damage applies." },
     { path: "tank.fallDamageMultiplier", label: "Fall damage multiplier", step: "0.01", help: "Damage multiplier applied to excess fall distance." },
     { path: "tank.fallDamageBase", label: "Fall damage base", step: "1", help: "Flat amount subtracted before fall damage is dealt." },
+    { path: "tank.destructionExplosionRadius", label: "Destruction explosion size", step: "1", help: "Damage radius and visible maximum radius when a tank is destroyed." },
+    { path: "tank.destructionExplosionDamage", label: "Destruction explosion damage", step: "1", help: "Maximum blast damage at the center of a destroyed tank." },
+    { path: "tank.destructionShrapnelCount", label: "Destruction shrapnel count", step: "1", help: "Number of evenly distributed fragments released by a destroyed tank." },
+    { path: "tank.destructionShrapnelSize", label: "Destruction shrapnel size", step: "1", help: "Fragment width used for collision and visible fragment thickness." },
+    { path: "tank.destructionShrapnelDamage", label: "Destruction shrapnel damage", step: "1", help: "Damage dealt by each fragment that strikes another living tank." },
   ],
   terrain: [
     { path: "terrain.gravity", label: "Gravity", step: "1", help: "Projectile acceleration during flight." },

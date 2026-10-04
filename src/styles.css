@@ -1132,18 +1132,24 @@ body.fullscreen-fallback-active {
 .boombox-standings-header > span { color: #bdeeff; background: rgba(28, 64, 101, .72); font-size: .69rem; font-weight: 900; letter-spacing: .05em; text-transform: uppercase; }
 .boombox-standings-row.is-local { box-shadow: inset 4px 0 #67e7ff; background: rgba(57, 161, 196, .13); }
 .boombox-standings-row.is-leader > span { color: #fff4cd; font-weight: 850; }
-.boombox-round-order,
-.boombox-interest-preview { margin: 0; color: #d8e7ff; font-size: .84rem; line-height: 1.45; }
+.overlay.is-boombox .boombox-round-order,
+.overlay.is-boombox .boombox-interest-preview,
+.overlay.is-boombox .boombox-credit-breakdown { margin: 0; color: #edf6ff !important; opacity: 1; font-size: .84rem; font-weight: 650; line-height: 1.5; }
+.overlay.is-boombox .boombox-credit-breakdown { padding: 10px 12px; border-left: 3px solid #67e7ff; border-radius: 5px; background: rgba(42, 114, 155, .22); color: #fff6d8 !important; }
+.overlay.is-boombox .boombox-intermission-section .boombox-section-heading span { color: #dcecff; font-weight: 850; }
 .boombox-intermission-shop { display: grid; grid-template-columns: minmax(210px, 1fr) auto minmax(210px, 1fr) auto; align-items: end; gap: 10px; }
 .boombox-intermission-shop label { display: grid; gap: 6px; color: #f1f6ff; font-size: .76rem; font-weight: 900; letter-spacing: .05em; text-transform: uppercase; }
 .boombox-intermission-shop select { width: 100%; min-height: 44px; padding: 0 10px; }
 .boombox-intermission-inventory { display: flex; flex-wrap: wrap; gap: 7px; }
 .boombox-intermission-inventory span { padding: 6px 9px; border: 1px solid rgba(143, 204, 255, .3); border-radius: 999px; color: #eaf5ff; background: rgba(35, 72, 112, .5); font-size: .75rem; font-weight: 800; }
+.boombox-round-defense-label { display: grid; grid-template-columns: minmax(190px, auto) minmax(180px, 320px); align-items: center; justify-content: start; gap: 10px; color: #f1f6ff !important; font-weight: 800; }
+.boombox-round-defense-label select { min-height: 44px; padding: 0 10px; }
 
 @media (max-width: 760px) {
   .boombox-intermission-shop { grid-template-columns: 1fr; }
   .boombox-intermission-shop button { width: 100%; }
   .boombox-leader-badge { border-radius: 10px; }
+  .boombox-round-defense-label { grid-template-columns: 1fr; }
 }
 
 .overlay[hidden],

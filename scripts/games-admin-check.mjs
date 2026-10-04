@@ -8,6 +8,7 @@ const storeDir = mkdtempSync(join(tmpdir(), "games-admin-check-"));
 const adminPath = join(storeDir, "admin.json");
 const configPath = join(storeDir, "admin-config.json");
 const server = spawn(process.execPath, ["server.mjs"], { env: { ...process.env, PORT: String(port), GAMES_ADMIN_STORE_PATH: adminPath, GAMES_ADMIN_CONFIG_STORE_PATH: configPath }, stdio: ["ignore", "pipe", "pipe"] });
+server.stderr.on("data", (chunk) => process.stderr.write(chunk));
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const request = async (path, options = {}) => {
   const response = await fetch(`http://localhost:${port}${path}`, options);
@@ -32,17 +33,17 @@ try {
   result = await request("/api/admin/session", { headers: { Cookie: cookie } });
   if (!result.body.authenticated || result.body.email !== "ant1982@gmail.com") throw new Error("Admin session was not established.");
   result = await request("/api/admin/config", { headers: { Cookie: cookie } });
-  if (result.response.status !== 200 || result.body.config?.economy?.startingCredits !== 100 || result.body.defaults?.economy?.startingCredits !== 100 || Object.keys(result.body.custom || {}).length || !result.body.config?.weapons?.cannon || !result.body.catalogs?.utilities?.["guidance-kit"]) throw new Error("Admin configuration defaults or split model were not returned.");
+  if (result.response.status !== 200 || result.body.config?.economy?.startingCredits !== 100 || result.body.defaults?.economy?.startingCredits !== 100 || result.body.config?.economy?.killReward !== 25 || result.body.config?.economy?.survivalRewardPerOpponent !== 10 || result.body.config?.tank?.destructionExplosionRadius !== 75 || result.body.config?.tank?.destructionExplosionDamage !== 20 || result.body.config?.tank?.destructionShrapnelCount !== 12 || result.body.config?.tank?.destructionShrapnelSize !== 4 || result.body.config?.tank?.destructionShrapnelDamage !== 6 || Object.keys(result.body.custom || {}).length || !result.body.config?.weapons?.cannon || !result.body.catalogs?.utilities?.["guidance-kit"]) throw new Error("Admin configuration defaults or split model were not returned.");
   for (const [id, weapon] of Object.entries(result.body.defaults.weapons)) if (weapon.count !== undefined && weapon.count < 1) throw new Error(`Unsafe default projectile count for ${id}.`);
   for (const [id, utility] of Object.entries(result.body.defaults.utilities)) {
     if (utility.purchaseAmount < 1 || utility.inventory < utility.purchaseAmount) throw new Error(`Unsafe default utility capacity for ${id}.`);
     if (utility.amount !== undefined && utility.amount <= 0) throw new Error(`Non-positive default utility effect for ${id}.`);
   }
   const savedDefaults = result.body.defaults;
-  result = await request("/api/admin/config", { method: "PUT", headers: { "Content-Type": "application/json", Cookie: cookie }, body: JSON.stringify({ defaults: savedDefaults, custom: { economy: { startingCredits: 275 }, weapons: { cannon: { cost: 42 } } } }) });
-  if (result.response.status !== 200 || result.body.config.economy.startingCredits !== 275 || result.body.defaults.economy.startingCredits !== 100 || result.body.custom.economy.startingCredits !== 275 || result.body.config.weapons.cannon.cost !== 42) throw new Error("Admin custom values did not merge with the default baseline.");
+  result = await request("/api/admin/config", { method: "PUT", headers: { "Content-Type": "application/json", Cookie: cookie }, body: JSON.stringify({ defaults: savedDefaults, custom: { economy: { startingCredits: 275, killReward: 40, survivalRewardPerOpponent: 15 }, tank: { destructionExplosionRadius: 120, destructionShrapnelDamage: 9 }, weapons: { cannon: { cost: 42 } } } }) });
+  if (result.response.status !== 200 || result.body.config.economy.startingCredits !== 275 || result.body.defaults.economy.startingCredits !== 100 || result.body.custom.economy.startingCredits !== 275 || result.body.config.economy.killReward !== 40 || result.body.config.economy.survivalRewardPerOpponent !== 15 || result.body.config.tank.destructionExplosionRadius !== 120 || result.body.config.tank.destructionShrapnelDamage !== 9 || result.body.config.weapons.cannon.cost !== 42) throw new Error("Admin custom values did not merge with the default baseline.");
   result = await request("/api/admin/config", { headers: { Cookie: cookie } });
-  if (result.body.config.economy.startingCredits !== 275 || result.body.custom.economy.startingCredits !== 275) throw new Error("Admin custom values did not persist.");
+  if (result.body.config.economy.startingCredits !== 275 || result.body.custom.economy.startingCredits !== 275 || result.body.config.economy.killReward !== 40 || result.body.config.tank.destructionExplosionRadius !== 120) throw new Error("Admin custom values did not persist.");
   result = await request("/api/admin/config", { method: "PUT", headers: { "Content-Type": "application/json", Cookie: cookie }, body: JSON.stringify({ defaults: result.body.defaults, custom: {} }) });
   if (result.response.status !== 200 || result.body.config.economy.startingCredits !== 100 || Object.keys(result.body.custom || {}).length) throw new Error("Restore-default behavior did not clear custom overrides.");
   result = await request("/api/admin/logout", { method: "POST", headers: { Cookie: cookie } });
